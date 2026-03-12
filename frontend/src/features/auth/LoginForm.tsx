@@ -36,29 +36,23 @@ export function LoginForm(): JSX.Element {
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Username or Email</label>
-        <input
-          {...register("identifier", { required: true })}
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-          placeholder="alice"
-        />
-      </div>
-      <div className="space-y-1">
-        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Password</label>
-        <input
-          {...register("password", { required: true })}
-          type="password"
-          className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"
-          placeholder="********"
-        />
-      </div>
+    <form onSubmit={onSubmit} className="space-y-3">
+      <input
+        {...register("identifier", { required: true })}
+        className="w-full rounded-lg border border-[#ccd0d5] bg-[#f5f6f7] px-4 py-3 text-[15px] text-[#1c1e21] outline-none transition focus:border-[#0084ff] focus:bg-white focus:ring-2 focus:ring-[#0084ff]/20 placeholder:text-[#90949c]"
+        placeholder="Username or Email"
+      />
+      <input
+        {...register("password", { required: true })}
+        type="password"
+        className="w-full rounded-lg border border-[#ccd0d5] bg-[#f5f6f7] px-4 py-3 text-[15px] text-[#1c1e21] outline-none transition focus:border-[#0084ff] focus:bg-white focus:ring-2 focus:ring-[#0084ff]/20 placeholder:text-[#90949c]"
+        placeholder="Password"
+      />
       <button
         disabled={submitting || formState.isSubmitting}
-        className="w-full rounded-xl bg-accent-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-accent-700 disabled:opacity-50"
+        className="w-full rounded-lg bg-[#0084ff] px-4 py-3 text-[17px] font-bold text-white transition hover:bg-[#0073e6] active:bg-[#006be0] disabled:opacity-60"
       >
-        {submitting ? "Signing in..." : "Sign In"}
+        {submitting ? "Signing in..." : "Log In"}
       </button>
     </form>
   );

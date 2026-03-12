@@ -4,32 +4,38 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #000000;
+  --foreground: #050505;
   --card: #ffffff;
-  --border: #e5e7eb;
-  --secondary: #f3f4f6;
-  --muted: #6b7280;
-  --primary: #2b91ff;
+  --border: #e4e6ea;
+  --secondary: #f0f2f5;
+  --muted: #65676b;
+  --primary: #0084ff;
   --primary-foreground: #ffffff;
-  --messenger-hover: #f3f4f6;
-  --messenger-active: #e8f2ff;
-  --messenger-bubble-received: #f3f4f6;
-  --messenger-online: #22c55e;
+  --messenger-hover: #f2f2f2;
+  --messenger-active: #e7f3ff;
+  --messenger-bubble-received: #f0f0f0;
+  --messenger-online: #31a24c;
+  --messenger-sidebar-bg: #ffffff;
+  --messenger-header-bg: #ffffff;
+  --messenger-chat-bg: #ffffff;
 }
 
 .dark {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --border: #1f2937;
-  --secondary: #1f2937;
-  --muted: #94a3b8;
-  --primary: #5aa8ff;
-  --primary-foreground: #e2e8f0;
-  --messenger-hover: #1f2937;
-  --messenger-active: #1b3558;
-  --messenger-bubble-received: #1f2937;
-  --messenger-online: #22c55e;
+  --background: #18191a;
+  --foreground: #e4e6eb;
+  --card: #242526;
+  --border: #3a3b3c;
+  --secondary: #3a3b3c;
+  --muted: #b0b3b8;
+  --primary: #0084ff;
+  --primary-foreground: #ffffff;
+  --messenger-hover: #3a3b3c;
+  --messenger-active: #263951;
+  --messenger-bubble-received: #3a3b3c;
+  --messenger-online: #31a24c;
+  --messenger-sidebar-bg: #242526;
+  --messenger-header-bg: #242526;
+  --messenger-chat-bg: #18191a;
 }
 
 html,
@@ -46,4 +52,19 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #bcc0c4;
+  border-radius: 3px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #4e4f50;
 }

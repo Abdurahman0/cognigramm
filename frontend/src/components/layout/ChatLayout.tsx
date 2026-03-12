@@ -23,7 +23,7 @@ export function ChatLayout(): JSX.Element {
     <div className="flex h-screen bg-[var(--background)]">
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-20 w-full flex-col border-r border-[var(--border)] bg-[var(--background)] transition-transform duration-300 md:relative md:w-[360px] md:translate-x-0",
+          "fixed inset-y-0 left-0 z-20 w-full flex-col border-r border-[var(--border)] bg-[var(--messenger-sidebar-bg)] transition-transform duration-300 md:relative md:w-[360px] md:translate-x-0",
           showSidebar ? "translate-x-0" : "-translate-x-full"
         )}
       >

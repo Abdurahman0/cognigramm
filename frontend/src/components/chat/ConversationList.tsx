@@ -2,11 +2,10 @@
 
 import { useMemo, useState } from "react";
 import {
-  Bars3Icon,
   MagnifyingGlassIcon,
-  MoonIcon,
   PencilSquareIcon,
-  SunIcon
+  SunIcon,
+  MoonIcon
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -39,13 +38,13 @@ function resolvePreview(message: Message | undefined): string {
     return message.content.trim();
   }
   if (message.message_type === "image") {
-    return "Photo";
+    return "📷 Photo";
   }
   if (message.message_type === "voice") {
-    return "Voice message";
+    return "🎤 Voice message";
   }
   if (message.message_type === "file") {
-    return "File";
+    return "📎 File";
   }
   return "Message";
 }
@@ -152,52 +151,52 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
   };
 
   return (
-    <aside className="flex h-full flex-col border-r border-[var(--border)] bg-[var(--background)]">
-      <header className="px-4 pb-2 pt-3">
+    <aside className="flex h-full flex-col bg-[var(--messenger-sidebar-bg)]">
+      {/* Header */}
+      <header className="px-4 pb-2 pt-4">
         <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary)]">
-              <Bars3Icon className="h-5 w-5 text-[var(--primary-foreground)]" />
-            </div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">Chats</h1>
-          </div>
-          <div className="flex items-center gap-2">
+          <h1 className="text-[24px] font-bold text-[var(--foreground)]">Chats</h1>
+          <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={toggleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition-colors hover:bg-[var(--messenger-hover)]"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition hover:bg-[var(--messenger-hover)]"
             >
-              {theme === "dark" ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+              {theme === "dark" ? <SunIcon className="h-[18px] w-[18px]" /> : <MoonIcon className="h-[18px] w-[18px]" />}
             </button>
             <button
               type="button"
               onClick={() => setDialogOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition-colors hover:bg-[var(--messenger-hover)]"
+              title="New message"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition hover:bg-[var(--messenger-hover)]"
             >
-              <PencilSquareIcon className="h-5 w-5" />
+              <PencilSquareIcon className="h-[18px] w-[18px]" />
             </button>
           </div>
         </div>
 
+        {/* Search bar */}
         <div className="relative mb-3">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search"
-            className="h-9 w-full rounded-full bg-[var(--secondary)] pl-9 pr-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+            placeholder="Search Messenger"
+            className="h-[36px] w-full rounded-full bg-[var(--secondary)] pl-9 pr-3 text-[15px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--primary)]/30"
           />
         </div>
 
-        <div className="mb-1 flex gap-1">
+        {/* Tabs */}
+        <div className="flex gap-1">
           <button
             type="button"
             onClick={() => setActiveTab("chats")}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
               activeTab === "chats"
                 ? "bg-[var(--messenger-active)] text-[var(--primary)]"
-                : "text-[var(--muted)] hover:bg-[var(--secondary)]"
+                : "text-[var(--muted)] hover:bg-[var(--messenger-hover)]"
             )}
           >
             Chats
@@ -206,10 +205,10 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
             type="button"
             onClick={() => setActiveTab("people")}
             className={cn(
-              "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
+              "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
               activeTab === "people"
                 ? "bg-[var(--messenger-active)] text-[var(--primary)]"
-                : "text-[var(--muted)] hover:bg-[var(--secondary)]"
+                : "text-[var(--muted)] hover:bg-[var(--messenger-hover)]"
             )}
           >
             People
@@ -217,12 +216,13 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+      {/* List */}
+      <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {activeTab === "chats" ? (
-          <div className="space-y-0.5">
+          <div>
             {loading ? <LoadingState /> : null}
             {!loading && chatsFiltered.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-[var(--muted)]">No conversations found.</p>
+              <p className="px-4 py-3 text-[13px] text-[var(--muted)]">No conversations found.</p>
             ) : null}
             {!loading &&
               chatsFiltered.map((conversation) => {
@@ -241,7 +241,7 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
                     conversation={conversation}
                     active={activeConversationId === conversation.id}
                     currentUserId={currentUser?.id}
-                    previewText={unreadCount > 0 ? `New message: ${resolvePreview(lastMessage)}` : resolvePreview(lastMessage)}
+                    previewText={resolvePreview(lastMessage)}
                     previewTime={lastMessage?.created_at || null}
                     unreadCount={unreadCount}
                     onClick={openConversation}
@@ -250,10 +250,10 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
               })}
           </div>
         ) : (
-          <div className="space-y-0.5">
+          <div>
             {usersQuery.isLoading ? <LoadingState /> : null}
             {!usersQuery.isLoading && usersFiltered.length === 0 ? (
-              <p className="px-3 py-3 text-xs text-[var(--muted)]">No users found.</p>
+              <p className="px-4 py-3 text-[13px] text-[var(--muted)]">No users found.</p>
             ) : null}
             {usersFiltered.map((user) => {
               const hasConversation = Boolean(findDirectConversation(user.id));
@@ -265,21 +265,21 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
                   onClick={() => handleUserClick(user)}
                   className="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--messenger-hover)]"
                 >
-                  <div className="relative h-12 w-12 shrink-0 rounded-full bg-[var(--secondary)]" />
+                  {/* Avatar */}
+                  <div className="relative shrink-0">
+                    <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-gradient-to-br from-[#a0aec0] to-[#718096] text-xl font-bold text-white">
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                    {isOnline && (
+                      <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--messenger-sidebar-bg)] bg-[var(--messenger-online)]" />
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1 text-left">
                     <div className="flex items-center justify-between">
-                      <span className="truncate text-[15px] text-[var(--foreground)]">{user.username}</span>
-                      <span className="text-xs text-[var(--muted)]">{hasConversation ? "Open" : "Message"}</span>
+                      <span className="truncate text-[15px] font-semibold text-[var(--foreground)]">{user.username}</span>
+                      <span className="ml-2 shrink-0 text-[12px] text-[var(--primary)]">{hasConversation ? "Open" : "Message"}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          "h-2.5 w-2.5 rounded-full",
-                          isOnline ? "bg-[var(--messenger-online)]" : "bg-slate-300 dark:bg-slate-600"
-                        )}
-                      />
-                      <span className="truncate text-[13px] text-[var(--muted)]">{user.email}</span>
-                    </div>
+                    <p className="truncate text-[13px] text-[var(--muted)]">{isOnline ? "Active now" : user.email}</p>
                   </div>
                 </button>
               );
