@@ -4,17 +4,17 @@ import { usePresenceStore } from "@/store/presenceStore";
 import type { Conversation } from "@/types/conversation";
 import { formatMessageTime } from "@/utils/date";
 
-/* Deterministic avatar color per user id */
-const AVATAR_COLORS = [
-  ["#3b82f6", "#1d4ed8"], // blue
-  ["#8b5cf6", "#6d28d9"], // purple
-  ["#ec4899", "#be185d"], // pink
-  ["#f97316", "#c2410c"], // orange
-  ["#10b981", "#065f46"], // green
-  ["#f59e0b", "#b45309"], // amber
+const DEFAULT_AVATAR_GRADIENT: [string, string] = ["#3b82f6", "#1d4ed8"];
+const AVATAR_COLORS: [string, string][] = [
+  ["#3b82f6", "#1d4ed8"],
+  ["#8b5cf6", "#6d28d9"],
+  ["#ec4899", "#be185d"],
+  ["#f97316", "#c2410c"],
+  ["#10b981", "#065f46"],
+  ["#f59e0b", "#b45309"],
 ];
 function avatarGradient(id: number): [string, string] {
-  return AVATAR_COLORS[id % AVATAR_COLORS.length] ?? AVATAR_COLORS[0]!;
+  return AVATAR_COLORS[id % AVATAR_COLORS.length] ?? DEFAULT_AVATAR_GRADIENT;
 }
 
 interface Props {

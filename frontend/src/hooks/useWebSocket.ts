@@ -23,9 +23,11 @@ function buildSessionId(): string {
 export function useWebSocket(): void {
   const { accessToken, isAuthenticated } = useAuthStore();
   const activeConversationId = useConversationStore((state) => state.activeConversationId);
+  const conversations = useConversationStore((state) => state.conversations);
   const setStatus = useWebSocketStore((state) => state.setStatus);
   const sessionId = useMemo(buildSessionId, []);
   const activeConversationIdRef = useRef<number | null>(activeConversationId);
+  const joinedRoomsRef = useRef(new Set<number>());
 
   useEffect(() => {
     activeConversationIdRef.current = activeConversationId;
@@ -46,11 +48,9 @@ export function useWebSocket(): void {
     const unsubscribe = realtimeSocketClient.subscribe((event) => {
       if (event.event === "connected") {
         setStatus("connected");
+        joinedRoomsRef.current = new Set();
         const currentConversationId = activeConversationIdRef.current;
         realtimeSocketClient.send("active_conversation", { conversation_id: currentConversationId });
-        if (currentConversationId) {
-          realtimeSocketClient.send("join_conversation", { conversation_id: currentConversationId });
-        }
       }
       if (event.event === "error") {
         setStatus("error");
@@ -69,4 +69,18 @@ export function useWebSocket(): void {
     }
     realtimeSocketClient.send("active_conversation", { conversation_id: activeConversationId });
   }, [activeConversationId, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      joinedRoomsRef.current = new Set();
+      return;
+    }
+    for (const conversation of conversations) {
+      if (joinedRoomsRef.current.has(conversation.id)) {
+        continue;
+      }
+      realtimeSocketClient.send("join_conversation", { conversation_id: conversation.id });
+      joinedRoomsRef.current.add(conversation.id);
+    }
+  }, [conversations, isAuthenticated]);
 }

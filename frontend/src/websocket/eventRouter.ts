@@ -8,6 +8,7 @@ import { queryKeys } from "@/services/query/queryKeys";
 import { useConversationStore } from "@/store/conversationStore";
 import { useMessageStore } from "@/store/messageStore";
 import { usePresenceStore } from "@/store/presenceStore";
+import { useUserStore } from "@/store/userStore";
 import type { Message } from "@/types/message";
 import type { MissedMessagesPayload, SocketEnvelope } from "@/types/websocket";
 
@@ -85,6 +86,16 @@ export function routeWebSocketEvent(envelope: SocketEnvelope): void {
 
   if (event === "message_read") {
     const data = payload as { message_id: number; user_id: number; read_at?: string | null };
+    const currentUserId = useUserStore.getState().currentUser?.id;
+    if (currentUserId && data.user_id === currentUserId) {
+      const conversations = Object.entries(useMessageStore.getState().byConversation);
+      for (const [conversationIdRaw, messages] of conversations) {
+        if (messages.some((message) => message.id === data.message_id)) {
+          messageStore.markConversationMessagesRead(Number(conversationIdRaw), [data.message_id]);
+          break;
+        }
+      }
+    }
     const conversationId = useConversationStore.getState().activeConversationId;
     if (conversationId) {
       messageStore.updateMessageDelivery(conversationId, data.message_id, {

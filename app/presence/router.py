@@ -13,14 +13,6 @@ from app.users.models import User
 def get_presence_router(pubsub: RedisPubSub) -> APIRouter:
     router = APIRouter(prefix="/presence", tags=["presence"])
 
-    @router.get("/users/{user_id}", response_model=PresenceStateOut)
-    async def get_user_presence(
-        user_id: int,
-        _: User = Depends(get_current_user),
-    ) -> PresenceStateOut:
-        service = PresenceService(pubsub.redis)
-        return await service.get_user_presence(user_id)
-
     @router.get("/users/online", response_model=list[int])
     async def get_online_users(
         limit: int = Query(default=5000, ge=1, le=10000),
@@ -28,6 +20,14 @@ def get_presence_router(pubsub: RedisPubSub) -> APIRouter:
     ) -> list[int]:
         service = PresenceService(pubsub.redis)
         return await service.list_online_users(limit)
+
+    @router.get("/users/{user_id}", response_model=PresenceStateOut)
+    async def get_user_presence(
+        user_id: int,
+        _: User = Depends(get_current_user),
+    ) -> PresenceStateOut:
+        service = PresenceService(pubsub.redis)
+        return await service.get_user_presence(user_id)
 
     @router.get("/conversations/{conversation_id}/typing", response_model=TypingStateOut)
     async def get_typing_users(

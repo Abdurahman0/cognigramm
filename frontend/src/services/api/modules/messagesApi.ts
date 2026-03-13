@@ -16,6 +16,10 @@ export const messagesApi = {
     });
     return data;
   },
+  async getLatestByConversation(conversationId: number): Promise<Message | null> {
+    const { data } = await httpClient.get<Message | null>(`/conversations/${conversationId}/messages/latest`);
+    return data;
+  },
   async searchConversation(conversationId: number, query: string, limit = 25, offset = 0): Promise<MessageSearchResult[]> {
     const { data } = await httpClient.get<MessageSearchResult[]>(`/conversations/${conversationId}/messages/search`, {
       params: { q: query, limit, offset }

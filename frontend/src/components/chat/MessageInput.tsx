@@ -151,8 +151,8 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
 
         {/* Text input */}
         <div
-          className="relative flex flex-1 items-center rounded-full px-4 py-[8px]"
-          style={{ background: "var(--surface)" }}
+          className="relative flex flex-1 items-center rounded-[26px] border px-4 py-[9px]"
+          style={{ background: "var(--surface)", borderColor: "var(--border)" }}
         >
           <input
             ref={inputRef}

@@ -6,9 +6,11 @@ import type { DeliveryState, Message } from "@/types/message";
 
 interface MessageState {
   byConversation: Record<number, Message[]>;
+  readByConversation: Record<number, Set<number>>;
   setConversationMessages: (conversationId: number, messages: Message[]) => void;
   prependOlderMessages: (conversationId: number, messages: Message[]) => void;
   upsertMessage: (conversationId: number, message: Message) => void;
+  markConversationMessagesRead: (conversationId: number, messageIds: number[]) => void;
   markMessageLocalState: (conversationId: number, clientMessageId: string, state: "pending" | "synced" | "failed") => void;
   updateMessageDelivery: (
     conversationId: number,
@@ -34,6 +36,7 @@ function mergeUniqueMessages(messages: Message[]): Message[] {
 
 export const useMessageStore = create<MessageState>((set, get) => ({
   byConversation: {},
+  readByConversation: {},
   setConversationMessages: (conversationId, messages) => {
     set((state) => ({
       byConversation: {
@@ -62,6 +65,22 @@ export const useMessageStore = create<MessageState>((set, get) => ({
       byConversation: {
         ...state.byConversation,
         [conversationId]: mergeUniqueMessages(next)
+      }
+    }));
+  },
+  markConversationMessagesRead: (conversationId, messageIds) => {
+    if (!messageIds.length) {
+      return;
+    }
+    const existing = get().readByConversation[conversationId] ?? new Set<number>();
+    const next = new Set(existing);
+    for (const messageId of messageIds) {
+      next.add(messageId);
+    }
+    set((state) => ({
+      readByConversation: {
+        ...state.readByConversation,
+        [conversationId]: next
       }
     }));
   },
@@ -99,10 +118,17 @@ export const useMessageStore = create<MessageState>((set, get) => ({
   },
   removeMessage: (conversationId, messageId) => {
     const existing = get().byConversation[conversationId] || [];
+    const readExisting = get().readByConversation[conversationId] ?? new Set<number>();
+    const readNext = new Set(readExisting);
+    readNext.delete(messageId);
     set((state) => ({
       byConversation: {
         ...state.byConversation,
         [conversationId]: existing.filter((message) => message.id !== messageId)
+      },
+      readByConversation: {
+        ...state.readByConversation,
+        [conversationId]: readNext
       }
     }));
   }

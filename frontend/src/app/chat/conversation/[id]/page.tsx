@@ -61,9 +61,6 @@ export default function ConversationPage(): JSX.Element {
       return;
     }
     realtimeSocketClient.send("join_conversation", { conversation_id: conversationId });
-    return () => {
-      realtimeSocketClient.send("leave_conversation", { conversation_id: conversationId });
-    };
   }, [conversationId]);
 
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
@@ -15,7 +15,7 @@ import { ConversationItem } from "@/components/chat/ConversationItem";
 import { LoadingState } from "@/components/common/LoadingState";
 import { CreateConversationDialog } from "@/features/conversations/CreateConversationDialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { conversationsApi } from "@/services/api";
+import { conversationsApi, messagesApi } from "@/services/api";
 import { useConversationStore } from "@/store/conversationStore";
 import { useMessageStore } from "@/store/messageStore";
 import { useUIStore } from "@/store/uiStore";
@@ -25,7 +25,7 @@ import type { Message } from "@/types/message";
 import { cn } from "@/utils/cn";
 
 function previewOf(msg: Message | undefined): string {
-  if (!msg) return "No messages yet";
+  if (!msg) return "Start conversation";
   if (msg.deleted_at) return "Message deleted";
   if (msg.content?.trim()) return msg.content.trim();
   if (msg.message_type === "image") return "📷 Photo";
@@ -33,6 +33,8 @@ function previewOf(msg: Message | undefined): string {
   if (msg.message_type === "file") return "📎 File";
   return "Message";
 }
+
+const EMPTY_READ_SET = new Set<number>();
 
 /** Find an existing direct conversation with targetUserId (without needing currentUser). */
 function findDirectWith(conversations: Conversation[], targetUserId: number): Conversation | undefined {
@@ -59,10 +61,13 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
   const toggleTheme = useUIStore((s) => s.toggleTheme);
   const currentUser = useUserStore((s) => s.currentUser);
   const byConversation = useMessageStore((s) => s.byConversation);
+  const readByConversation = useMessageStore((s) => s.readByConversation);
+  const upsertMessage = useMessageStore((s) => s.upsertMessage);
 
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const debQuery = useDebouncedValue(query.trim().toLowerCase(), 180);
+  const previewRequestedRef = useRef(new Set<number>());
 
   /* ── open existing conversation ── */
   const openConv = (id: number) => {
@@ -102,6 +107,27 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
       return `${title} ${names}`.toLowerCase().includes(debQuery);
     });
   }, [sorted, debQuery]);
+
+  useEffect(() => {
+    const missing = filtered.filter(
+      (conversation) =>
+        (byConversation[conversation.id]?.length ?? 0) === 0 && !previewRequestedRef.current.has(conversation.id)
+    );
+    if (!missing.length) {
+      return;
+    }
+    for (const conversation of missing) {
+      previewRequestedRef.current.add(conversation.id);
+      messagesApi
+        .getLatestByConversation(conversation.id)
+        .then((last) => {
+          if (last) {
+            upsertMessage(conversation.id, last);
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [byConversation, filtered, upsertMessage]);
 
   return (
     <aside className="flex h-full flex-col" style={{ background: "var(--messenger-sidebar-bg)" }}>
@@ -157,6 +183,7 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
           filtered.map((conv) => {
             const msgs = byConversation[conv.id] ?? [];
             const lastMsg = msgs[msgs.length - 1];
+            const readSet = readByConversation[conv.id] ?? EMPTY_READ_SET;
             const unread =
               activeId === conv.id
                 ? 0
@@ -164,6 +191,7 @@ export function ConversationList({ loading }: ConversationListProps): JSX.Elemen
                     (m) =>
                       m.sender_id !== currentUser?.id &&
                       !m.deleted_at &&
+                      !readSet.has(m.id) &&
                       m.delivery_state !== "read"
                   ).length;
             return (

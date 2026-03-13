@@ -94,6 +94,17 @@ class MessageService:
         result = await self.session.scalars(stmt)
         return list(result.all())
 
+    async def get_latest_message(self, conversation_id: int, user_id: int) -> Message | None:
+        await self.assert_member(conversation_id, user_id)
+        stmt = (
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .options(selectinload(Message.sender), selectinload(Message.attachments))
+            .order_by(Message.created_at.desc(), Message.id.desc())
+            .limit(1)
+        )
+        return await self.session.scalar(stmt)
+
     async def search_messages(
         self,
         conversation_id: int,

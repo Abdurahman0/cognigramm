@@ -51,6 +51,19 @@ async def get_message_history(
     return [MessageOut.model_validate(message) for message in messages]
 
 
+@router.get("/conversations/{conversation_id}/messages/latest", response_model=MessageOut | None)
+async def get_latest_message(
+    conversation_id: int,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> MessageOut | None:
+    service = MessageService(session)
+    message = await service.get_latest_message(conversation_id, current_user.id)
+    if message is None:
+        return None
+    return MessageOut.model_validate(message)
+
+
 @router.get("/conversations/{conversation_id}/messages/search", response_model=list[MessageSearchOut])
 async def search_messages(
     conversation_id: int,

@@ -33,6 +33,7 @@ export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: Pr
   const currentUser = useUserStore((s) => s.currentUser);
   const typingByConv = usePresenceStore((s) => s.typingByConversation);
   const updateDelivery = useMessageStore((s) => s.updateMessageDelivery);
+  const markConversationMessagesRead = useMessageStore((s) => s.markConversationMessagesRead);
   const [deletingMsg, setDeletingMsg] = useState<Message | null>(null);
 
   const parentRef = useRef<HTMLDivElement>(null);
@@ -118,17 +119,28 @@ export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: Pr
   /* ── Mark messages as read ── */
   useEffect(() => {
     if (!conversationId || !currentUser || !messages.length) return;
+    const alreadyReadIds = messages
+      .filter((m) => m.sender_id !== currentUser.id && (m.delivery_state === "read" || Boolean(m.read_at)))
+      .map((m) => m.id)
+      .filter((id) => id > 0);
+    if (alreadyReadIds.length) {
+      markConversationMessagesRead(conversationId, alreadyReadIds);
+    }
     const unread = messages.filter(
       (m) => m.id > 0 && m.sender_id !== currentUser.id && m.delivery_state !== "read" && !readIds.current.has(m.id)
     );
     if (!unread.length) return;
+    markConversationMessagesRead(
+      conversationId,
+      unread.map((m) => m.id)
+    );
     for (const m of unread) {
       readIds.current.add(m.id);
       updateDelivery(conversationId, m.id, { state: "read", read_at: new Date().toISOString() });
       messagesApi.markRead(m.id).catch(() => undefined);
       realtimeSocketClient.send("read_receipt", { message_id: m.id });
     }
-  }, [conversationId, currentUser, messages, updateDelivery]);
+  }, [conversationId, currentUser, markConversationMessagesRead, messages, updateDelivery]);
 
   /* ── Typing usernames ── */
   const typingIds = conversationId ? typingByConv[conversationId] ?? new Set<number>() : new Set<number>();
