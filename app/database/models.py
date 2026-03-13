@@ -16,7 +16,7 @@ from app.messages.models import (
     MessageStatus,
     MessageType,
 )
-from app.users.models import User
+from app.users.models import Department, Role, User, UserStatus
 
 __all__ = [
     "Conversation",
@@ -36,5 +36,8 @@ __all__ = [
     "MessageReadReceipt",
     "MessageStatus",
     "MessageType",
+    "Role",
+    "Department",
+    "UserStatus",
     "User",
 ]

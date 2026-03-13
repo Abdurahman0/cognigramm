@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user
 from app.database.session import get_db_session
 from app.users.models import User
-from app.users.schemas import UserOut
+from app.users.schemas import UserOut, UserStatusUpdateRequest, UserUpdateRequest
 
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -13,6 +14,43 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=UserOut)
 async def get_me(current_user: User = Depends(get_current_user)) -> User:
+    return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    payload: UserUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> User:
+    updates = payload.model_dump(exclude_unset=True)
+    if "handle" in updates and isinstance(updates["handle"], str):
+        updates["handle"] = updates["handle"].strip().lstrip("@") or None
+    if "timezone" in updates and isinstance(updates["timezone"], str):
+        updates["timezone"] = updates["timezone"].strip() or current_user.timezone
+    for key, value in updates.items():
+        setattr(current_user, key, value)
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Profile update conflicts with existing data",
+        )
+    await session.refresh(current_user)
+    return current_user
+
+
+@router.patch("/me/status", response_model=UserOut)
+async def update_my_status(
+    payload: UserStatusUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> User:
+    current_user.status = payload.status
+    await session.commit()
+    await session.refresh(current_user)
     return current_user
 
 
