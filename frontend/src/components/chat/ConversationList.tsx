@@ -5,48 +5,43 @@ import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
   SunIcon,
-  MoonIcon
+  MoonIcon,
 } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { ConversationItem } from "@/components/chat/ConversationItem";
 import { LoadingState } from "@/components/common/LoadingState";
 import { CreateConversationDialog } from "@/features/conversations/CreateConversationDialog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { conversationsApi, usersApi } from "@/services/api";
-import { queryKeys } from "@/services/query/queryKeys";
+import { conversationsApi } from "@/services/api";
 import { useConversationStore } from "@/store/conversationStore";
 import { useMessageStore } from "@/store/messageStore";
-import { usePresenceStore } from "@/store/presenceStore";
 import { useUIStore } from "@/store/uiStore";
 import { useUserStore } from "@/store/userStore";
 import type { Conversation } from "@/types/conversation";
 import type { Message } from "@/types/message";
-import type { User } from "@/types/user";
 import { cn } from "@/utils/cn";
 
-function resolvePreview(message: Message | undefined): string {
-  if (!message) {
-    return "No messages yet";
-  }
-  if (message.deleted_at) {
-    return "Message deleted";
-  }
-  if (message.content && message.content.trim()) {
-    return message.content.trim();
-  }
-  if (message.message_type === "image") {
-    return "📷 Photo";
-  }
-  if (message.message_type === "voice") {
-    return "🎤 Voice message";
-  }
-  if (message.message_type === "file") {
-    return "📎 File";
-  }
+function previewOf(msg: Message | undefined): string {
+  if (!msg) return "No messages yet";
+  if (msg.deleted_at) return "Message deleted";
+  if (msg.content?.trim()) return msg.content.trim();
+  if (msg.message_type === "image") return "📷 Photo";
+  if (msg.message_type === "voice") return "🎤 Voice message";
+  if (msg.message_type === "file") return "📎 File";
   return "Message";
+}
+
+/** Find an existing direct conversation with targetUserId (without needing currentUser). */
+function findDirectWith(conversations: Conversation[], targetUserId: number): Conversation | undefined {
+  return conversations.find(
+    (c) =>
+      c.type === "direct" &&
+      c.participants.length === 2 &&
+      c.participants.some((p) => p.user_id === targetUserId)
+  );
 }
 
 interface ConversationListProps {
@@ -55,240 +50,171 @@ interface ConversationListProps {
 
 export function ConversationList({ loading }: ConversationListProps): JSX.Element {
   const router = useRouter();
-  const conversations = useConversationStore((state) => state.conversations);
-  const activeConversationId = useConversationStore((state) => state.activeConversationId);
-  const setActiveConversationId = useConversationStore((state) => state.setActiveConversationId);
-  const upsertConversation = useConversationStore((state) => state.upsertConversation);
-  const setMobileSidebarOpen = useUIStore((state) => state.setMobileSidebarOpen);
-  const theme = useUIStore((state) => state.theme);
-  const toggleTheme = useUIStore((state) => state.toggleTheme);
-  const currentUser = useUserStore((state) => state.currentUser);
-  const messagesByConversation = useMessageStore((state) => state.byConversation);
-  const onlineUserIds = usePresenceStore((state) => state.onlineUserIds);
+  const conversations = useConversationStore((s) => s.conversations);
+  const activeId = useConversationStore((s) => s.activeConversationId);
+  const setActiveId = useConversationStore((s) => s.setActiveConversationId);
+  const upsertConversation = useConversationStore((s) => s.upsertConversation);
+  const setMobileSidebarOpen = useUIStore((s) => s.setMobileSidebarOpen);
+  const theme = useUIStore((s) => s.theme);
+  const toggleTheme = useUIStore((s) => s.toggleTheme);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const byConversation = useMessageStore((s) => s.byConversation);
+
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"chats" | "people">("chats");
-  const debouncedQuery = useDebouncedValue(query.trim().toLowerCase(), 200);
+  const debQuery = useDebouncedValue(query.trim().toLowerCase(), 180);
 
-  const usersQuery = useQuery({
-    queryKey: queryKeys.searchUsers("__all__"),
-    queryFn: () => usersApi.search({ limit: 500, offset: 0, includeSelf: false }),
-    staleTime: 60_000
-  });
-
-  const createDirectMutation = useMutation({
-    mutationFn: async (user: User) =>
-      conversationsApi.create({
-        type: "direct",
-        participant_ids: [user.id]
-      }),
-    onSuccess: (conversation) => {
-      upsertConversation(conversation);
-      setActiveConversationId(conversation.id);
-      setMobileSidebarOpen(false);
-      router.push(`/chat/conversation/${conversation.id}`);
-    },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Unable to open chat");
-    }
-  });
-
-  const sortedConversations = useMemo(() => {
-    const list = [...conversations];
-    list.sort((left, right) => {
-      const leftLast = messagesByConversation[left.id]?.[messagesByConversation[left.id].length - 1];
-      const rightLast = messagesByConversation[right.id]?.[messagesByConversation[right.id].length - 1];
-      const leftTs = leftLast?.created_at || left.created_at;
-      const rightTs = rightLast?.created_at || right.created_at;
-      if (leftTs === rightTs) {
-        return right.id - left.id;
-      }
-      return leftTs < rightTs ? 1 : -1;
-    });
-    return list;
-  }, [conversations, messagesByConversation]);
-
-  const chatsFiltered = useMemo(() => {
-    if (!debouncedQuery) {
-      return sortedConversations;
-    }
-    return sortedConversations.filter((conversation) => {
-      const title = conversation.title || "";
-      const members = conversation.participants.map((participant) => participant.username).join(" ");
-      return `${title} ${members}`.toLowerCase().includes(debouncedQuery);
-    });
-  }, [debouncedQuery, sortedConversations]);
-
-  const usersFiltered = useMemo(() => {
-    const items = usersQuery.data ?? [];
-    if (!debouncedQuery) {
-      return items;
-    }
-    return items.filter((user) => `${user.username} ${user.email}`.toLowerCase().includes(debouncedQuery));
-  }, [debouncedQuery, usersQuery.data]);
-
-  const findDirectConversation = (targetUserId: number): Conversation | undefined =>
-    conversations.find(
-      (conversation) =>
-        conversation.type === "direct" &&
-        conversation.participants.some((participant) => participant.user_id === targetUserId) &&
-        conversation.participants.some((participant) => participant.user_id === currentUser?.id)
-    );
-
-  const openConversation = (conversationId: number) => {
-    setActiveConversationId(conversationId);
+  /* ── open existing conversation ── */
+  const openConv = (id: number) => {
+    setActiveId(id);
     setMobileSidebarOpen(false);
-    router.push(`/chat/conversation/${conversationId}`);
+    router.push(`/chat/conversation/${id}`);
   };
 
-  const handleUserClick = (user: User) => {
-    const existingConversation = findDirectConversation(user.id);
-    if (existingConversation) {
-      openConversation(existingConversation.id);
-      return;
-    }
-    createDirectMutation.mutate(user);
-  };
+  /* ── create/find direct conversation ── */
+  const createMutation = useMutation({
+    mutationFn: (targetUserId: number) =>
+      conversationsApi.create({ type: "direct", participant_ids: [targetUserId] }),
+    onSuccess: (conv) => {
+      upsertConversation(conv);
+      openConv(conv.id);
+    },
+    onError: () => toast.error("Could not open chat"),
+  });
+
+  /* ── Sort conversations by last message ── */
+  const sorted = useMemo(() => {
+    return [...conversations].sort((a, b) => {
+      const msgsA = byConversation[a.id] ?? [];
+      const msgsB = byConversation[b.id] ?? [];
+      const tsA = msgsA[msgsA.length - 1]?.created_at ?? a.created_at;
+      const tsB = msgsB[msgsB.length - 1]?.created_at ?? b.created_at;
+      return tsA < tsB ? 1 : tsA > tsB ? -1 : b.id - a.id;
+    });
+  }, [conversations, byConversation]);
+
+  /* ── Filter by search query ── */
+  const filtered = useMemo(() => {
+    if (!debQuery) return sorted;
+    return sorted.filter((c) => {
+      const title = c.title || "";
+      const names = c.participants.map((p) => p.username).join(" ");
+      return `${title} ${names}`.toLowerCase().includes(debQuery);
+    });
+  }, [sorted, debQuery]);
 
   return (
-    <aside className="flex h-full flex-col bg-[var(--messenger-sidebar-bg)]">
-      {/* Header */}
-      <header className="px-4 pb-2 pt-4">
+    <aside className="flex h-full flex-col" style={{ background: "var(--messenger-sidebar-bg)" }}>
+
+      {/* ── Header ── */}
+      <header className="px-4 pb-1 pt-4 shrink-0">
         <div className="mb-3 flex items-center justify-between">
-          <h1 className="text-[24px] font-bold text-[var(--foreground)]">Chats</h1>
+          <h1 className="text-[24px] font-bold leading-none" style={{ color: "var(--fg)" }}>
+            Chats
+          </h1>
           <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition hover:bg-[var(--messenger-hover)]"
-            >
-              {theme === "dark" ? <SunIcon className="h-[18px] w-[18px]" /> : <MoonIcon className="h-[18px] w-[18px]" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDialogOpen(true)}
-              title="New message"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)] transition hover:bg-[var(--messenger-hover)]"
-            >
+            <IconBtn onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"}>
+              {theme === "dark"
+                ? <SunIcon className="h-[18px] w-[18px]" />
+                : <MoonIcon className="h-[18px] w-[18px]" />}
+            </IconBtn>
+            <IconBtn onClick={() => setDialogOpen(true)} title="New message">
               <PencilSquareIcon className="h-[18px] w-[18px]" />
-            </button>
+            </IconBtn>
           </div>
         </div>
 
-        {/* Search bar */}
-        <div className="relative mb-3">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]" />
+        {/* Search */}
+        <div className="relative mb-2">
+          <MagnifyingGlassIcon
+            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2"
+            style={{ color: "var(--fg-secondary)" }}
+          />
           <input
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search Messenger"
-            className="h-[36px] w-full rounded-full bg-[var(--secondary)] pl-9 pr-3 text-[15px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)] focus:ring-2 focus:ring-[var(--primary)]/30"
+            className="h-[36px] w-full rounded-full pl-9 pr-3 text-[15px] outline-none"
+            style={{
+              background: "var(--surface)",
+              color: "var(--fg)",
+            }}
           />
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("chats")}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-              activeTab === "chats"
-                ? "bg-[var(--messenger-active)] text-[var(--primary)]"
-                : "text-[var(--muted)] hover:bg-[var(--messenger-hover)]"
-            )}
-          >
-            Chats
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("people")}
-            className={cn(
-              "rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors",
-              activeTab === "people"
-                ? "bg-[var(--messenger-active)] text-[var(--primary)]"
-                : "text-[var(--muted)] hover:bg-[var(--messenger-hover)]"
-            )}
-          >
-            People
-          </button>
         </div>
       </header>
 
-      {/* List */}
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
-        {activeTab === "chats" ? (
-          <div>
-            {loading ? <LoadingState /> : null}
-            {!loading && chatsFiltered.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-[var(--muted)]">No conversations found.</p>
-            ) : null}
-            {!loading &&
-              chatsFiltered.map((conversation) => {
-                const items = messagesByConversation[conversation.id] || [];
-                const lastMessage = items[items.length - 1];
-                const unreadCount =
-                  activeConversationId === conversation.id
-                    ? 0
-                    : items.filter(
-                        (message) =>
-                          message.sender_id !== currentUser?.id && !message.deleted_at && message.delivery_state !== "read"
-                      ).length;
-                return (
-                  <ConversationItem
-                    key={conversation.id}
-                    conversation={conversation}
-                    active={activeConversationId === conversation.id}
-                    currentUserId={currentUser?.id}
-                    previewText={resolvePreview(lastMessage)}
-                    previewTime={lastMessage?.created_at || null}
-                    unreadCount={unreadCount}
-                    onClick={openConversation}
-                  />
-                );
-              })}
-          </div>
-        ) : (
-          <div>
-            {usersQuery.isLoading ? <LoadingState /> : null}
-            {!usersQuery.isLoading && usersFiltered.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-[var(--muted)]">No users found.</p>
-            ) : null}
-            {usersFiltered.map((user) => {
-              const hasConversation = Boolean(findDirectConversation(user.id));
-              const isOnline = onlineUserIds.has(user.id);
-              return (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => handleUserClick(user)}
-                  className="flex w-full items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-[var(--messenger-hover)]"
-                >
-                  {/* Avatar */}
-                  <div className="relative shrink-0">
-                    <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-gradient-to-br from-[#a0aec0] to-[#718096] text-xl font-bold text-white">
-                      {user.username.charAt(0).toUpperCase()}
-                    </div>
-                    {isOnline && (
-                      <span className="absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[var(--messenger-sidebar-bg)] bg-[var(--messenger-online)]" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 text-left">
-                    <div className="flex items-center justify-between">
-                      <span className="truncate text-[15px] font-semibold text-[var(--foreground)]">{user.username}</span>
-                      <span className="ml-2 shrink-0 text-[12px] text-[var(--primary)]">{hasConversation ? "Open" : "Message"}</span>
-                    </div>
-                    <p className="truncate text-[13px] text-[var(--muted)]">{isOnline ? "Active now" : user.email}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+      {/* ── Conversation list ── */}
+      <div className="flex-1 overflow-y-auto px-2 py-1">
+        {loading && <LoadingState />}
+
+        {!loading && filtered.length === 0 && (
+          <p className="px-3 py-3 text-[14px]" style={{ color: "var(--fg-secondary)" }}>
+            {query ? "No results found." : "No conversations yet. Create one!"}
+          </p>
         )}
+
+        {!loading &&
+          filtered.map((conv) => {
+            const msgs = byConversation[conv.id] ?? [];
+            const lastMsg = msgs[msgs.length - 1];
+            const unread =
+              activeId === conv.id
+                ? 0
+                : msgs.filter(
+                    (m) =>
+                      m.sender_id !== currentUser?.id &&
+                      !m.deleted_at &&
+                      m.delivery_state !== "read"
+                  ).length;
+            return (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                active={activeId === conv.id}
+                currentUserId={currentUser?.id}
+                previewText={previewOf(lastMsg)}
+                previewTime={lastMsg?.created_at ?? null}
+                unreadCount={unread}
+                onClick={openConv}
+              />
+            );
+          })}
       </div>
 
-      <CreateConversationDialog open={dialogOpen} onClose={() => setDialogOpen(false)} />
+      {/* ── Create conversation dialog ── */}
+      <CreateConversationDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onOpenConversation={(conv) => {
+          upsertConversation(conv);
+          openConv(conv.id);
+        }}
+      />
     </aside>
+  );
+}
+
+/* ── Helper: circular icon button ── */
+function IconBtn({
+  children,
+  onClick,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
+      style={{ background: "var(--surface)", color: "var(--fg)" }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--surface-hover)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.background = "var(--surface)")}
+    >
+      {children}
+    </button>
   );
 }

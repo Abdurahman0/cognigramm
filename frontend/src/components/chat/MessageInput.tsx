@@ -4,9 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FaceSmileIcon,
   PhotoIcon,
-  PlusIcon,
+  PlusCircleIcon,
   XMarkIcon,
-  CheckIcon
 } from "@heroicons/react/24/outline";
 import { HandThumbUpIcon, PaperAirplaneIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
 import { toast } from "sonner";
@@ -16,219 +15,246 @@ import { sendMessageAction } from "@/features/messages/messageActions";
 import { messagesApi } from "@/services/api";
 import { useMessageStore } from "@/store/messageStore";
 import type { Message, MessageType } from "@/types/message";
-import { cn } from "@/utils/cn";
 import { realtimeSocketClient } from "@/websocket/socketClient";
 
-interface MessageInputProps {
+interface Props {
   conversationId: number;
   editingMessage?: Message | null;
   onCancelEditing?: () => void;
 }
 
-export function MessageInput({ conversationId, editingMessage = null, onCancelEditing }: MessageInputProps): JSX.Element {
+export function MessageInput({ conversationId, editingMessage = null, onCancelEditing }: Props): JSX.Element {
   const [content, setContent] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
-  const wasEditingRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const wasEditing = useRef(false);
 
   useEffect(() => {
     if (!editingMessage) {
       setFiles([]);
-      if (wasEditingRef.current) {
-        setContent("");
-      }
-      wasEditingRef.current = false;
+      if (wasEditing.current) setContent("");
+      wasEditing.current = false;
       return;
     }
-    wasEditingRef.current = true;
+    wasEditing.current = true;
     setFiles([]);
     setContent(editingMessage.content || "");
-    inputRef.current?.focus();
+    setTimeout(() => inputRef.current?.focus(), 50);
   }, [editingMessage]);
 
-  const resolvedType = useMemo<MessageType>(() => {
-    if (files.length === 0) {
-      return "text";
-    }
-    const first = files[0];
-    if (first.type.startsWith("image/")) {
-      return "image";
-    }
-    if (first.type.startsWith("audio/")) {
-      return "voice";
-    }
+  const type = useMemo<MessageType>(() => {
+    if (!files.length) return "text";
+    const f = files[0]!;
+    if (f.type.startsWith("image/")) return "image";
+    if (f.type.startsWith("audio/")) return "voice";
     return "file";
   }, [files]);
 
-  const canSend = Boolean(content.trim().length > 0 || files.length > 0) && !sending;
+  const hasText = content.trim().length > 0;
+  const canSend = (hasText || files.length > 0) && !sending;
   const isEditing = Boolean(editingMessage);
 
-  async function onSend(): Promise<void> {
-    if (!canSend) {
-      return;
-    }
-    const trimmedContent = content.trim();
+  async function send(): Promise<void> {
+    if (!canSend) return;
+    const trimmed = content.trim();
     setSending(true);
     try {
       if (editingMessage) {
-        if (!trimmedContent) {
-          toast.error("Message cannot be empty");
-          return;
-        }
-        const edited = await messagesApi.editMessage(editingMessage.id, trimmedContent);
+        if (!trimmed) { toast.error("Message cannot be empty"); return; }
+        const edited = await messagesApi.editMessage(editingMessage.id, trimmed);
         useMessageStore.getState().upsertMessage(conversationId, edited);
-        realtimeSocketClient.send("edit_message", {
-          message_id: editingMessage.id,
-          content: trimmedContent
-        });
-        toast.success("Message edited");
+        realtimeSocketClient.send("edit_message", { message_id: editingMessage.id, content: trimmed });
         onCancelEditing?.();
         return;
       }
-
-      await sendMessageAction({
-        conversationId,
-        content: trimmedContent || null,
-        type: resolvedType,
-        files
-      });
+      await sendMessageAction({ conversationId, content: trimmed || null, type, files });
       setContent("");
       setFiles([]);
       realtimeSocketClient.send("typing_stop", { conversation_id: conversationId });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send message");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to send");
     } finally {
       setSending(false);
     }
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send().catch(() => undefined); }
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setContent(e.target.value);
+    if (isEditing) return;
+    if (e.target.value.trim()) {
+      realtimeSocketClient.send("typing_start", { conversation_id: conversationId });
+    } else {
+      realtimeSocketClient.send("typing_stop", { conversation_id: conversationId });
+    }
+  }
+
+  function addFiles(f: FileList | null) {
+    if (!f) return;
+    setFiles((prev) => [...prev, ...Array.from(f)]);
+  }
+
   return (
-    <section className="border-t border-[var(--border)] px-3 py-2" style={{ background: "var(--messenger-header-bg)" }}>
+    <section
+      className="shrink-0 border-t px-3 py-2"
+      style={{ borderColor: "var(--border)", background: "var(--messenger-header-bg)" }}
+    >
       {/* Editing banner */}
-      {isEditing ? (
-        <div className="mb-2 flex items-start justify-between gap-2 rounded-xl border border-[#0084ff]/30 bg-[#e7f3ff] px-3 py-2">
+      {isEditing && (
+        <div
+          className="mb-2 flex items-start justify-between gap-2 rounded-xl border px-3 py-2"
+          style={{ borderColor: "var(--blue)", background: "var(--surface-active)" }}
+        >
           <div className="min-w-0">
-            <p className="text-[12px] font-semibold text-[#0084ff]">Editing message</p>
-            <p className="truncate text-[12px] text-[var(--muted)]">{editingMessage?.content || "Attachment"}</p>
+            <p className="text-[12px] font-semibold" style={{ color: "var(--blue)" }}>Editing message</p>
+            <p className="truncate text-[12px]" style={{ color: "var(--fg-secondary)" }}>
+              {editingMessage?.content || "Attachment"}
+            </p>
           </div>
           <button
             type="button"
             onClick={() => onCancelEditing?.()}
-            className="rounded-full p-1 text-[var(--muted)] transition hover:bg-[var(--secondary)]"
+            className="rounded-full p-1 transition"
+            style={{ color: "var(--fg-secondary)" }}
           >
             <XMarkIcon className="h-4 w-4" />
           </button>
         </div>
-      ) : null}
+      )}
 
-      <AttachmentPreview files={files} onRemove={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))} />
+      {/* File previews */}
+      <AttachmentPreview
+        files={files}
+        onRemove={(i) => setFiles((prev) => prev.filter((_, idx) => idx !== i))}
+      />
 
+      {/* Input row */}
       <div className="flex items-center gap-1">
-        {/* Left action buttons */}
+        {/* Left icons */}
         {!isEditing && (
           <>
-            <label title="More options" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
-              <PlusIcon className="h-[22px] w-[22px]" />
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={(event) => {
-                  const selected = Array.from(event.target.files || []);
-                  if (!selected.length) return;
-                  setFiles((prev) => [...prev, ...selected]);
-                }}
-              />
-            </label>
-            <label title="Send photo or video" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
-              <PhotoIcon className="h-[22px] w-[22px]" />
-              <input
-                type="file"
-                multiple
-                accept="image/*,video/*"
-                className="hidden"
-                onChange={(event) => {
-                  const selected = Array.from(event.target.files || []);
-                  if (!selected.length) return;
-                  setFiles((prev) => [...prev, ...selected]);
-                }}
-              />
-            </label>
-            <button title="Send voice message" className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
-              <MicrophoneIcon className="h-[22px] w-[22px]" />
-            </button>
+            <FileBtn accept="*" multiple onFiles={addFiles} title="Attach file">
+              <PlusCircleIcon className="h-[26px] w-[26px]" />
+            </FileBtn>
+            <FileBtn accept="image/*,video/*" multiple onFiles={addFiles} title="Photo / Video">
+              <PhotoIcon className="h-[26px] w-[26px]" />
+            </FileBtn>
+            <ActionBtn title="Voice message">
+              <MicrophoneIcon className="h-[26px] w-[26px]" />
+            </ActionBtn>
           </>
         )}
 
         {/* Text input */}
-        <div className="relative flex flex-1 items-center rounded-full bg-[var(--secondary)] px-4 py-2">
+        <div
+          className="relative flex flex-1 items-center rounded-full px-4 py-[8px]"
+          style={{ background: "var(--surface)" }}
+        >
           <input
             ref={inputRef}
             value={content}
-            onChange={(event) => {
-              setContent(event.target.value);
-              if (isEditing) return;
-              if (event.target.value.trim().length > 0) {
-                realtimeSocketClient.send("typing_start", { conversation_id: conversationId });
-              } else {
-                realtimeSocketClient.send("typing_stop", { conversation_id: conversationId });
-              }
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                onSend().catch(() => undefined);
-              }
-            }}
-            placeholder={isEditing ? "Edit message..." : "Aa"}
-            className="flex-1 bg-transparent text-[15px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={isEditing ? "Edit message…" : "Aa"}
+            className="flex-1 bg-transparent text-[15px] outline-none"
+            style={{ color: "var(--fg)" }}
           />
           <button
             type="button"
-            title="Insert emoji"
-            className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-[var(--muted)] transition hover:text-[var(--foreground)]"
+            title="Emoji"
+            className="ml-1 shrink-0 transition opacity-70 hover:opacity-100"
+            style={{ color: "var(--fg-secondary)" }}
           >
             <FaceSmileIcon className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Right action button */}
+        {/* Right button */}
         {canSend ? (
-          isEditing ? (
-            <button
-              type="button"
-              onClick={() => onSend().catch(() => undefined)}
-              title="Save edit"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0084ff] text-white transition hover:bg-[#0073e6]"
-            >
-              <CheckIcon className="h-5 w-5" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onSend().catch(() => undefined)}
-              title="Send message"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]"
-            >
-              <PaperAirplaneIcon className="h-[22px] w-[22px]" />
-            </button>
-          )
-        ) : (
-          !isEditing && (
-            <button
-              type="button"
-              title="Send like"
-              onClick={() => {
-                sendMessageAction({ conversationId, content: "👍", type: "text", files: [] }).catch(() => undefined);
-              }}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]"
-            >
-              <HandThumbUpIcon className="h-[22px] w-[22px]" />
-            </button>
-          )
-        )}
+          <ActionBtn
+            title={isEditing ? "Save edit" : "Send message"}
+            onClick={() => send().catch(() => undefined)}
+            primary
+          >
+            <PaperAirplaneIcon className="h-[22px] w-[22px]" />
+          </ActionBtn>
+        ) : !isEditing ? (
+          <ActionBtn
+            title="Like"
+            onClick={() =>
+              sendMessageAction({ conversationId, content: "👍", type: "text", files: [] }).catch(() => undefined)
+            }
+          >
+            <HandThumbUpIcon className="h-[22px] w-[22px]" />
+          </ActionBtn>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+/* Tiny helper components */
+function ActionBtn({
+  children,
+  onClick,
+  title,
+  primary,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  title?: string;
+  primary?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition"
+      style={
+        primary
+          ? { background: "var(--blue)", color: "#fff" }
+          : { color: "var(--blue)" }
+      }
+      onMouseEnter={(e) => {
+        if (!primary) (e.currentTarget as HTMLButtonElement).style.background = "var(--surface)";
+      }}
+      onMouseLeave={(e) => {
+        if (!primary) (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function FileBtn({
+  children,
+  accept,
+  multiple,
+  onFiles,
+  title,
+}: {
+  children: React.ReactNode;
+  accept: string;
+  multiple?: boolean;
+  onFiles: (f: FileList | null) => void;
+  title?: string;
+}) {
+  return (
+    <label
+      title={title}
+      className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition"
+      style={{ color: "var(--blue)" }}
+      onMouseEnter={(e) => ((e.currentTarget as HTMLLabelElement).style.background = "var(--surface)")}
+      onMouseLeave={(e) => ((e.currentTarget as HTMLLabelElement).style.background = "transparent")}
+    >
+      {children}
+      <input type="file" accept={accept} multiple={multiple} className="hidden" onChange={(e) => onFiles(e.target.files)} />
+    </label>
   );
 }

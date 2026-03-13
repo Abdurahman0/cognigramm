@@ -18,72 +18,70 @@ import type { Message } from "@/types/message";
 import { formatMessageDate } from "@/utils/date";
 import { realtimeSocketClient } from "@/websocket/socketClient";
 
-interface MessageListProps {
+interface Props {
   conversationId: number | null;
   onScrollToTop: () => void;
   onRequestEdit: (message: Message) => void;
 }
 
-type ListDateItem = { kind: "date"; key: string; date: string };
-type ListMessageItem = { kind: "message"; key: string; message: Message };
-type MessageListItem = ListDateItem | ListMessageItem;
+type DateItem = { kind: "date"; key: string; date: string };
+type MsgItem = { kind: "message"; key: string; message: Message };
+type ListItem = DateItem | MsgItem;
 
-export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: MessageListProps): JSX.Element {
+export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: Props): JSX.Element {
   const { messages, hasNextPage, isLoading, isFetchingNextPage, fetchNextPage } = useMessages(conversationId);
-  const currentUser = useUserStore((state) => state.currentUser);
-  const typingByConversation = usePresenceStore((state) => state.typingByConversation);
-  const updateMessageDelivery = useMessageStore((state) => state.updateMessageDelivery);
-  const [deletingMessage, setDeletingMessage] = useState<Message | null>(null);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const typingByConv = usePresenceStore((s) => s.typingByConversation);
+  const updateDelivery = useMessageStore((s) => s.updateMessageDelivery);
+  const [deletingMsg, setDeletingMsg] = useState<Message | null>(null);
 
   const parentRef = useRef<HTMLDivElement>(null);
   const loadingOlderRef = useRef(false);
-  const readMarkedIdsRef = useRef(new Set<number>());
-  const shouldStickToBottomRef = useRef(true);
-  const previousConversationRef = useRef<number | null>(null);
-  const previousMessageCountRef = useRef(0);
+  const readIds = useRef(new Set<number>());
+  const stickBottom = useRef(true);
+  const prevConvRef = useRef<number | null>(null);
+  const prevCountRef = useRef(0);
 
-  const conversation = useConversationStore((state) =>
-    conversationId ? state.conversationsById[conversationId] : null
+  const conv = useConversationStore((s) =>
+    conversationId ? s.conversationsById[conversationId] : null
   );
-  const isGroupConversation = conversation?.type === "group";
+  const isGroup = conv?.type === "group";
 
-  const listItems = useMemo<MessageListItem[]>(() => {
-    const items: MessageListItem[] = [];
+  /* ── Build virtual list items ── */
+  const items = useMemo<ListItem[]>(() => {
+    const out: ListItem[] = [];
     let lastDate: string | null = null;
-    for (const message of messages) {
-      const messageDate = formatMessageDate(message.created_at);
-      if (messageDate !== lastDate) {
-        items.push({ kind: "date", key: `date-${messageDate}-${message.id}`, date: messageDate });
-        lastDate = messageDate;
+    for (const msg of messages) {
+      const d = formatMessageDate(msg.created_at);
+      if (d !== lastDate) {
+        out.push({ kind: "date", key: `d-${d}-${msg.id}`, date: d });
+        lastDate = d;
       }
-      items.push({ kind: "message", key: `message-${message.id}-${message.client_message_id}`, message });
+      out.push({ kind: "message", key: `m-${msg.id}-${msg.client_message_id}`, message: msg });
     }
-    return items;
+    return out;
   }, [messages]);
 
-  const virtualizer = useVirtualizer({
-    count: listItems.length,
+  const virt = useVirtualizer({
+    count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 60,
-    overscan: 10
+    estimateSize: () => 56,
+    overscan: 10,
   });
 
+  /* ── Scroll handler: load older messages ── */
   const onScroll = useCallback(() => {
-    if (!parentRef.current) return;
-    const element = parentRef.current;
-    const distanceToBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
-    shouldStickToBottomRef.current = distanceToBottom < 140;
-
-    if (element.scrollTop > 140 || loadingOlderRef.current || !hasNextPage || isFetchingNextPage) return;
-
+    const el = parentRef.current;
+    if (!el) return;
+    stickBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (el.scrollTop > 100 || loadingOlderRef.current || !hasNextPage || isFetchingNextPage) return;
     loadingOlderRef.current = true;
-    const previousHeight = element.scrollHeight;
+    const prevH = el.scrollHeight;
     fetchNextPage()
       .then(() => {
         requestAnimationFrame(() => {
           if (!parentRef.current) return;
-          const heightDiff = parentRef.current.scrollHeight - previousHeight;
-          parentRef.current.scrollTop += heightDiff;
+          parentRef.current.scrollTop += parentRef.current.scrollHeight - prevH;
           onScrollToTop();
         });
       })
@@ -91,76 +89,71 @@ export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: Me
   }, [fetchNextPage, hasNextPage, isFetchingNextPage, onScrollToTop]);
 
   useEffect(() => {
-    const element = parentRef.current;
-    if (!element) return;
-    element.addEventListener("scroll", onScroll);
-    return () => element.removeEventListener("scroll", onScroll);
+    const el = parentRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
   }, [onScroll]);
 
+  /* ── Scroll to bottom on new messages / conversation switch ── */
   useEffect(() => {
-    if (previousConversationRef.current !== conversationId) {
-      previousConversationRef.current = conversationId;
-      previousMessageCountRef.current = 0;
-      readMarkedIdsRef.current = new Set<number>();
+    if (prevConvRef.current !== conversationId) {
+      prevConvRef.current = conversationId;
+      prevCountRef.current = 0;
+      readIds.current = new Set();
       requestAnimationFrame(() => {
         if (parentRef.current) parentRef.current.scrollTop = parentRef.current.scrollHeight;
       });
       return;
     }
-    if (messages.length <= previousMessageCountRef.current) return;
-    previousMessageCountRef.current = messages.length;
-    if (shouldStickToBottomRef.current) {
+    if (messages.length <= prevCountRef.current) return;
+    prevCountRef.current = messages.length;
+    if (stickBottom.current) {
       requestAnimationFrame(() => {
         if (parentRef.current) parentRef.current.scrollTop = parentRef.current.scrollHeight;
       });
     }
   }, [conversationId, messages.length]);
 
+  /* ── Mark messages as read ── */
   useEffect(() => {
-    if (!conversationId || !currentUser || messages.length === 0) return;
-    const unreadMessages = messages.filter(
-      (message) =>
-        message.id > 0 &&
-        message.sender_id !== currentUser.id &&
-        message.delivery_state !== "read" &&
-        !readMarkedIdsRef.current.has(message.id)
+    if (!conversationId || !currentUser || !messages.length) return;
+    const unread = messages.filter(
+      (m) => m.id > 0 && m.sender_id !== currentUser.id && m.delivery_state !== "read" && !readIds.current.has(m.id)
     );
-    if (unreadMessages.length === 0) return;
-    for (const message of unreadMessages) {
-      readMarkedIdsRef.current.add(message.id);
-      updateMessageDelivery(conversationId, message.id, { state: "read", read_at: new Date().toISOString() });
-      messagesApi.markRead(message.id).catch(() => undefined);
-      realtimeSocketClient.send("read_receipt", { message_id: message.id });
+    if (!unread.length) return;
+    for (const m of unread) {
+      readIds.current.add(m.id);
+      updateDelivery(conversationId, m.id, { state: "read", read_at: new Date().toISOString() });
+      messagesApi.markRead(m.id).catch(() => undefined);
+      realtimeSocketClient.send("read_receipt", { message_id: m.id });
     }
-  }, [conversationId, currentUser, messages, updateMessageDelivery]);
+  }, [conversationId, currentUser, messages, updateDelivery]);
 
-  const typingUserIds = conversationId ? typingByConversation[conversationId] || new Set<number>() : new Set<number>();
-  const typingUsernames = Array.from(typingUserIds)
-    .filter((userId) => userId !== currentUser?.id)
-    .map((userId) => {
-      const participant = conversation?.participants.find((member) => member.user_id === userId);
-      return participant?.username || `User ${userId}`;
-    });
+  /* ── Typing usernames ── */
+  const typingIds = conversationId ? typingByConv[conversationId] ?? new Set<number>() : new Set<number>();
+  const typingNames = Array.from(typingIds)
+    .filter((id) => id !== currentUser?.id)
+    .map((id) => conv?.participants.find((p) => p.user_id === id)?.username ?? `User ${id}`);
 
+  /* ── Loading state ── */
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <LoadingState label="Loading messages..." />
+        <LoadingState label="Loading messages…" />
       </div>
     );
   }
 
   if (!conversationId) {
-    return (
-      <EmptyState title="No conversation selected" description="Choose a conversation to start messaging." />
-    );
+    return <EmptyState title="No conversation selected" description="Choose a conversation to start." />;
   }
 
-  if (messages.length === 0) {
+  if (!messages.length) {
     return (
       <div className="flex flex-1 flex-col">
-        <EmptyState title="No messages yet" description="Be the first to say something!" />
-        <TypingIndicator usernames={typingUsernames} />
+        <EmptyState title="No messages yet" description="Say hello!" />
+        <TypingIndicator usernames={typingNames} />
       </div>
     );
   }
@@ -170,72 +163,61 @@ export function MessageList({ conversationId, onScrollToTop, onRequestEdit }: Me
       <div
         ref={parentRef}
         className="flex-1 overflow-y-auto py-2"
-        style={{ scrollbarWidth: "thin", scrollbarColor: "var(--border) transparent" }}
+        style={{ scrollbarWidth: "thin" }}
       >
-        {isFetchingNextPage ? (
+        {isFetchingNextPage && (
           <div className="px-4 pt-2">
-            <LoadingState className="py-2" label="Loading older messages..." />
+            <LoadingState className="py-1" label="Loading older messages…" />
           </div>
-        ) : null}
-        <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative" }}>
-          {virtualizer.getVirtualItems().map((virtualRow) => {
-            const item = listItems[virtualRow.index];
+        )}
+        <div style={{ height: `${virt.getTotalSize()}px`, position: "relative" }}>
+          {virt.getVirtualItems().map((row) => {
+            const item = items[row.index];
             if (!item) return null;
 
             if (item.kind === "date") {
               return (
                 <div
                   key={item.key}
-                  data-index={virtualRow.index}
-                  ref={virtualizer.measureElement}
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    transform: `translateY(${virtualRow.start}px)`
-                  }}
+                  data-index={row.index}
+                  ref={virt.measureElement}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${row.start}px)` }}
                   className="flex items-center justify-center py-3"
                 >
-                  <span className="rounded-full bg-[var(--secondary)] px-3 py-1 text-[11px] font-medium text-[var(--muted)]">
+                  <span
+                    className="rounded-full px-3 py-1 text-[11px] font-medium"
+                    style={{ background: "var(--surface)", color: "var(--fg-secondary)" }}
+                  >
                     {item.date}
                   </span>
                 </div>
               );
             }
 
-            const message = item.message;
-            const isOwn = message.sender_id === currentUser?.id;
-            const senderName = message.sender?.username || null;
-
+            const msg = item.message;
+            const isOwn = msg.sender_id === currentUser?.id;
             return (
               <div
                 key={item.key}
-                data-index={virtualRow.index}
-                ref={virtualizer.measureElement}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  transform: `translateY(${virtualRow.start}px)`
-                }}
+                data-index={row.index}
+                ref={virt.measureElement}
+                style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${row.start}px)` }}
               >
                 <MessageBubble
-                  message={message}
+                  message={msg}
                   isOwn={Boolean(isOwn)}
-                  showSenderName={Boolean(!isOwn && isGroupConversation)}
-                  senderName={senderName}
-                  onEdit={isOwn ? () => onRequestEdit(message) : undefined}
-                  onDelete={isOwn ? () => setDeletingMessage(message) : undefined}
+                  showSenderName={Boolean(!isOwn && isGroup)}
+                  senderName={msg.sender?.username ?? null}
+                  onEdit={isOwn ? () => onRequestEdit(msg) : undefined}
+                  onDelete={isOwn ? () => setDeletingMsg(msg) : undefined}
                 />
               </div>
             );
           })}
         </div>
       </div>
-      <TypingIndicator usernames={typingUsernames} />
-      <MessageDeleteDialog message={deletingMessage} onClose={() => setDeletingMessage(null)} />
+      <TypingIndicator usernames={typingNames} />
+      <MessageDeleteDialog message={deletingMsg} onClose={() => setDeletingMsg(null)} />
     </>
   );
 }

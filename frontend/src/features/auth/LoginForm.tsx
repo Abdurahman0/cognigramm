@@ -7,31 +7,22 @@ import { toast } from "sonner";
 
 import { authErrorMessage, loginAction } from "@/features/auth/authActions";
 
-interface LoginFormValues {
-  identifier: string;
-  password: string;
-}
+interface Vals { identifier: string; password: string; }
 
 export function LoginForm(): JSX.Element {
   const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
-  const { register, handleSubmit, formState } = useForm<LoginFormValues>({
-    defaultValues: {
-      identifier: "",
-      password: ""
-    }
-  });
+  const [busy, setBusy] = useState(false);
+  const { register, handleSubmit } = useForm<Vals>({ defaultValues: { identifier: "", password: "" } });
 
-  const onSubmit = handleSubmit(async (values) => {
-    setSubmitting(true);
+  const onSubmit = handleSubmit(async (vals) => {
+    setBusy(true);
     try {
-      await loginAction(values);
-      toast.success("Welcome back");
+      await loginAction(vals);
       router.replace("/chat");
-    } catch (error) {
-      toast.error(authErrorMessage(error));
+    } catch (e) {
+      toast.error(authErrorMessage(e));
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   });
 
@@ -39,20 +30,47 @@ export function LoginForm(): JSX.Element {
     <form onSubmit={onSubmit} className="space-y-3">
       <input
         {...register("identifier", { required: true })}
-        className="w-full rounded-lg border border-[#ccd0d5] bg-[#f5f6f7] px-4 py-3 text-[15px] text-[#1c1e21] outline-none transition focus:border-[#0084ff] focus:bg-white focus:ring-2 focus:ring-[#0084ff]/20 placeholder:text-[#90949c]"
         placeholder="Username or Email"
+        className="w-full rounded-lg border px-4 py-3 text-[15px] outline-none transition"
+        style={{
+          borderColor: "#ccd0d5",
+          background: "#f5f6f7",
+          color: "#1c1e21",
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "#0084ff";
+          e.currentTarget.style.background = "#fff";
+          e.currentTarget.style.boxShadow = "0 0 0 2px rgba(0,132,255,.2)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "#ccd0d5";
+          e.currentTarget.style.background = "#f5f6f7";
+          e.currentTarget.style.boxShadow = "none";
+        }}
       />
       <input
         {...register("password", { required: true })}
         type="password"
-        className="w-full rounded-lg border border-[#ccd0d5] bg-[#f5f6f7] px-4 py-3 text-[15px] text-[#1c1e21] outline-none transition focus:border-[#0084ff] focus:bg-white focus:ring-2 focus:ring-[#0084ff]/20 placeholder:text-[#90949c]"
         placeholder="Password"
+        className="w-full rounded-lg border px-4 py-3 text-[15px] outline-none transition"
+        style={{ borderColor: "#ccd0d5", background: "#f5f6f7", color: "#1c1e21" }}
+        onFocus={(e) => {
+          e.currentTarget.style.borderColor = "#0084ff";
+          e.currentTarget.style.background = "#fff";
+          e.currentTarget.style.boxShadow = "0 0 0 2px rgba(0,132,255,.2)";
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = "#ccd0d5";
+          e.currentTarget.style.background = "#f5f6f7";
+          e.currentTarget.style.boxShadow = "none";
+        }}
       />
       <button
-        disabled={submitting || formState.isSubmitting}
-        className="w-full rounded-lg bg-[#0084ff] px-4 py-3 text-[17px] font-bold text-white transition hover:bg-[#0073e6] active:bg-[#006be0] disabled:opacity-60"
+        disabled={busy}
+        className="w-full rounded-lg py-3 text-[17px] font-bold text-white transition"
+        style={{ background: busy ? "#4da6ff" : "#0084ff" }}
       >
-        {submitting ? "Signing in..." : "Log In"}
+        {busy ? "Signing in…" : "Log In"}
       </button>
     </form>
   );
