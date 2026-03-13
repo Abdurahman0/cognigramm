@@ -3,12 +3,13 @@ module.exports = function (api) {
   return {
     presets: ["babel-preset-expo"],
     plugins: [
-      "expo-router/babel",
       [
         "module-resolver",
         {
           alias: {
-            "@": "./"
+            "@": "./",
+            "zustand/middleware": "zustand/middleware.js",
+            "zustand/react/shallow": "zustand/react/shallow.js"
           }
         }
       ],

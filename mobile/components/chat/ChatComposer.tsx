@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -8,6 +8,8 @@ interface ChatComposerProps {
   keyboardVisible?: boolean;
   replyToText?: string;
   onClearReply?: () => void;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
   onSend: (body: string) => void;
   onSendAttachment: () => void;
 }
@@ -35,6 +37,8 @@ export function ChatComposer({
   keyboardVisible = false,
   replyToText,
   onClearReply,
+  onTypingStart,
+  onTypingStop,
   onSend,
   onSendAttachment
 }: ChatComposerProps): JSX.Element {
@@ -43,6 +47,58 @@ export function ChatComposer({
   const [text, setText] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(minInputHeight);
+  const typingActiveRef = useRef(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTypingTimeout = () => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = null;
+    }
+  };
+
+  const stopTyping = () => {
+    clearTypingTimeout();
+    if (!typingActiveRef.current) {
+      return;
+    }
+    typingActiveRef.current = false;
+    onTypingStop?.();
+  };
+
+  const startTyping = () => {
+    if (!typingActiveRef.current) {
+      typingActiveRef.current = true;
+      onTypingStart?.();
+    }
+    clearTypingTimeout();
+    typingTimeoutRef.current = setTimeout(() => {
+      stopTyping();
+    }, 1500);
+  };
+
+  useEffect(
+    () => () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = null;
+      }
+      if (typingActiveRef.current) {
+        typingActiveRef.current = false;
+        onTypingStop?.();
+      }
+    },
+    [onTypingStop]
+  );
+
+  const handleTextChange = (value: string) => {
+    setText(value);
+    if (value.trim().length === 0) {
+      stopTyping();
+      return;
+    }
+    startTyping();
+  };
 
   const handleSend = () => {
     const value = text.trim();
@@ -53,6 +109,7 @@ export function ChatComposer({
     setText("");
     setInputHeight(minInputHeight);
     setEmojiPickerOpen(false);
+    stopTyping();
     Keyboard.dismiss();
   };
 
@@ -108,12 +165,13 @@ export function ChatComposer({
         <View style={[styles.inputWrap, keyboardVisible && styles.inputWrapKeyboardOpen]}>
           <TextInput
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             placeholder="Type a message"
             placeholderTextColor={theme.colors.textMuted}
             multiline
             blurOnSubmit={false}
             onFocus={() => setEmojiPickerOpen(false)}
+            onBlur={stopTyping}
             onContentSizeChange={(event) => {
               const nextHeight = Math.max(minInputHeight, Math.min(94, event.nativeEvent.contentSize.height));
               setInputHeight(nextHeight);

@@ -15,6 +15,7 @@ export interface FileAttachment {
 
 export interface ChatMessage {
   id: ID;
+  clientMessageId?: string;
   chatId: ID;
   senderId: ID;
   body: string;
@@ -36,6 +37,8 @@ export interface ChatSummary {
   title: string;
   subtitle?: string;
   kind: ChatKind;
+  createdAt?: string;
+  ownerId?: ID;
   memberIds: ID[];
   avatar?: string;
   lastMessageId?: ID;

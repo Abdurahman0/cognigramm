@@ -2,8 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
-  Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -26,6 +26,7 @@ export default function ChatsScreen(): JSX.Element {
   const { theme } = useAppTheme();
   const { isDesktop } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
+  const [actionChatId, setActionChatId] = useState<string>("");
 
   const {
     chats,
@@ -66,17 +67,14 @@ export default function ChatsScreen(): JSX.Element {
     setRefreshing(false);
   };
 
+  const selectedActionChat = chats.find((item) => item.id === actionChatId);
+
   const openChatActions = (chatId: string) => {
-    const chat = chats.find((item) => item.id === chatId);
-    if (!chat) {
-      return;
-    }
-    Alert.alert(chat.title, "Conversation actions", [
-      { text: chat.pinned ? "Unpin" : "Pin", onPress: () => togglePin(chat.id) },
-      { text: chat.archived ? "Unarchive" : "Archive", onPress: () => toggleArchive(chat.id) },
-      { text: chat.muted ? "Unmute" : "Mute", onPress: () => toggleMute(chat.id) },
-      { text: "Cancel", style: "cancel" }
-    ]);
+    setActionChatId(chatId);
+  };
+
+  const closeChatActions = () => {
+    setActionChatId("");
   };
 
   const listElement = (
@@ -109,6 +107,7 @@ export default function ChatsScreen(): JSX.Element {
           lastMessage={(messagesByChat[item.id] ?? []).slice(-1)[0]}
           active={isDesktop && activeDesktopChatId === item.id}
           onLongPress={() => openChatActions(item.id)}
+          onOpenActions={() => openChatActions(item.id)}
           onPress={() => {
             if (isDesktop) {
               setDesktopChat(item.id);
@@ -123,7 +122,7 @@ export default function ChatsScreen(): JSX.Element {
   );
 
   return (
-    <ScreenContainer padded={false}>
+    <ScreenContainer padded={false} includeBottomInset={false}>
       <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <SectionHeader
           title="Business Chats"
@@ -164,12 +163,6 @@ export default function ChatsScreen(): JSX.Element {
               </Pressable>
             );
           })}
-          <Pressable onPress={() => router.push("/(app)/pinned")} style={styles.linkPill}>
-            <Text style={{ color: theme.colors.accent, fontSize: 12, fontWeight: "600" }}>Pinned</Text>
-          </Pressable>
-          <Pressable onPress={() => router.push("/(app)/archived")} style={styles.linkPill}>
-            <Text style={{ color: theme.colors.accent, fontSize: 12, fontWeight: "600" }}>Archived</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -189,6 +182,75 @@ export default function ChatsScreen(): JSX.Element {
       ) : (
         <View style={styles.mobileListWrap}>{listElement}</View>
       )}
+
+      <Modal
+        transparent
+        animationType="fade"
+        visible={Boolean(selectedActionChat)}
+        onRequestClose={closeChatActions}
+      >
+        <Pressable style={styles.actionsBackdrop} onPress={closeChatActions}>
+          <Pressable
+            onPress={() => undefined}
+            style={[
+              styles.actionsPanel,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border
+              }
+            ]}
+          >
+            <Text style={[styles.actionsTitle, { color: theme.colors.textPrimary }]}>{selectedActionChat?.title}</Text>
+            <Text style={[styles.actionsSubtitle, { color: theme.colors.textMuted }]}>Conversation actions</Text>
+
+            <Pressable
+              onPress={() => {
+                if (selectedActionChat) {
+                  togglePin(selectedActionChat.id);
+                }
+                closeChatActions();
+              }}
+              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
+            >
+              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
+                {selectedActionChat?.pinned ? "Unpin" : "Pin"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (selectedActionChat) {
+                  toggleArchive(selectedActionChat.id);
+                }
+                closeChatActions();
+              }}
+              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
+            >
+              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
+                {selectedActionChat?.archived ? "Unarchive" : "Archive"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                if (selectedActionChat) {
+                  toggleMute(selectedActionChat.id);
+                }
+                closeChatActions();
+              }}
+              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
+            >
+              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
+                {selectedActionChat?.muted ? "Unmute" : "Mute"}
+              </Text>
+            </Pressable>
+
+            <Pressable onPress={closeChatActions} style={[styles.closeButton, { backgroundColor: theme.colors.surfaceMuted }]}>
+              <Text style={[styles.closeButtonText, { color: theme.colors.textSecondary }]}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -225,18 +287,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 7
   },
-  linkPill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 7
-  },
   mobileListWrap: {
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 12
   },
   listContent: {
-    paddingBottom: 20
+    paddingBottom: 8
   },
   desktopRoot: {
     flex: 1,
@@ -257,5 +314,50 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24
+  },
+  actionsBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.35)",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24
+  },
+  actionsPanel: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    width: "100%"
+  },
+  actionsTitle: {
+    fontSize: 16,
+    fontWeight: "700"
+  },
+  actionsSubtitle: {
+    fontSize: 12,
+    marginTop: 2
+  },
+  actionsButton: {
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 11
+  },
+  actionsButtonText: {
+    fontSize: 14,
+    fontWeight: "600"
+  },
+  closeButton: {
+    alignItems: "center",
+    borderRadius: 10,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 11
+  },
+  closeButtonText: {
+    fontSize: 14,
+    fontWeight: "700"
   }
 });
+
+

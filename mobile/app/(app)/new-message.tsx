@@ -51,29 +51,33 @@ export default function NewMessageScreen(): JSX.Element {
     setSelectedIds((state) => (state.includes(userId) ? state.filter((id) => id !== userId) : [...state, userId]));
   };
 
-  const handleCreate = () => {
-    if (mode === "direct") {
-      const first = selectedIds[0];
-      if (!first) {
-        toast.error("Select a colleague");
+  const handleCreate = async () => {
+    try {
+      if (mode === "direct") {
+        const first = selectedIds[0];
+        if (!first) {
+          toast.error("Select a colleague");
+          return;
+        }
+        const id = await startDirectConversation(first);
+        router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
         return;
       }
-      const id = startDirectConversation(first);
-      router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
-      return;
-    }
 
-    if (!title.trim() || selectedIds.length === 0) {
-      toast.error("Add title and members");
-      return;
+      if (!title.trim() || selectedIds.length === 0) {
+        toast.error("Add title and members");
+        return;
+      }
+      const id = await createGroupConversation({
+        title: title.trim(),
+        memberIds: selectedIds,
+        kind: mode === "channel" ? "channel" : "group"
+      });
+      toast.success(mode === "channel" ? "Channel created" : "Group created");
+      router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
+    } catch (error) {
+      toast.error("Unable to create conversation", error instanceof Error ? error.message : "Unexpected error");
     }
-    const id = createGroupConversation({
-      title: title.trim(),
-      memberIds: selectedIds,
-      kind: mode === "channel" ? "channel" : "group"
-    });
-    toast.success(mode === "channel" ? "Channel created" : "Group created");
-    router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
   };
 
   return (
@@ -161,7 +165,7 @@ export default function NewMessageScreen(): JSX.Element {
                 <View style={styles.rowCopy}>
                   <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{item.fullName}</Text>
                   <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                    {item.role.toUpperCase()} • {item.department}
+                    {item.role.toUpperCase()} - {item.department}
                   </Text>
                 </View>
                 {selected ? <Feather name="check-circle" size={18} color={theme.colors.accent} /> : null}

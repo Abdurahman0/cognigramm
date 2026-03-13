@@ -23,8 +23,8 @@ export default function LoginScreen(): JSX.Element {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "amina.rahimova@company.local",
-      password: "123456"
+      email: "",
+      password: ""
     }
   });
 

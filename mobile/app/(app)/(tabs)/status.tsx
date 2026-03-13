@@ -27,9 +27,13 @@ export default function StatusScreen(): JSX.Element {
             return (
               <Pressable
                 key={status}
-                onPress={() => {
-                  updateProfile({ presence: status, isOnline: status !== "offline" });
-                  toast.success("Status updated", PRESENCE_LABELS[status]);
+                onPress={async () => {
+                  try {
+                    await updateProfile({ presence: status, isOnline: status !== "offline" });
+                    toast.success("Status updated", PRESENCE_LABELS[status]);
+                  } catch (error) {
+                    toast.error("Unable to update status", error instanceof Error ? error.message : "Unexpected error");
+                  }
                 }}
                 style={[
                   styles.statusCard,

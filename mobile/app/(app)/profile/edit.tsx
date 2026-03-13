@@ -40,10 +40,14 @@ export default function EditProfileScreen(): JSX.Element {
     }
   });
 
-  const save = handleSubmit((values) => {
-    updateCurrentUserProfile(values);
-    toast.success("Profile updated");
-    router.back();
+  const save = handleSubmit(async (values) => {
+    try {
+      await updateCurrentUserProfile(values);
+      toast.success("Profile updated");
+      router.back();
+    } catch (error) {
+      toast.error("Unable to update profile", error instanceof Error ? error.message : "Unexpected error");
+    }
   });
 
   return (

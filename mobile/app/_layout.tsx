@@ -19,7 +19,9 @@ export default function RootLayout(): JSX.Element {
   const [queryClient] = useState(() => new QueryClient());
   const { theme } = useAppTheme();
   const authHydrated = useAuthStore((state) => state.hydrated);
+  const session = useAuthStore((state) => state.session);
   const chatHydrated = useChatStore((state) => state.hydrated);
+  const initializeChats = useChatStore((state) => state.initializeForSession);
   const settingsHydrated = useSettingsStore((state) => state.hydrated);
 
   useEffect(() => {
@@ -31,6 +33,13 @@ export default function RootLayout(): JSX.Element {
       SplashScreen.hideAsync().catch(() => undefined);
     }
   }, [authHydrated, chatHydrated, settingsHydrated]);
+
+  useEffect(() => {
+    if (!authHydrated || !chatHydrated) {
+      return;
+    }
+    initializeChats().catch(() => undefined);
+  }, [authHydrated, chatHydrated, initializeChats, session?.token]);
 
   const ready = authHydrated && chatHydrated && settingsHydrated;
 

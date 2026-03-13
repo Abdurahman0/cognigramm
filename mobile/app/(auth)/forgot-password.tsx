@@ -28,7 +28,7 @@ export default function ForgotPasswordScreen(): JSX.Element {
   const submit = handleSubmit(async (values) => {
     try {
       await requestOtp(values.email);
-      toast.success("Verification sent", "Use code 123456 for demo.");
+      toast.success("Verification sent");
       router.push("/(auth)/otp");
     } catch (error) {
       toast.error("Unable to send code", error instanceof Error ? error.message : "Unexpected error");

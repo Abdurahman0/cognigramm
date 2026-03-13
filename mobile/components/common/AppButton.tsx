@@ -57,14 +57,14 @@ export function AppButton({
       accessibilityRole="button"
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.button,
         {
           width: fullWidth ? "100%" : "auto",
           borderRadius: theme.radius.md,
           borderColor: variantStyle.borderColor,
           backgroundColor: variantStyle.backgroundColor,
-          opacity: isDisabled ? 0.5 : pressed ? 0.86 : 1
+          opacity: isDisabled ? 0.5 : pressed ? 0.86 : hovered ? 0.93 : 1
         }
       ]}
     >

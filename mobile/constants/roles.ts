@@ -9,5 +9,6 @@ export const ROLE_LABELS: Record<EmployeeRole, string> = {
   designer: "Designer",
   product: "Product",
   qa: "QA",
-  intern: "Intern"
+  intern: "Intern",
+  employee: "Employee"
 };

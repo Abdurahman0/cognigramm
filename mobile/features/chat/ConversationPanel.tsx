@@ -68,6 +68,11 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
   const keyboardVisibleRef = useRef(false);
   const baselineBottomInsetRef = useRef(insets.bottom);
   const baselineComposerBottomRef = useRef<number | null>(null);
+  const webViewportHeightRef = useRef<number | null>(null);
+  const webViewportSignatureRef = useRef("");
+  const unreadAutoScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ignoreNextScrollEventRef = useRef(false);
+  const userTouchedScrollRef = useRef(false);
   const composerTranslateY = useRef(new Animated.Value(0)).current;
   const [replyToMessageId, setReplyToMessageId] = useState<string>("");
   const [selectedMessageId, setSelectedMessageId] = useState<string>("");
@@ -76,6 +81,7 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [entryUnreadCount, setEntryUnreadCount] = useState(0);
   const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState("");
+  const [entryScrollReady, setEntryScrollReady] = useState(false);
   const isNearBottomRef = useRef(true);
   const lastMessageIdRef = useRef("");
   const shouldRunInitialScrollRef = useRef(true);
@@ -86,28 +92,26 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
     messages,
     loadingOlder,
     sendMessage,
-    addIncomingMessage,
-    simulateTyping,
     editMessage,
     deleteMessage,
     forwardMessage,
     loadOlderMessages,
     setActiveConversationId,
-    markConversationRead
+    markConversationRead,
+    sendTypingEvent
   } = useChatStore(useShallow((state) => ({
     chats: state.chats,
     users: state.users,
     messages: state.messagesByChat[chatId] ?? [],
     loadingOlder: state.loadingOlderByChat[chatId] ?? false,
     sendMessage: state.sendMessage,
-    addIncomingMessage: state.addIncomingMessage,
-    simulateTyping: state.simulateTyping,
     editMessage: state.editMessage,
     deleteMessage: state.deleteMessage,
     forwardMessage: state.forwardMessage,
     loadOlderMessages: state.loadOlderMessages,
     setActiveConversationId: state.setActiveConversationId,
-    markConversationRead: state.markConversationRead
+    markConversationRead: state.markConversationRead,
+    sendTypingEvent: state.sendTypingEvent
   })));
 
   const chat = chats.find((item) => item.id === chatId);
@@ -119,28 +123,45 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
     () => messages.find((message) => message.id === selectedMessageId),
     [messages, selectedMessageId]
   );
-  const autoResponderId = useMemo(
-    () => chat?.memberIds.find((memberId) => memberId !== currentUser.id),
-    [chat?.memberIds, currentUser.id]
-  );
 
   useFocusEffect(
     useCallback(() => {
-      const unreadAtEntry = useChatStore.getState().chats.find((item) => item.id === chatId)?.unreadCount ?? 0;
+      userTouchedScrollRef.current = false;
+      if (unreadAutoScrollTimeoutRef.current) {
+        clearTimeout(unreadAutoScrollTimeoutRef.current);
+        unreadAutoScrollTimeoutRef.current = null;
+      }
+      setEntryScrollReady(false);
+      const state = useChatStore.getState();
+      const unreadAtEntry = state.chats.find((item) => item.id === chatId)?.unreadCount ?? 0;
+      const entryMessages = state.messagesByChat[chatId] ?? [];
+      const unreadStartIndex = unreadAtEntry > 0 ? Math.max(entryMessages.length - unreadAtEntry, 0) : -1;
+      const unreadStartMessageId = unreadStartIndex >= 0 ? entryMessages[unreadStartIndex]?.id ?? "" : "";
       setEntryUnreadCount(unreadAtEntry);
-      setEntryFirstUnreadMessageId("");
+      setEntryFirstUnreadMessageId(unreadStartMessageId);
       shouldRunInitialScrollRef.current = true;
+      setEntryScrollReady(true);
       setActiveConversationId(chatId);
       markConversationRead(chatId);
       return () => {
+        if (unreadAutoScrollTimeoutRef.current) {
+          clearTimeout(unreadAutoScrollTimeoutRef.current);
+          unreadAutoScrollTimeoutRef.current = null;
+        }
+        sendTypingEvent(chatId, false);
         setActiveConversationId("");
         setEntryUnreadCount(0);
         setEntryFirstUnreadMessageId("");
+        setEntryScrollReady(false);
       };
-    }, [chatId, markConversationRead, setActiveConversationId])
+    }, [chatId, markConversationRead, sendTypingEvent, setActiveConversationId])
   );
 
   useEffect(() => {
+    if (!entryScrollReady) {
+      return;
+    }
+
     const nextLastMessage = messages[messages.length - 1];
     if (!nextLastMessage) {
       lastMessageIdRef.current = "";
@@ -149,34 +170,53 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
 
     if (shouldRunInitialScrollRef.current) {
       if (entryUnreadCount > 0) {
-        if (!entryFirstUnreadMessageId) {
-          const unreadIndex = Math.max(messages.length - entryUnreadCount, 0);
-          const unreadMessage = messages[unreadIndex];
-          if (unreadMessage) {
-            setEntryFirstUnreadMessageId(unreadMessage.id);
-          }
-          return;
-        }
-
-        const unreadIndex = messages.findIndex((message) => message.id === entryFirstUnreadMessageId);
+        const unreadIndexById = entryFirstUnreadMessageId
+          ? messages.findIndex((message) => message.id === entryFirstUnreadMessageId)
+          : -1;
+        const fallbackUnreadIndex = Math.max(messages.length - entryUnreadCount, 0);
+        const unreadIndex =
+          unreadIndexById >= 0 ? unreadIndexById : messages[fallbackUnreadIndex] ? fallbackUnreadIndex : -1;
         if (unreadIndex >= 0) {
           requestAnimationFrame(() => {
+            ignoreNextScrollEventRef.current = true;
             listRef.current?.scrollToIndex({
               index: Math.max(unreadIndex - 1, 0),
               animated: false,
               viewPosition: 0.05
             });
+            setTimeout(() => {
+              ignoreNextScrollEventRef.current = false;
+            }, 120);
           });
           isNearBottomRef.current = false;
+          if (unreadAutoScrollTimeoutRef.current) {
+            clearTimeout(unreadAutoScrollTimeoutRef.current);
+          }
+          unreadAutoScrollTimeoutRef.current = setTimeout(() => {
+            unreadAutoScrollTimeoutRef.current = null;
+            if (userTouchedScrollRef.current) {
+              return;
+            }
+            isNearBottomRef.current = true;
+            listRef.current?.scrollToEnd({ animated: true });
+          }, 850);
         } else {
           requestAnimationFrame(() => {
+            ignoreNextScrollEventRef.current = true;
             listRef.current?.scrollToEnd({ animated: false });
+            setTimeout(() => {
+              ignoreNextScrollEventRef.current = false;
+            }, 120);
           });
           isNearBottomRef.current = true;
         }
       } else {
         requestAnimationFrame(() => {
+          ignoreNextScrollEventRef.current = true;
           listRef.current?.scrollToEnd({ animated: false });
+          setTimeout(() => {
+            ignoreNextScrollEventRef.current = false;
+          }, 120);
         });
         isNearBottomRef.current = true;
       }
@@ -201,7 +241,7 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
     requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({ animated: true });
     });
-  }, [currentUser.id, entryFirstUnreadMessageId, entryUnreadCount, messages]);
+  }, [currentUser.id, entryFirstUnreadMessageId, entryUnreadCount, entryScrollReady, messages]);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -228,16 +268,125 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
       });
     };
 
+    const isEditableTarget = (target: EventTarget | null): boolean => {
+      if (typeof HTMLElement === "undefined" || !(target instanceof HTMLElement)) {
+        return false;
+      }
+      const tag = target.tagName.toLowerCase();
+      return tag === "input" || tag === "textarea" || target.isContentEditable;
+    };
+
+    const syncWebViewport = () => {
+      if (Platform.OS !== "web" || typeof window === "undefined") {
+        return;
+      }
+
+      const viewport = (
+        window as {
+          visualViewport?: {
+            height: number;
+            offsetTop: number;
+          };
+        }
+      ).visualViewport;
+
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+      const viewportSignature = `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`;
+      const activeElement = typeof document === "undefined" ? null : document.activeElement;
+      const inputFocused = isEditableTarget(activeElement);
+      const signatureChanged = webViewportSignatureRef.current !== viewportSignature;
+
+      if (signatureChanged) {
+        webViewportSignatureRef.current = viewportSignature;
+        if (!inputFocused) {
+          webViewportHeightRef.current = viewportHeight;
+        }
+      }
+
+      if (webViewportHeightRef.current == null) {
+        webViewportHeightRef.current = viewportHeight;
+      }
+
+      const baselineViewport = webViewportHeightRef.current ?? viewportHeight;
+      const viewportDrop = Math.max(0, baselineViewport - viewportHeight);
+
+      measureComposerBottom((currentBottom) => {
+        const baselineBottom = baselineComposerBottomRef.current ?? currentBottom;
+        const referenceBottom = Math.max(currentBottom, baselineBottom);
+        const overlap = Math.max(0, referenceBottom - viewportBottom);
+        const keyboardIsVisible = inputFocused && (overlap > 0 || viewportDrop > 90);
+        const duration = keyboardIsVisible ? 110 : 160;
+
+        setKeyboardVisible(keyboardIsVisible);
+        keyboardVisibleRef.current = keyboardIsVisible;
+        setComposerBottomInset(keyboardIsVisible ? 0 : baselineBottomInsetRef.current);
+        animateComposer(keyboardIsVisible ? -overlap : 0, duration);
+
+        if (keyboardIsVisible && isNearBottomRef.current) {
+          requestAnimationFrame(() => {
+            listRef.current?.scrollToEnd({ animated: false });
+          });
+        }
+
+        if (!keyboardIsVisible) {
+          webViewportHeightRef.current = viewportHeight;
+          baselineComposerBottomRef.current = currentBottom;
+        }
+      });
+    };
+
+    if (Platform.OS === "web") {
+      if (typeof window === "undefined") {
+        return;
+      }
+      const viewport = (
+        window as {
+          visualViewport?: {
+            height: number;
+            addEventListener: (name: "resize" | "scroll", listener: () => void) => void;
+            removeEventListener: (name: "resize" | "scroll", listener: () => void) => void;
+          };
+        }
+      ).visualViewport;
+
+      const onWindowResize = () => {
+        syncWebViewport();
+      };
+      const onFocusChange = () => {
+        setTimeout(syncWebViewport, 0);
+      };
+
+      webViewportHeightRef.current = viewport?.height ?? window.innerHeight;
+      webViewportSignatureRef.current = `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`;
+      requestAnimationFrame(syncWebViewport);
+
+      viewport?.addEventListener("resize", syncWebViewport);
+      viewport?.addEventListener("scroll", syncWebViewport);
+      window.addEventListener("resize", onWindowResize);
+      window.addEventListener("orientationchange", onWindowResize);
+      if (typeof document !== "undefined") {
+        document.addEventListener("focusin", onFocusChange);
+        document.addEventListener("focusout", onFocusChange);
+      }
+      return () => {
+        viewport?.removeEventListener("resize", syncWebViewport);
+        viewport?.removeEventListener("scroll", syncWebViewport);
+        window.removeEventListener("resize", onWindowResize);
+        window.removeEventListener("orientationchange", onWindowResize);
+        if (typeof document !== "undefined") {
+          document.removeEventListener("focusin", onFocusChange);
+          document.removeEventListener("focusout", onFocusChange);
+        }
+      };
+    }
+
     const handleKeyboardShow = (event: KeyboardEvent) => {
       setKeyboardVisible(true);
       if (isNearBottomRef.current) {
         requestAnimationFrame(() => {
           listRef.current?.scrollToEnd({ animated: true });
         });
-      }
-
-      if (Platform.OS !== "android") {
-        return;
       }
 
       keyboardVisibleRef.current = true;
@@ -248,7 +397,7 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
         Dimensions.get("window").height - (event.endCoordinates?.height ?? 0);
 
       measureComposerBottom((currentBottom) => {
-        const keyboardGap = 16;
+        const keyboardGap = Platform.OS === "android" ? baselineBottomInsetRef.current : 0;
         const baselineBottom = baselineComposerBottomRef.current ?? currentBottom;
         const referenceBottom = Math.max(currentBottom, baselineBottom);
         const overlap = referenceBottom + keyboardGap - keyboardTop;
@@ -259,12 +408,10 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
 
     const handleKeyboardHide = (event: KeyboardEvent) => {
       setKeyboardVisible(false);
-      if (Platform.OS === "android") {
-        keyboardVisibleRef.current = false;
-        setComposerBottomInset(baselineBottomInsetRef.current);
-        const duration = typeof event.duration === "number" && event.duration > 0 ? event.duration : 180;
-        animateComposer(0, duration);
-      }
+      keyboardVisibleRef.current = false;
+      setComposerBottomInset(baselineBottomInsetRef.current);
+      const duration = typeof event.duration === "number" && event.duration > 0 ? event.duration : 180;
+      animateComposer(0, duration);
 
       if (isNearBottomRef.current) {
         requestAnimationFrame(() => {
@@ -290,8 +437,11 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
   }, [composerTranslateY]);
 
   useEffect(() => {
+    baselineBottomInsetRef.current = insets.bottom;
     if (Platform.OS !== "android") {
-      setComposerBottomInset(insets.bottom);
+      if (!keyboardVisibleRef.current) {
+        setComposerBottomInset(insets.bottom);
+      }
       return;
     }
 
@@ -299,7 +449,6 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
       return;
     }
 
-    baselineBottomInsetRef.current = insets.bottom;
     setComposerBottomInset(insets.bottom);
 
     requestAnimationFrame(() => {
@@ -399,20 +548,6 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
     router.push({ pathname: "/(app)/chat-info/[chatId]", params: { chatId: chat.id } });
   };
 
-  const triggerAutoResponse = () => {
-    if (!autoResponderId || chat.kind === "announcement") {
-      return;
-    }
-    simulateTyping(chat.id, autoResponderId, 1400);
-    setTimeout(() => {
-      addIncomingMessage({
-        chatId: chat.id,
-        senderId: autoResponderId,
-        body: "Received. I will update the thread shortly."
-      });
-    }, 1500);
-  };
-
   const handleAttachmentPick = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -442,7 +577,6 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
         }
       });
       toast.success("File sent", file.name);
-      triggerAutoResponse();
     } catch (error) {
       toast.error("Unable to open file picker", error instanceof Error ? error.message : "Unexpected picker error.");
     }
@@ -523,17 +657,24 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
         onScroll={({ nativeEvent }) => {
+          if (!ignoreNextScrollEventRef.current) {
+            userTouchedScrollRef.current = true;
+            if (unreadAutoScrollTimeoutRef.current) {
+              clearTimeout(unreadAutoScrollTimeoutRef.current);
+              unreadAutoScrollTimeoutRef.current = null;
+            }
+          }
           const distanceFromBottom =
             nativeEvent.contentSize.height - (nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height);
           isNearBottomRef.current = distanceFromBottom < 88;
         }}
         contentContainerStyle={[
-          styles.messagesContainer,
-          {
-            backgroundColor: theme.colors.background,
-            paddingBottom: composerHeight + composerBottomInset + (keyboardVisible ? 6 : 0)
-          }
-        ]}
+            styles.messagesContainer,
+            {
+              backgroundColor: theme.colors.background,
+              paddingBottom: composerHeight + (keyboardVisible ? 6 : 4)
+            }
+          ]}
         ListEmptyComponent={
           <View style={styles.emptyStateWrap}>
             <EmptyState
@@ -619,6 +760,8 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
           keyboardVisible={keyboardVisible}
           replyToText={replyText}
           onClearReply={() => setReplyToMessageId("")}
+          onTypingStart={() => sendTypingEvent(chat.id, true)}
+          onTypingStop={() => sendTypingEvent(chat.id, false)}
           onSend={(body) => {
             sendMessage({
               chatId: chat.id,
@@ -629,7 +772,6 @@ export function ConversationPanel({ chatId, compact = false }: ConversationPanel
             });
             isNearBottomRef.current = true;
             setReplyToMessageId("");
-            triggerAutoResponse();
           }}
           onSendAttachment={handleAttachmentPick}
         />
@@ -737,3 +879,5 @@ const styles = StyleSheet.create({
     width: 24
   }
 });
+
+

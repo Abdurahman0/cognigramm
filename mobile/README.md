@@ -1,6 +1,6 @@
 # Company Messenger (Expo + React Native + Web)
 
-Premium internal company messenger scaffold with shared mobile/web codebase and fully local demo logic.
+Internal company messenger with shared Android + web codebase connected to the Python backend API and WebSocket gateway.
 
 ## Stack
 
@@ -68,14 +68,16 @@ npm run build:ios
 - `components/`: Reusable UI primitives and chat components
 - `features/`: Feature-specific logic and selectors
 - `store/`: Zustand stores (auth, chats, settings)
-- `mock/`: Shared business mock data
 - `types/`: Strict domain types
 - `theme/`: Centralized enterprise design tokens
-- `services/`: Mock async services for auth and demo flows
+- `services/api`: Backend REST client and adapters
+- `services/realtime`: WebSocket client
 - `utils/`: IDs, date formatting, message helpers
 
-## Demo credentials
+## Environment
 
-- Email: `amina.rahimova@company.local`
-- Password: `123456`
-- OTP code: `123456`
+Set API endpoints with Expo public env vars:
+
+- `EXPO_PUBLIC_API_BASE_URL` (for example `http://localhost:8000`)
+- `EXPO_PUBLIC_WS_BASE_URL` (for example `ws://localhost:8001`)
+- `EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD` (`true` by default)

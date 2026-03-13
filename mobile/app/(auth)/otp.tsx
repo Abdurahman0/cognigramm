@@ -56,7 +56,7 @@ export default function OtpScreen(): JSX.Element {
                 value={field.value}
                 onChangeText={field.onChange}
                 error={errors.code?.message}
-                hint="Demo code: 123456"
+                hint="Enter the code sent to your email"
               />
             )}
           />
@@ -68,7 +68,7 @@ export default function OtpScreen(): JSX.Element {
                 return;
               }
               await requestOtp(otpEmail);
-              toast.info("Code resent", "Use 123456 for demo.");
+              toast.info("Code resent");
             }}
           >
             <Text style={[styles.link, { color: theme.colors.accent }]}>Resend code</Text>

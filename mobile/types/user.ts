@@ -9,7 +9,8 @@ export type EmployeeRole =
   | "designer"
   | "product"
   | "qa"
-  | "intern";
+  | "intern"
+  | "employee";
 
 export type Department =
   | "Executive"
@@ -18,12 +19,14 @@ export type Department =
   | "Design"
   | "HR"
   | "Operations"
-  | "Sales";
+  | "Sales"
+  | "General";
 
 export type UserPresence = "available" | "in_meeting" | "busy" | "on_break" | "offline" | "remote";
 
 export interface User {
   id: ID;
+  username?: string;
   fullName: string;
   email: string;
   avatar: string;
@@ -34,5 +37,10 @@ export interface User {
   isOnline: boolean;
   about: string;
   timezone: string;
+  phone?: string;
+  handle?: string;
+  officeLocation?: string;
+  managerId?: ID;
+  createdAt?: string;
   lastSeenAt?: string;
 }

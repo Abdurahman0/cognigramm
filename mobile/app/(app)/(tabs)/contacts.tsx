@@ -4,6 +4,7 @@ import { FlatList, StyleSheet, View } from "react-native";
 
 import { EmptyState, ScreenContainer, SearchBar, SectionHeader, UserCard } from "@/components/common";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
@@ -11,6 +12,7 @@ import { useShallow } from "zustand/react/shallow";
 export default function ContactsScreen(): JSX.Element {
   const router = useRouter();
   const { theme } = useAppTheme();
+  const toast = useAppToast();
   const currentUser = useCurrentUser();
   const { users, query, setQuery, startDirectConversation } = useChatStore(useShallow((state) => ({
     users: state.users,
@@ -52,9 +54,13 @@ export default function ContactsScreen(): JSX.Element {
             <UserCard
               user={item}
               trailingLabel={item.isOnline ? "Online" : "Offline"}
-              onPress={() => {
-                const id = startDirectConversation(item.id);
-                router.push({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
+              onPress={async () => {
+                try {
+                  const id = await startDirectConversation(item.id);
+                  router.push({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
+                } catch (error) {
+                  toast.error("Unable to open chat", error instanceof Error ? error.message : "Unexpected error");
+                }
               }}
             />
           )}

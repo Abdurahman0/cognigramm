@@ -52,7 +52,7 @@ export default function CallsScreen(): JSX.Element {
             <Pressable
               onPress={() =>
                 toast.success(
-                  item.call.mode === "video" ? "Video call started (demo)" : "Voice call started (demo)",
+                  item.call.mode === "video" ? "Video call started" : "Voice call started",
                   item.user?.fullName ?? "Unknown participant"
                 )
               }
@@ -68,7 +68,7 @@ export default function CallsScreen(): JSX.Element {
               <View style={styles.main}>
                 <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{item.user?.fullName ?? "Unknown"}</Text>
                 <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                  {item.call.mode === "video" ? "Video" : "Voice"} • {item.call.result} • {formatRelative(item.call.createdAt)}
+                  {item.call.mode === "video" ? "Video" : "Voice"} - {item.call.result} - {formatRelative(item.call.createdAt)}
                 </Text>
               </View>
               <View style={styles.right}>

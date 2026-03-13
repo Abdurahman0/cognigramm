@@ -15,7 +15,6 @@ import {
 } from "@/components/common";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
-import { conversationMetaById, employeeMetaById, mockChannels } from "@/mock";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -237,16 +236,16 @@ export default function ChatInfoScreen(): JSX.Element {
     );
   }
 
-  const channelTemplate =
-    chat.kind === "channel" || chat.kind === "announcement"
-      ? mockChannels.find(
-          (channel) => channel.kind === chat.kind && channel.name.trim().toLowerCase() === chat.title.trim().toLowerCase()
-        )
-      : undefined;
-  const conversationMeta = conversationMetaById[chat.id];
-  const owner = users.find((user) => user.id === conversationMeta?.createdById) ?? admins[0] ?? members[0];
-  const peerMeta = directPeer ? employeeMetaById[directPeer.id] : undefined;
-  const manager = peerMeta?.managerId ? users.find((user) => user.id === peerMeta.managerId) : undefined;
+  const owner = admins[0] ?? members[0];
+  const manager = directPeer?.managerId ? users.find((user) => user.id === directPeer.managerId) : undefined;
+  const peerMeta = directPeer
+    ? {
+        handle: directPeer.handle,
+        phone: directPeer.phone,
+        officeLocation: directPeer.officeLocation,
+        joinedAt: directPeer.createdAt
+      }
+    : undefined;
 
   const heroTitle = chat.kind === "direct" ? directPeer?.fullName ?? chat.title : chat.title;
   const heroAvatar = chat.kind === "direct" ? directPeer?.avatar : chat.avatar;
@@ -257,7 +256,7 @@ export default function ChatInfoScreen(): JSX.Element {
   const heroDescription =
     chat.kind === "direct"
       ? directPeer?.about ?? "Internal direct communication channel."
-      : channelTemplate?.description ?? chat.subtitle ?? "Internal workspace for team collaboration.";
+      : chat.subtitle ?? "Internal workspace for team collaboration.";
 
   const quickActionMap: Record<QuickActionId, { icon: FeatherName; label: string; onPress: () => void; active?: boolean }> = {
     message: {
@@ -314,12 +313,12 @@ export default function ChatInfoScreen(): JSX.Element {
       : ["search", "mute", "call", "members", "files", "important"];
 
   const handleClearChat = () => {
-    Alert.alert("Clear chat history", "This action is a UI placeholder until backend deletion is connected.", [
+    Alert.alert("Clear chat history", "This action is not yet available from the backend API.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Continue",
         style: "destructive",
-        onPress: () => toast.info("Clear requested", "Server-side clear action will be connected in API phase.")
+        onPress: () => toast.info("Not available", "Clear chat endpoint is not implemented in backend yet.")
       }
     ]);
   };
@@ -331,7 +330,7 @@ export default function ChatInfoScreen(): JSX.Element {
       {
         text: "Leave",
         style: "destructive",
-        onPress: () => toast.info("Leave requested", `Leave ${label} action is mocked for now.`)
+        onPress: () => toast.info("Not available", `Leave ${label} endpoint is not implemented in backend yet.`)
       }
     ]);
   };
@@ -362,11 +361,6 @@ export default function ChatInfoScreen(): JSX.Element {
                   <Text style={[styles.badgeLabel, { color: theme.colors.textSecondary }]}>
                     {PRESENCE_LABELS[directPeer?.presence ?? currentUser.presence]}
                   </Text>
-                </View>
-              ) : null}
-              {chat.kind !== "direct" && conversationMeta?.teamType ? (
-                <View style={[styles.badge, { backgroundColor: theme.colors.surfaceMuted }]}>
-                  <Text style={[styles.badgeLabel, { color: theme.colors.textSecondary }]}>{conversationMeta.teamType}</Text>
                 </View>
               ) : null}
             </View>
@@ -420,11 +414,8 @@ export default function ChatInfoScreen(): JSX.Element {
               <InfoRow icon="users" label="Members" value={`${chat.memberIds.length} members`} />
               <InfoRow icon="shield" label="Owner" value={owner ? `${owner.fullName} (${ROLE_LABELS[owner.role]})` : "Not available"} />
               <InfoRow icon="layers" label="Department" value={chat.departmentLabel ?? "Cross-functional"} />
-              <InfoRow icon="calendar" label="Created" value={formatCalendarDate(conversationMeta?.createdAt)} />
+              <InfoRow icon="calendar" label="Created" value={formatCalendarDate(chat.createdAt)} />
               <InfoRow icon="file-text" label="Description" value={heroDescription} />
-              {conversationMeta?.postingPolicy ? (
-                <InfoRow icon="lock" label="Posting policy" value={conversationMeta.postingPolicy} />
-              ) : null}
             </>
           )}
         </View>

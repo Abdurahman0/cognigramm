@@ -25,6 +25,9 @@ export default function TabsLayout(): JSX.Element {
           paddingTop: 6,
           paddingBottom: Math.max(insets.bottom - 2, 8)
         },
+        tabBarItemStyle: {
+          marginTop: -2
+        },
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "600"

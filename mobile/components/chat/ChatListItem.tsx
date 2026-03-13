@@ -15,6 +15,7 @@ interface ChatListItemProps {
   active?: boolean;
   onPress: () => void;
   onLongPress?: () => void;
+  onOpenActions?: () => void;
 }
 
 const getDirectPeer = (chat: ChatSummary, users: User[], currentUserId: string): User | undefined => {
@@ -30,7 +31,8 @@ export function ChatListItem({
   lastMessage,
   active = false,
   onPress,
-  onLongPress
+  onLongPress,
+  onOpenActions
 }: ChatListItemProps): JSX.Element {
   const { theme } = useAppTheme();
   const currentUser = useCurrentUser();
@@ -43,11 +45,11 @@ export function ChatListItem({
     <Pressable
       onPress={onPress}
       onLongPress={onLongPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.root,
         {
           borderColor: active ? theme.colors.accent : theme.colors.border,
-          backgroundColor: active ? theme.colors.accentMuted : theme.colors.surface,
+          backgroundColor: active ? theme.colors.accentMuted : hovered ? theme.colors.surfaceMuted : theme.colors.surface,
           opacity: pressed ? 0.92 : 1
         }
       ]}
@@ -84,6 +86,11 @@ export function ChatListItem({
               <View style={[styles.badge, { backgroundColor: theme.colors.accent }]}>
                 <Text style={styles.badgeText}>{chat.unreadCount > 9 ? "9+" : chat.unreadCount}</Text>
               </View>
+            ) : null}
+            {onOpenActions ? (
+              <Pressable onPress={onOpenActions} hitSlop={8} style={styles.moreBtn}>
+                <Feather name="more-vertical" size={14} color={theme.colors.textMuted} />
+              </Pressable>
             ) : null}
           </View>
         </View>
@@ -135,6 +142,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8
+  },
+  moreBtn: {
+    alignItems: "center",
+    height: 18,
+    justifyContent: "center",
+    width: 18
   },
   badge: {
     alignItems: "center",
