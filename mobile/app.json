@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Company Messenger",
+    "slug": "company-messenger",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "companymessenger",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.company.messenger"
+    },
+    "android": {
+      "package": "com.company.messenger",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1220"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-system-ui"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
