@@ -1,8 +1,7 @@
 "use client";
 
-import { UserGroupIcon, UserIcon } from "@heroicons/react/24/solid";
+import { UserGroupIcon } from "@heroicons/react/24/solid";
 
-import { UserPresenceBadge } from "@/components/presence/UserPresenceBadge";
 import { usePresenceStore } from "@/store/presenceStore";
 import type { Conversation } from "@/types/conversation";
 import { formatMessageTime } from "@/utils/date";
@@ -27,43 +26,79 @@ export function ConversationItem({
   unreadCount,
   onClick
 }: ConversationItemProps): JSX.Element {
-  const presenceState = usePresenceStore((state) => state.userPresence);
   const onlineUserIds = usePresenceStore((state) => state.onlineUserIds);
-  const directPeer = conversation.type === "direct" ? conversation.participants.find((p) => p.user_id !== currentUserId) : null;
-  const title = conversation.type === "group" ? conversation.title || `Group #${conversation.id}` : directPeer?.username || `User #${conversation.id}`;
+  const directPeer = conversation.type === "direct"
+    ? conversation.participants.find((p) => p.user_id !== currentUserId)
+    : null;
+  const title = conversation.type === "group"
+    ? conversation.title || `Group #${conversation.id}`
+    : directPeer?.username || `User #${conversation.id}`;
   const isOnline = directPeer ? onlineUserIds.has(directPeer.user_id) : false;
-  const lastSeen = directPeer ? presenceState[directPeer.user_id]?.last_seen : null;
+  const avatarLetter = title.charAt(0).toUpperCase();
+  const hasUnread = unreadCount > 0;
 
   return (
     <button
       onClick={() => onClick(conversation.id)}
       className={cn(
-        "w-full rounded-lg px-3 py-2 text-left transition",
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
         active
           ? "bg-[var(--messenger-active)]"
           : "hover:bg-[var(--messenger-hover)]"
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[var(--secondary)] text-[var(--foreground)]">
-            {conversation.type === "group" ? <UserGroupIcon className="h-5 w-5" /> : <UserIcon className="h-5 w-5" />}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[15px] text-[var(--foreground)]">{title}</p>
-            <p className="truncate text-[13px] text-[var(--muted)]">
-              {previewText}
-            </p>
+      {/* Avatar */}
+      <div className="relative shrink-0">
+        {conversation.type === "group" ? (
+          <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#8b5cf6]">
+            <UserGroupIcon className="h-6 w-6 text-white" />
           </div>
+        ) : (
+          <div className="flex h-[54px] w-[54px] items-center justify-center rounded-full bg-gradient-to-br from-[#60a5fa] to-[#3b82f6] text-[20px] font-bold text-white">
+            {avatarLetter}
+          </div>
+        )}
+        {/* Online indicator */}
+        {isOnline && (
+          <span className="absolute bottom-0.5 right-0.5 h-[14px] w-[14px] rounded-full border-2 border-[var(--messenger-sidebar-bg)] bg-[var(--messenger-online)]" />
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-1">
+          <span
+            className={cn(
+              "truncate text-[15px]",
+              hasUnread ? "font-bold text-[var(--foreground)]" : "font-semibold text-[var(--foreground)]"
+            )}
+          >
+            {title}
+          </span>
+          {previewTime ? (
+            <span
+              className={cn(
+                "shrink-0 text-[11px]",
+                hasUnread ? "font-semibold text-[var(--primary)]" : "text-[var(--muted)]"
+              )}
+            >
+              {formatMessageTime(previewTime)}
+            </span>
+          ) : null}
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          {previewTime ? <span className="text-xs text-[var(--muted)]">{formatMessageTime(previewTime)}</span> : null}
-          {unreadCount > 0 ? (
-            <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[11px] font-bold text-[var(--primary-foreground)]">
+        <div className="flex items-center justify-between gap-1">
+          <p
+            className={cn(
+              "truncate text-[13px]",
+              hasUnread ? "font-semibold text-[var(--foreground)]" : "text-[var(--muted)]"
+            )}
+          >
+            {previewText}
+          </p>
+          {hasUnread ? (
+            <span className="ml-1 inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[11px] font-bold text-white">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
-          ) : conversation.type === "direct" && directPeer ? (
-            <UserPresenceBadge isOnline={isOnline} lastSeen={lastSeen} compact />
           ) : null}
         </div>
       </div>

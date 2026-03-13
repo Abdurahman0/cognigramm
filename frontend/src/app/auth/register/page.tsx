@@ -4,18 +4,20 @@ import { RegisterForm } from "@/features/auth/RegisterForm";
 
 export default function RegisterPage(): JSX.Element {
   return (
-    <section className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Create Account</h1>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Start messaging in realtime across all your devices.</p>
+    <section className="space-y-5">
+      <div className="space-y-1 text-center">
+        <h2 className="text-xl font-semibold text-[#050505]">Create a new account</h2>
+        <p className="text-sm text-[#65676b]">It&apos;s quick and easy.</p>
       </div>
       <RegisterForm />
-      <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-        Already registered?{" "}
-        <Link href="/auth/login" className="font-semibold text-accent-700 hover:underline dark:text-accent-300">
-          Sign in
-        </Link>
-      </p>
+      <div className="border-t border-[#e4e6ea] pt-4 text-center">
+        <p className="text-sm text-[#65676b]">
+          Already have an account?{" "}
+          <Link href="/auth/login" className="font-semibold text-[#0084ff] hover:underline">
+            Log in
+          </Link>
+        </p>
+      </div>
     </section>
   );
 }

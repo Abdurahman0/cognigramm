@@ -1,31 +1,67 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: messenger_postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: messenger
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      # Low-memory PostgreSQL configuration
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    command: >
+      postgres
+        -c shared_buffers=32MB
+        -c work_mem=4MB
+        -c maintenance_work_mem=32MB
+        -c effective_cache_size=64MB
+        -c max_connections=50
+        -c wal_buffers=4MB
+        -c checkpoint_completion_target=0.9
+        -c log_min_messages=warning
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     container_name: messenger_redis
     restart: unless-stopped
+    # Cap memory at 64MB and disable disk persistence (saves RAM & disk I/O)
+    command: >
+      redis-server
+        --maxmemory 48mb
+        --maxmemory-policy allkeys-lru
+        --save ""
+        --appendonly no
     ports:
       - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 72m
 
   rabbitmq:
-    image: rabbitmq:3.13-management
+    # Use slim image without management UI (saves ~80-100MB RAM)
+    image: rabbitmq:3.13-alpine
     container_name: messenger_rabbitmq
     restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      # Reduce RabbitMQ memory headroom
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit vm_memory_high_watermark 0.4"
     ports:
       - "5672:5672"
-      - "15672:15672"
+    deploy:
+      resources:
+        limits:
+          memory: 192m
 
   minio:
     image: minio/minio:latest
@@ -34,23 +70,33 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data --console-address ":9001"
+    # Only start the API server, skip the console UI (saves memory)
+    command: server /data
     ports:
       - "9000:9000"
-      - "9001:9001"
     volumes:
       - minio_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   minio-init:
     image: minio/mc:latest
     container_name: messenger_minio_init
     depends_on:
       - minio
+    restart: on-failure
     entrypoint: >
       /bin/sh -c "
+      sleep 3 &&
       /usr/bin/mc alias set local http://minio:9000 minioadmin minioadmin &&
       /usr/bin/mc mb -p local/messenger-files || true
       "
+    deploy:
+      resources:
+        limits:
+          memory: 32m
 
   api:
     build: .
@@ -67,7 +113,12 @@ services:
       - minio-init
     ports:
       - "8000:8000"
-    command: sh -c "alembic upgrade head && uvicorn app.api_main:app --host 0.0.0.0 --port 8000 --workers 2"
+    # 1 worker instead of 2 → saves ~80MB per extra worker
+    command: sh -c "alembic upgrade head && uvicorn app.api_main:app --host 0.0.0.0 --port 8000 --workers 1"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
   websocket:
     build: .
@@ -81,7 +132,12 @@ services:
       - api
     ports:
       - "8001:8001"
-    command: sh -c "export WEBSOCKET_INSTANCE_ID=$$(hostname) && uvicorn app.ws_main:app --host 0.0.0.0 --port 8001 --workers 2"
+    # 1 worker instead of 2
+    command: sh -c "export WEBSOCKET_INSTANCE_ID=$$(hostname) && uvicorn app.ws_main:app --host 0.0.0.0 --port 8001 --workers 1"
+    deploy:
+      resources:
+        limits:
+          memory: 192m
 
   workers:
     build: .
@@ -92,7 +148,11 @@ services:
       - postgres
       - redis
       - rabbitmq
-    command: sh -c "python -m app.workers.main"
+    command: python -m app.workers.main
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   analytics-worker:
     build: .
@@ -102,7 +162,11 @@ services:
     depends_on:
       - postgres
       - rabbitmq
-    command: sh -c "python -m app.analytics.worker"
+    command: python -m app.analytics.worker
+    deploy:
+      resources:
+        limits:
+          memory: 128m
 
   frontend:
     build:
@@ -118,6 +182,10 @@ services:
       - websocket
     ports:
       - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
 
 volumes:
   postgres_data:

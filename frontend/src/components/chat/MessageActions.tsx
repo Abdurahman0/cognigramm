@@ -37,9 +37,9 @@ export function MessageActions({ isOwn, onEdit, onDelete }: MessageActionsProps)
       <button
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "inline-flex items-center justify-center rounded-lg p-1.5 transition-opacity",
+          "inline-flex items-center justify-center rounded-full p-1.5 transition-opacity",
           "opacity-100 md:opacity-0 md:group-hover:opacity-100",
-          "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800",
+          "text-[var(--muted)] hover:bg-[var(--secondary)]",
           isOpen ? "md:opacity-100" : ""
         )}
         aria-label="Message actions"
@@ -54,7 +54,7 @@ export function MessageActions({ isOwn, onEdit, onDelete }: MessageActionsProps)
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div
             className={cn(
-              "absolute right-0 z-20 min-w-[140px] rounded-xl border border-slate-200/80 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900",
+              "absolute right-0 z-20 min-w-[140px] rounded-xl border border-[var(--border)] bg-[var(--card)] p-1 shadow-lg",
               "animate-in fade-in zoom-in-95 duration-150"
             )}
           >
@@ -64,8 +64,8 @@ export function MessageActions({ isOwn, onEdit, onDelete }: MessageActionsProps)
                 setIsOpen(false);
               }}
               className={cn(
-                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm",
-                "text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800",
+                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-[14px]",
+                "text-[var(--foreground)] hover:bg-[var(--secondary)]",
                 "transition-colors"
               )}
             >

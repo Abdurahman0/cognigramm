@@ -12,17 +12,20 @@ export function AttachmentPreview({ files, onRemove }: AttachmentPreviewProps): 
     return null;
   }
   return (
-    <div className="mb-2 space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900/70">
+    <div className="mb-2 space-y-1.5 rounded-2xl border border-[var(--border)] bg-[var(--secondary)] p-2">
       {files.map((file, index) => (
-        <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5 text-xs dark:bg-slate-800">
+        <div
+          key={`${file.name}-${index}`}
+          className="flex items-center justify-between gap-2 rounded-xl bg-[var(--card)] px-3 py-2 text-[13px]"
+        >
           <div className="min-w-0">
-            <p className="truncate font-medium">{file.name}</p>
-            <p className="text-slate-500 dark:text-slate-400">{Math.ceil(file.size / 1024)} KB</p>
+            <p className="truncate font-medium text-[var(--foreground)]">{file.name}</p>
+            <p className="text-[var(--muted)]">{Math.ceil(file.size / 1024)} KB</p>
           </div>
           <button
             type="button"
             onClick={() => onRemove(index)}
-            className="rounded-md bg-red-50 px-2 py-1 text-red-600 dark:bg-red-900/20 dark:text-red-300"
+            className="shrink-0 rounded-full bg-red-50 px-2.5 py-1 text-[12px] font-medium text-red-600 hover:bg-red-100"
           >
             Remove
           </button>
@@ -37,7 +40,7 @@ export function MessageAttachmentList({ attachments }: { attachments: MessageAtt
     return null;
   }
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-2 space-y-1.5">
       {attachments.map((attachment) => {
         const href = attachment.public_url || "#";
         const isImage = attachment.mime_type.startsWith("image/");
@@ -48,9 +51,13 @@ export function MessageAttachmentList({ attachments }: { attachments: MessageAtt
               href={href}
               target="_blank"
               rel="noreferrer"
-              className="block overflow-hidden rounded-lg border border-slate-300/50 dark:border-slate-600/50"
+              className="block overflow-hidden rounded-2xl"
             >
-              <img src={attachment.public_url} alt={attachment.original_name} className="max-h-72 w-full object-cover" />
+              <img
+                src={attachment.public_url}
+                alt={attachment.original_name}
+                className="max-h-72 w-full object-cover"
+              />
             </a>
           );
         }
@@ -60,10 +67,10 @@ export function MessageAttachmentList({ attachments }: { attachments: MessageAtt
             href={href}
             target="_blank"
             rel="noreferrer"
-            className="block rounded-lg border border-slate-300/50 bg-slate-50 px-3 py-2 text-xs dark:border-slate-600/50 dark:bg-slate-900/60"
+            className="block rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-[13px] hover:bg-white/20"
           >
-            <p className="font-medium">{attachment.original_name}</p>
-            <p className="text-slate-500 dark:text-slate-400">{Math.ceil(attachment.size_bytes / 1024)} KB</p>
+            <p className="font-medium">📎 {attachment.original_name}</p>
+            <p className="opacity-70">{Math.ceil(attachment.size_bytes / 1024)} KB</p>
           </a>
         );
       })}

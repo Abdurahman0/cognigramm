@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  CheckIcon,
   FaceSmileIcon,
-  HandThumbUpIcon,
   PhotoIcon,
   PlusIcon,
-  XMarkIcon
-} from "@heroicons/react/24/solid";
-import { MicrophoneIcon, PaperAirplaneIcon } from "@heroicons/react/24/outline";
+  XMarkIcon,
+  CheckIcon
+} from "@heroicons/react/24/outline";
+import { HandThumbUpIcon, PaperAirplaneIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
 import { toast } from "sonner";
 
 import { AttachmentPreview } from "@/components/chat/AttachmentPreview";
@@ -31,6 +30,7 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const wasEditingRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!editingMessage) {
@@ -44,6 +44,7 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
     wasEditingRef.current = true;
     setFiles([]);
     setContent(editingMessage.content || "");
+    inputRef.current?.focus();
   }, [editingMessage]);
 
   const resolvedType = useMemo<MessageType>(() => {
@@ -103,17 +104,18 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
   }
 
   return (
-    <section className="border-t border-[var(--border)] px-3 py-2">
+    <section className="border-t border-[var(--border)] px-3 py-2" style={{ background: "var(--messenger-header-bg)" }}>
+      {/* Editing banner */}
       {isEditing ? (
-        <div className="mb-2 flex items-start justify-between gap-2 rounded-xl border border-[var(--primary)]/40 bg-[var(--messenger-active)] px-3 py-2">
+        <div className="mb-2 flex items-start justify-between gap-2 rounded-xl border border-[#0084ff]/30 bg-[#e7f3ff] px-3 py-2">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-[var(--primary)]">Editing message</p>
-            <p className="truncate text-xs text-[var(--muted)]">{editingMessage?.content || "Attachment message"}</p>
+            <p className="text-[12px] font-semibold text-[#0084ff]">Editing message</p>
+            <p className="truncate text-[12px] text-[var(--muted)]">{editingMessage?.content || "Attachment"}</p>
           </div>
           <button
             type="button"
             onClick={() => onCancelEditing?.()}
-            className="rounded-md p-1 text-[var(--muted)] hover:bg-[var(--secondary)]"
+            className="rounded-full p-1 text-[var(--muted)] transition hover:bg-[var(--secondary)]"
           >
             <XMarkIcon className="h-4 w-4" />
           </button>
@@ -122,54 +124,51 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
 
       <AttachmentPreview files={files} onRemove={(index) => setFiles((prev) => prev.filter((_, i) => i !== index))} />
 
-      <div className="flex items-center gap-2">
-        <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full hover:bg-[var(--secondary)]">
-          <PlusIcon className="h-5 w-5 text-[var(--primary)]" />
-          <input
-            type="file"
-            multiple
-            disabled={isEditing}
-            className="hidden"
-            onChange={(event) => {
-              const selected = Array.from(event.target.files || []);
-              if (!selected.length) {
-                return;
-              }
-              setFiles((prev) => [...prev, ...selected]);
-            }}
-          />
-        </label>
+      <div className="flex items-center gap-1">
+        {/* Left action buttons */}
+        {!isEditing && (
+          <>
+            <label title="More options" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
+              <PlusIcon className="h-[22px] w-[22px]" />
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  const selected = Array.from(event.target.files || []);
+                  if (!selected.length) return;
+                  setFiles((prev) => [...prev, ...selected]);
+                }}
+              />
+            </label>
+            <label title="Send photo or video" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
+              <PhotoIcon className="h-[22px] w-[22px]" />
+              <input
+                type="file"
+                multiple
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={(event) => {
+                  const selected = Array.from(event.target.files || []);
+                  if (!selected.length) return;
+                  setFiles((prev) => [...prev, ...selected]);
+                }}
+              />
+            </label>
+            <button title="Send voice message" className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]">
+              <MicrophoneIcon className="h-[22px] w-[22px]" />
+            </button>
+          </>
+        )}
 
-        <label className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full hover:bg-[var(--secondary)]">
-          <PhotoIcon className="h-5 w-5 text-[var(--primary)]" />
+        {/* Text input */}
+        <div className="relative flex flex-1 items-center rounded-full bg-[var(--secondary)] px-4 py-2">
           <input
-            type="file"
-            multiple
-            accept="image/*"
-            disabled={isEditing}
-            className="hidden"
-            onChange={(event) => {
-              const selected = Array.from(event.target.files || []);
-              if (!selected.length) {
-                return;
-              }
-              setFiles((prev) => [...prev, ...selected]);
-            }}
-          />
-        </label>
-
-        <button className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--secondary)]">
-          <MicrophoneIcon className="h-5 w-5 text-[var(--primary)]" />
-        </button>
-
-        <div className="flex flex-1 items-center rounded-full bg-[var(--secondary)] px-3 py-1.5">
-          <input
+            ref={inputRef}
             value={content}
             onChange={(event) => {
               setContent(event.target.value);
-              if (isEditing) {
-                return;
-              }
+              if (isEditing) return;
               if (event.target.value.trim().length > 0) {
                 realtimeSocketClient.send("typing_start", { conversation_id: conversationId });
               } else {
@@ -177,34 +176,57 @@ export function MessageInput({ conversationId, editingMessage = null, onCancelEd
               }
             }}
             onKeyDown={(event) => {
-              if (event.key === "Enter") {
+              if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
                 onSend().catch(() => undefined);
               }
             }}
-            placeholder={isEditing ? "Change message..." : "Aa"}
-            className="flex-1 bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+            placeholder={isEditing ? "Edit message..." : "Aa"}
+            className="flex-1 bg-transparent text-[15px] text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
           />
-          <button className="ml-1 flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/70 dark:hover:bg-black/20">
-            <FaceSmileIcon className="h-5 w-5 text-[var(--muted)]" />
+          <button
+            type="button"
+            title="Insert emoji"
+            className="ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-[var(--muted)] transition hover:text-[var(--foreground)]"
+          >
+            <FaceSmileIcon className="h-5 w-5" />
           </button>
         </div>
 
+        {/* Right action button */}
         {canSend ? (
-          <button
-            type="button"
-            onClick={() => onSend().catch(() => undefined)}
-            className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-full transition-colors",
-              isEditing ? "bg-emerald-500 text-white hover:bg-emerald-600" : "hover:bg-[var(--secondary)]"
-            )}
-          >
-            {isEditing ? <CheckIcon className="h-5 w-5" /> : <PaperAirplaneIcon className="h-5 w-5 text-[var(--primary)]" />}
-          </button>
+          isEditing ? (
+            <button
+              type="button"
+              onClick={() => onSend().catch(() => undefined)}
+              title="Save edit"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0084ff] text-white transition hover:bg-[#0073e6]"
+            >
+              <CheckIcon className="h-5 w-5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSend().catch(() => undefined)}
+              title="Send message"
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]"
+            >
+              <PaperAirplaneIcon className="h-[22px] w-[22px]" />
+            </button>
+          )
         ) : (
-          <button className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-[var(--secondary)]">
-            <HandThumbUpIcon className="h-5 w-5 text-[var(--primary)]" />
-          </button>
+          !isEditing && (
+            <button
+              type="button"
+              title="Send like"
+              onClick={() => {
+                sendMessageAction({ conversationId, content: "👍", type: "text", files: [] }).catch(() => undefined);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full text-[#0084ff] transition hover:bg-[var(--secondary)]"
+            >
+              <HandThumbUpIcon className="h-[22px] w-[22px]" />
+            </button>
+          )
         )}
       </div>
     </section>
