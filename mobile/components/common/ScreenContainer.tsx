@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -18,6 +18,7 @@ export function ScreenContainer({
 }: ScreenContainerProps): JSX.Element {
   const { theme } = useAppTheme();
   const edges = includeBottomInset ? (["top", "bottom"] as const) : (["top"] as const);
+  const webContentStyle = Platform.OS === "web" ? styles.webContent : null;
 
   if (scroll) {
     return (
@@ -26,6 +27,7 @@ export function ScreenContainer({
           style={styles.scroll}
           contentContainerStyle={[
             styles.content,
+            webContentStyle,
             padded && {
               paddingHorizontal: theme.spacing.lg,
               paddingBottom: theme.spacing.xxl
@@ -45,6 +47,7 @@ export function ScreenContainer({
       <View
         style={[
           styles.content,
+          webContentStyle,
           padded && {
             paddingHorizontal: theme.spacing.lg,
             paddingBottom: theme.spacing.lg
@@ -66,5 +69,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1
+  },
+  webContent: {
+    alignSelf: "center",
+    maxWidth: 1120,
+    width: "100%"
   }
 });
