@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -30,7 +30,7 @@ export function SearchBar({
     >
       <Feather name="search" size={17} color={theme.colors.textMuted} />
       <TextInput
-        style={[styles.input, { color: theme.colors.textPrimary }]}
+        style={[styles.input, Platform.OS === "web" ? styles.inputWeb : null, { color: theme.colors.textPrimary }]}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textMuted}
         value={value}
@@ -58,5 +58,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginLeft: 8,
     paddingVertical: 10
+  },
+  inputWeb: {
+    outlineStyle: "solid",
+    outlineWidth: 0,
+    outlineColor: "transparent"
   }
 });

@@ -1,9 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
-  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -26,7 +25,6 @@ export default function ChatsScreen(): JSX.Element {
   const { theme } = useAppTheme();
   const { isDesktop } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
-  const [actionChatId, setActionChatId] = useState<string>("");
 
   const {
     chats,
@@ -34,26 +32,22 @@ export default function ChatsScreen(): JSX.Element {
     filter,
     searchQuery,
     activeDesktopChatId,
+    setActiveConversationId,
     setFilter,
     setSearchQuery,
     setDesktopChat,
-    refreshChats,
-    togglePin,
-    toggleMute,
-    toggleArchive
+    refreshChats
   } = useChatStore(useShallow((state) => ({
     chats: state.chats,
     messagesByChat: state.messagesByChat,
     filter: state.activeFilter,
     searchQuery: state.chatSearchQuery,
     activeDesktopChatId: state.activeDesktopChatId,
+    setActiveConversationId: state.setActiveConversationId,
     setFilter: state.setActiveFilter,
     setSearchQuery: state.setChatSearchQuery,
     setDesktopChat: state.setActiveDesktopChatId,
-    refreshChats: state.refreshChats,
-    togglePin: state.togglePin,
-    toggleMute: state.toggleMute,
-    toggleArchive: state.toggleArchive
+    refreshChats: state.refreshChats
   })));
 
   const filteredChats = useMemo(
@@ -61,20 +55,24 @@ export default function ChatsScreen(): JSX.Element {
     [chats, messagesByChat, searchQuery, filter]
   );
 
+  useEffect(() => {
+    if (!isDesktop) {
+      return;
+    }
+    if (activeDesktopChatId) {
+      setActiveConversationId(activeDesktopChatId);
+    }
+    return () => {
+      if (activeDesktopChatId) {
+        setActiveConversationId("");
+      }
+    };
+  }, [activeDesktopChatId, isDesktop, setActiveConversationId]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await refreshChats();
     setRefreshing(false);
-  };
-
-  const selectedActionChat = chats.find((item) => item.id === actionChatId);
-
-  const openChatActions = (chatId: string) => {
-    setActionChatId(chatId);
-  };
-
-  const closeChatActions = () => {
-    setActionChatId("");
   };
 
   const listElement = (
@@ -106,8 +104,6 @@ export default function ChatsScreen(): JSX.Element {
           chat={item}
           lastMessage={(messagesByChat[item.id] ?? []).slice(-1)[0]}
           active={isDesktop && activeDesktopChatId === item.id}
-          onLongPress={() => openChatActions(item.id)}
-          onOpenActions={() => openChatActions(item.id)}
           onPress={() => {
             if (isDesktop) {
               setDesktopChat(item.id);
@@ -126,12 +122,9 @@ export default function ChatsScreen(): JSX.Element {
       <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <SectionHeader
           title="Business Chats"
-          subtitle="Direct, channels, and announcements"
+          subtitle="Direct and group conversations"
           rightSlot={
             <View style={styles.headerActions}>
-              <Pressable onPress={() => router.push("/(app)/search")} style={styles.iconBtn}>
-                <Feather name="search" size={18} color={theme.colors.textPrimary} />
-              </Pressable>
               <Pressable onPress={() => router.push("/(app)/new-message")} style={styles.iconBtn}>
                 <Feather name="edit-2" size={18} color={theme.colors.textPrimary} />
               </Pressable>
@@ -182,75 +175,6 @@ export default function ChatsScreen(): JSX.Element {
       ) : (
         <View style={styles.mobileListWrap}>{listElement}</View>
       )}
-
-      <Modal
-        transparent
-        animationType="fade"
-        visible={Boolean(selectedActionChat)}
-        onRequestClose={closeChatActions}
-      >
-        <Pressable style={styles.actionsBackdrop} onPress={closeChatActions}>
-          <Pressable
-            onPress={() => undefined}
-            style={[
-              styles.actionsPanel,
-              {
-                backgroundColor: theme.colors.surface,
-                borderColor: theme.colors.border
-              }
-            ]}
-          >
-            <Text style={[styles.actionsTitle, { color: theme.colors.textPrimary }]}>{selectedActionChat?.title}</Text>
-            <Text style={[styles.actionsSubtitle, { color: theme.colors.textMuted }]}>Conversation actions</Text>
-
-            <Pressable
-              onPress={() => {
-                if (selectedActionChat) {
-                  togglePin(selectedActionChat.id);
-                }
-                closeChatActions();
-              }}
-              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
-            >
-              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
-                {selectedActionChat?.pinned ? "Unpin" : "Pin"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                if (selectedActionChat) {
-                  toggleArchive(selectedActionChat.id);
-                }
-                closeChatActions();
-              }}
-              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
-            >
-              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
-                {selectedActionChat?.archived ? "Unarchive" : "Archive"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => {
-                if (selectedActionChat) {
-                  toggleMute(selectedActionChat.id);
-                }
-                closeChatActions();
-              }}
-              style={[styles.actionsButton, { borderColor: theme.colors.border }]}
-            >
-              <Text style={[styles.actionsButtonText, { color: theme.colors.textPrimary }]}>
-                {selectedActionChat?.muted ? "Unmute" : "Mute"}
-              </Text>
-            </Pressable>
-
-            <Pressable onPress={closeChatActions} style={[styles.closeButton, { backgroundColor: theme.colors.surfaceMuted }]}>
-              <Text style={[styles.closeButtonText, { color: theme.colors.textSecondary }]}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </ScreenContainer>
   );
 }
@@ -314,49 +238,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24
-  },
-  actionsBackdrop: {
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.35)",
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24
-  },
-  actionsPanel: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    width: "100%"
-  },
-  actionsTitle: {
-    fontSize: 16,
-    fontWeight: "700"
-  },
-  actionsSubtitle: {
-    fontSize: 12,
-    marginTop: 2
-  },
-  actionsButton: {
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11
-  },
-  actionsButtonText: {
-    fontSize: 14,
-    fontWeight: "600"
-  },
-  closeButton: {
-    alignItems: "center",
-    borderRadius: 10,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 11
-  },
-  closeButtonText: {
-    fontSize: 14,
-    fontWeight: "700"
   }
 });
 

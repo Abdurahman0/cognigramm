@@ -6,8 +6,6 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface ChatComposerProps {
   keyboardVisible?: boolean;
-  replyToText?: string;
-  onClearReply?: () => void;
   onTypingStart?: () => void;
   onTypingStop?: () => void;
   onSend: (body: string) => void;
@@ -35,15 +33,13 @@ const emojiCatalog = [
 
 export function ChatComposer({
   keyboardVisible = false,
-  replyToText,
-  onClearReply,
   onTypingStart,
   onTypingStop,
   onSend,
   onSendAttachment
 }: ChatComposerProps): JSX.Element {
   const { theme } = useAppTheme();
-  const minInputHeight = Platform.OS === "ios" ? 22 : 20;
+  const minInputHeight = Platform.OS === "ios" ? 22 : Platform.OS === "web" ? 24 : 20;
   const [text, setText] = useState("");
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [inputHeight, setInputHeight] = useState(minInputHeight);
@@ -74,7 +70,7 @@ export function ChatComposer({
     clearTypingTimeout();
     typingTimeoutRef.current = setTimeout(() => {
       stopTyping();
-    }, 1500);
+    }, 2000);
   };
 
   useEffect(
@@ -119,17 +115,6 @@ export function ChatComposer({
 
   return (
     <View style={[styles.root, { borderTopColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-      {replyToText ? (
-        <View style={[styles.replyWrap, { backgroundColor: theme.colors.surfaceMuted }]}>
-          <Text numberOfLines={1} style={[styles.replyText, { color: theme.colors.textSecondary }]}>
-            Replying to: {replyToText}
-          </Text>
-          <Pressable onPress={onClearReply} hitSlop={8}>
-            <Feather name="x" size={16} color={theme.colors.textMuted} />
-          </Pressable>
-        </View>
-      ) : null}
-
       {emojiPickerOpen ? (
         <View style={[styles.emojiPanel, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}>
           {emojiCatalog.map((emoji) => (
@@ -151,7 +136,12 @@ export function ChatComposer({
         style={[
           styles.composerShell,
           keyboardVisible && styles.composerShellKeyboardOpen,
-          { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted }
+          Platform.OS === "web" && styles.composerShellWeb,
+          {
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surfaceMuted,
+            borderWidth: Platform.OS === "web" ? 0 : 1
+          }
         ]}
       >
         <Pressable
@@ -162,7 +152,7 @@ export function ChatComposer({
           <Feather name="smile" size={20} color={theme.colors.textSecondary} />
         </Pressable>
 
-        <View style={[styles.inputWrap, keyboardVisible && styles.inputWrapKeyboardOpen]}>
+        <View style={[styles.inputWrap, keyboardVisible && styles.inputWrapKeyboardOpen, Platform.OS === "web" && styles.inputWrapWeb]}>
           <TextInput
             value={text}
             onChangeText={handleTextChange}
@@ -179,6 +169,7 @@ export function ChatComposer({
             style={[
               styles.input,
               keyboardVisible && styles.inputKeyboardOpen,
+              Platform.OS === "web" && styles.inputWeb,
               {
                 color: theme.colors.textPrimary,
                 height: inputHeight
@@ -231,6 +222,10 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     paddingVertical: 6
   },
+  composerShellWeb: {
+    alignItems: "center",
+    paddingVertical: 4
+  },
   composerShellKeyboardOpen: {
     paddingVertical: 7
   },
@@ -253,6 +248,9 @@ const styles = StyleSheet.create({
   inputWrapKeyboardOpen: {
     minHeight: 36
   },
+  inputWrapWeb: {
+    minHeight: 36
+  },
   input: {
     flex: 1,
     fontSize: 15,
@@ -263,6 +261,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingTop: 0,
     textAlignVertical: "center"
+  },
+  inputWeb: {
+    paddingBottom: 4,
+    paddingTop: 4,
+    outlineStyle: "solid",
+    outlineWidth: 0,
+    outlineColor: "transparent"
   },
   inputKeyboardOpen: {
     paddingBottom: 1,
@@ -278,19 +283,6 @@ const styles = StyleSheet.create({
   },
   sendButtonKeyboardOpen: {
     alignSelf: "center"
-  },
-  replyWrap: {
-    alignItems: "center",
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  replyText: {
-    flex: 1,
-    fontSize: 12,
-    marginRight: 8
   },
   emojiPanel: {
     borderRadius: 12,

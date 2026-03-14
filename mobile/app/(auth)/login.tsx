@@ -78,9 +78,6 @@ export default function LoginScreen(): JSX.Element {
         </View>
 
         <View style={styles.links}>
-          <Pressable onPress={() => router.push("/(auth)/forgot-password")}>
-            <Text style={[styles.link, { color: theme.colors.accent }]}>Forgot password?</Text>
-          </Pressable>
           <Pressable onPress={() => router.push("/(auth)/register")}>
             <Text style={[styles.link, { color: theme.colors.accent }]}>Create account</Text>
           </Pressable>

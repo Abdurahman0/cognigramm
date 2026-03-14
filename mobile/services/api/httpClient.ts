@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "@/services/api/config";
+import { notifyUnauthorized } from "@/services/api/unauthorizedHandler";
 
 interface ApiRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -95,6 +96,9 @@ export async function apiRequest<TResponse>(path: string, options: ApiRequestOpt
   const payload = await parseResponsePayload(response);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      notifyUnauthorized({ status: response.status, path });
+    }
     throw new ApiRequestError(extractErrorMessage(response.status, payload), response.status, payload);
   }
 

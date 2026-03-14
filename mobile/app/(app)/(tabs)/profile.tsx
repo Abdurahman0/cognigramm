@@ -41,23 +41,6 @@ export default function ProfileScreen(): JSX.Element {
           </View>
         </View>
 
-        <View style={styles.quickLinks}>
-          <Pressable
-            onPress={() => router.push("/(app)/settings")}
-            style={[styles.linkRow, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-          >
-            <Text style={[styles.linkLabel, { color: theme.colors.textPrimary }]}>General Settings</Text>
-            <Feather name="chevron-right" size={18} color={theme.colors.textMuted} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/(app)/settings/notifications")}
-            style={[styles.linkRow, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-          >
-            <Text style={[styles.linkLabel, { color: theme.colors.textPrimary }]}>Notification Settings</Text>
-            <Feather name="chevron-right" size={18} color={theme.colors.textMuted} />
-          </Pressable>
-        </View>
-
         <ToggleItem
           title="Compact chat density"
           description="Reduce spacing for dense desktop workflows."
@@ -114,20 +97,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 3
   },
-  quickLinks: {
-    gap: 10
-  },
-  linkRow: {
-    alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 52,
-    paddingHorizontal: 14
-  },
-  linkLabel: {
-    fontSize: 15,
-    fontWeight: "600"
-  }
 });

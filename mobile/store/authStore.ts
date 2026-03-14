@@ -12,16 +12,12 @@ interface AuthState {
   hasSeenOnboarding: boolean;
   session: AuthSession | null;
   currentUser: User;
-  otpEmail: string;
-  otpChallengeId: string;
   status: AsyncStatus;
   errorMessage: string;
   markHydrated: () => void;
   completeOnboarding: () => void;
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
-  requestOtp: (email: string) => Promise<void>;
-  verifyOtp: (code: string) => Promise<void>;
   setCurrentUserFromApi: (token: string) => Promise<void>;
   logout: () => void;
 }
@@ -47,9 +43,6 @@ const toUsernameSeed = (email: string): string => {
   return normalized.length >= 3 ? normalized : `member_${Date.now().toString(36).slice(-6)}`;
 };
 
-const unsupportedOtpError = () =>
-  new Error("Password reset/OTP flow is not available from the current backend API.");
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -57,8 +50,6 @@ export const useAuthStore = create<AuthState>()(
       hasSeenOnboarding: false,
       session: null,
       currentUser: defaultUser,
-      otpEmail: "",
-      otpChallengeId: "",
       status: "idle",
       errorMessage: "",
       markHydrated: () => set({ hydrated: true }),
@@ -82,9 +73,7 @@ export const useAuthStore = create<AuthState>()(
             session,
             currentUser: user,
             status: "success",
-            errorMessage: "",
-            otpEmail: "",
-            otpChallengeId: ""
+            errorMessage: ""
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Login failed.";
@@ -155,9 +144,7 @@ export const useAuthStore = create<AuthState>()(
             session,
             currentUser: user,
             status: "success",
-            errorMessage: "",
-            otpEmail: "",
-            otpChallengeId: ""
+            errorMessage: ""
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unable to complete sign in after registration.";
@@ -167,31 +154,6 @@ export const useAuthStore = create<AuthState>()(
           });
           throw error;
         }
-      },
-      requestOtp: async (email) => {
-        set({
-          status: "loading",
-          errorMessage: "",
-          otpEmail: email.trim()
-        });
-        const error = unsupportedOtpError();
-        set({
-          status: "error",
-          errorMessage: error.message
-        });
-        throw error;
-      },
-      verifyOtp: async () => {
-        set({
-          status: "loading",
-          errorMessage: ""
-        });
-        const error = unsupportedOtpError();
-        set({
-          status: "error",
-          errorMessage: error.message
-        });
-        throw error;
       },
       setCurrentUserFromApi: async (token) => {
         try {
@@ -209,8 +171,6 @@ export const useAuthStore = create<AuthState>()(
           hasSeenOnboarding,
           session: null,
           currentUser: defaultUser,
-          otpEmail: "",
-          otpChallengeId: "",
           status: "idle",
           errorMessage: ""
         });

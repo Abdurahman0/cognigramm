@@ -9,7 +9,6 @@ interface MessageBubbleProps {
   message: ChatMessage;
   senderName: string;
   isMine: boolean;
-  replyPreview?: string;
   onLongPress?: () => void;
 }
 
@@ -24,7 +23,6 @@ export function MessageBubble({
   message,
   senderName,
   isMine,
-  replyPreview,
   onLongPress
 }: MessageBubbleProps): JSX.Element {
   const { theme } = useAppTheme();
@@ -45,13 +43,6 @@ export function MessageBubble({
         ]}
       >
         {!isMine ? <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderName}</Text> : null}
-        {replyPreview ? (
-          <View style={[styles.reply, { borderColor: isMine ? "#AFC3FF" : theme.colors.border }]}>
-            <Text numberOfLines={1} style={[styles.replyText, { color: isMine ? "#E4ECFF" : theme.colors.textMuted }]}>
-              {replyPreview}
-            </Text>
-          </View>
-        ) : null}
         {message.isDeleted ? (
           <Text style={[styles.deletedText, { color: isMine ? "#D7E2FF" : theme.colors.textMuted }]}>
             This message was deleted
@@ -129,12 +120,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 6
-  },
-  reply: {
-    borderLeftWidth: 3,
-    paddingLeft: 8
-  },
-  replyText: {
-    fontSize: 12
   }
 });

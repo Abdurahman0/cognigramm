@@ -8,24 +8,21 @@ import { conversationsApi, messagesApi, presenceApi, usersApi, type ApiMessage, 
 import { deriveSharedFiles, mapApiConversationToChat, mapApiMessageToChatMessage, mapApiUserToUser, mapUploadAttachmentToApi, sortChatsByLastActivity } from "@/services/api/adapters";
 import { USE_LOCAL_MEDIA_UPLOAD } from "@/services/api/config";
 import { realtimeSocketClient, type SocketStatus } from "@/services/realtime/socketClient";
-import type { CallLogItem, ChatKind, ChatMessage, ChatSummary, FileAttachment, MessagePriority, MessageType, SharedFileItem, User, UserPresence } from "@/types";
+import type { ChatKind, ChatMessage, ChatSummary, FileAttachment, MessageType, SharedFileItem, User, UserPresence } from "@/types";
 import { createId } from "@/utils/ids";
 
-export type ChatFilterKey = "all" | "unread" | "channels" | "groups" | "archived" | "pinned";
+export type ChatFilterKey = "all" | "unread" | "groups";
 
 interface SendMessageInput {
   chatId: string;
   body: string;
   type: MessageType;
-  priority: MessagePriority;
-  replyToMessageId?: string;
   attachment?: FileAttachment;
 }
 
 interface CreateGroupConversationInput {
   title: string;
   memberIds: string[];
-  kind: "group" | "channel" | "announcement";
 }
 
 interface UpdateCurrentUserProfileInput {
@@ -38,15 +35,10 @@ interface UpdateCurrentUserProfileInput {
 }
 
 interface PersistedFields {
-  pinnedByChatId: Record<string, boolean>;
-  archivedByChatId: Record<string, boolean>;
-  mutedByChatId: Record<string, boolean>;
-  chatKindByConversationId: Record<string, ChatKind>;
   unreadByChatId: Record<string, number>;
   lastReadMessageIdByChatId: Record<string, string>;
   activeFilter: ChatFilterKey;
   chatSearchQuery: string;
-  messageSearchQuery: string;
   activeDesktopChatId: string;
 }
 
@@ -55,7 +47,6 @@ interface ChatStore extends PersistedFields {
   initializing: boolean;
   users: User[];
   chats: ChatSummary[];
-  calls: CallLogItem[];
   sharedFiles: SharedFileItem[];
   messagesByChat: Record<string, ChatMessage[]>;
   loadingOlderByChat: Record<string, boolean>;
@@ -68,9 +59,9 @@ interface ChatStore extends PersistedFields {
   markHydrated: () => void;
   initializeForSession: () => Promise<void>;
   refreshChats: () => Promise<void>;
+  syncConversations: (force?: boolean) => Promise<void>;
   setActiveFilter: (filter: ChatFilterKey) => void;
   setChatSearchQuery: (query: string) => void;
-  setMessageSearchQuery: (query: string) => void;
   setActiveDesktopChatId: (chatId: string) => void;
   setActiveConversationId: (chatId: string) => void;
   setAppVisibility: (visible: boolean) => void;
@@ -79,12 +70,8 @@ interface ChatStore extends PersistedFields {
   sendMessage: (payload: SendMessageInput) => Promise<void>;
   editMessage: (chatId: string, messageId: string, content: string) => Promise<void>;
   deleteMessage: (chatId: string, messageId: string) => Promise<void>;
-  forwardMessage: (sourceChatId: string, messageId: string, targetChatId: string) => Promise<void>;
   loadOlderMessages: (chatId: string) => Promise<void>;
   markConversationRead: (chatId: string) => Promise<void>;
-  togglePin: (chatId: string) => void;
-  toggleMute: (chatId: string) => void;
-  toggleArchive: (chatId: string) => void;
   startDirectConversation: (userId: string) => Promise<string>;
   createGroupConversation: (payload: CreateGroupConversationInput) => Promise<string>;
   updateCurrentUserProfile: (payload: UpdateCurrentUserProfileInput) => Promise<void>;
@@ -92,17 +79,44 @@ interface ChatStore extends PersistedFields {
 
 const INITIAL_MESSAGE_LIMIT = 50;
 const MESSAGE_PAGE_SIZE = 50;
+const TYPING_START_THROTTLE_MS = 2000;
+const TYPING_DISPLAY_TTL_MS = 2500;
+const CONVERSATION_SYNC_INTERVAL_MS = 5000;
+const CONVERSATION_SYNC_THROTTLE_MS = 3000;
+
+const typingActivityByChat = new Map<string, Map<string, number>>();
+const typingCleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const lastTypingStartSentAtByChat = new Map<string, number>();
+const typingActiveByChat = new Set<string>();
+let conversationSyncTimer: ReturnType<typeof setInterval> | null = null;
+let conversationSyncInFlight = false;
+let lastConversationSyncAt = 0;
+
+const startConversationSyncTimer = (get: () => ChatStore): void => {
+  if (conversationSyncTimer) {
+    return;
+  }
+  conversationSyncTimer = setInterval(() => {
+    const state = get();
+    if (!state.appVisible || state.websocketStatus === "disconnected" || state.websocketStatus === "idle") {
+      return;
+    }
+    state.syncConversations().catch(() => undefined);
+  }, CONVERSATION_SYNC_INTERVAL_MS);
+};
+
+const stopConversationSyncTimer = (): void => {
+  if (conversationSyncTimer) {
+    clearInterval(conversationSyncTimer);
+    conversationSyncTimer = null;
+  }
+};
 
 const initialPersisted: PersistedFields = {
-  pinnedByChatId: {},
-  archivedByChatId: {},
-  mutedByChatId: {},
-  chatKindByConversationId: {},
   unreadByChatId: {},
   lastReadMessageIdByChatId: {},
   activeFilter: "all",
   chatSearchQuery: "",
-  messageSearchQuery: "",
   activeDesktopChatId: ""
 };
 
@@ -210,9 +224,7 @@ const createOptimisticMessage = (payload: SendMessageInput, senderId: string, cl
     senderId,
     body: payload.body,
     type: payload.type,
-    priority: payload.priority,
     createdAt: now,
-    replyToMessageId: payload.replyToMessageId,
     attachment: payload.attachment,
     status: "sending",
     deliveredToIds: [],
@@ -235,10 +247,29 @@ const uploadAttachment = async (
     return null;
   }
 
+  const fileName = attachment.name || `file-${Date.now()}`;
+  const mimeType = attachment.mimeType || "application/octet-stream";
+
+  if (Platform.OS !== "web") {
+    const formData = new FormData();
+    formData.append("file", {
+      uri: attachment.uri,
+      name: fileName,
+      type: mimeType
+    } as unknown as Blob);
+    const result = await messagesApi.uploadLocalAttachment(token, formData);
+    return {
+      bucket: result.bucket,
+      object_key: result.object_key,
+      original_name: result.original_name,
+      mime_type: result.mime_type,
+      size_bytes: result.size_bytes,
+      public_url: result.public_url
+    };
+  }
+
   const fileResponse = await fetch(attachment.uri);
   const blob = await fileResponse.blob();
-  const fileName = attachment.name || `file-${Date.now()}`;
-  const mimeType = attachment.mimeType || blob.type || "application/octet-stream";
   const sizeBytes = typeof blob.size === "number" ? blob.size : 0;
   if (sizeBytes <= 0) {
     return null;
@@ -368,28 +399,67 @@ const fetchAllUsers = async (token: string): Promise<ApiUser[]> => {
 
 export const useChatStore = create<ChatStore>()(
   persist(
-    (set, get) => ({
-      ...initialPersisted,
-      hydrated: false,
-      initializing: false,
-      users: [],
-      chats: [],
-      calls: [],
-      sharedFiles: [],
-      messagesByChat: {},
-      loadingOlderByChat: {},
-      loadedMessageLimitByChat: {},
-      activeConversationId: "",
-      websocketStatus: "idle",
-      appVisible: true,
-      currentToken: "",
-      currentUserId: "",
-      markHydrated: () => set({ hydrated: true }),
-      initializeForSession: async () => {
+    (set, get) => {
+      const scheduleTypingCleanup = (chatId: string) => {
+        const existing = typingCleanupTimers.get(chatId);
+        if (existing) {
+          clearTimeout(existing);
+        }
+        const timeout = setTimeout(() => {
+          const activity = typingActivityByChat.get(chatId);
+          if (!activity) {
+            typingCleanupTimers.delete(chatId);
+            return;
+          }
+          const now = Date.now();
+          const activeIds: string[] = [];
+          activity.forEach((lastSeen, userId) => {
+            if (now - lastSeen <= TYPING_DISPLAY_TTL_MS) {
+              activeIds.push(userId);
+            } else {
+              activity.delete(userId);
+            }
+          });
+          set({
+            chats: updateChatById(get().chats, chatId, (chat) => ({
+              ...chat,
+              typingUserIds: activeIds
+            }))
+          });
+          if (activity.size > 0) {
+            scheduleTypingCleanup(chatId);
+          } else {
+            typingActivityByChat.delete(chatId);
+            typingCleanupTimers.delete(chatId);
+          }
+        }, TYPING_DISPLAY_TTL_MS);
+        typingCleanupTimers.set(chatId, timeout);
+      };
+
+      return {
+        ...initialPersisted,
+        hydrated: false,
+        initializing: false,
+        users: [],
+        chats: [],
+        sharedFiles: [],
+        messagesByChat: {},
+        loadingOlderByChat: {},
+        loadedMessageLimitByChat: {},
+        activeConversationId: "",
+        websocketStatus: "idle",
+        appVisible: true,
+        currentToken: "",
+        currentUserId: "",
+        markHydrated: () => set({ hydrated: true }),
+        initializeForSession: async () => {
         attachVisibilityWatchers();
         const session = useAuthStore.getState().session;
         if (!session) {
           realtimeSocketClient.disconnect();
+          stopConversationSyncTimer();
+          conversationSyncInFlight = false;
+          lastConversationSyncAt = 0;
           set({
             initializing: false,
             websocketStatus: "disconnected",
@@ -401,8 +471,7 @@ export const useChatStore = create<ChatStore>()(
             messagesByChat: {},
             loadingOlderByChat: {},
             loadedMessageLimitByChat: {},
-            activeConversationId: "",
-            calls: []
+            activeConversationId: ""
           });
           return;
         }
@@ -446,13 +515,9 @@ export const useChatStore = create<ChatStore>()(
           const chats = apiConversations.map((conversation) => {
             const conversationId = String(conversation.id);
             const mappedChat = mapApiConversationToChat(conversation, usersById, session.userId, {
-              pinned: get().pinnedByChatId[conversationId] ?? false,
-              archived: get().archivedByChatId[conversationId] ?? false,
-              muted: get().mutedByChatId[conversationId] ?? false,
               unreadCount: unreadByChatId[conversationId] ?? 0
             });
-            const overriddenKind = get().chatKindByConversationId[conversationId];
-            return overriddenKind ? { ...mappedChat, kind: overriddenKind } : mappedChat;
+            return mappedChat;
           });
 
           const latestByConversation = await Promise.all(
@@ -473,7 +538,7 @@ export const useChatStore = create<ChatStore>()(
             if (persistedChatId && sortedChats.some((chat) => chat.id === persistedChatId)) {
               return persistedChatId;
             }
-            return sortedChats.find((chat) => !chat.archived)?.id ?? sortedChats[0]?.id ?? "";
+            return sortedChats[0]?.id ?? "";
           })();
 
           set({
@@ -482,7 +547,7 @@ export const useChatStore = create<ChatStore>()(
             sharedFiles: deriveSharedFiles(messagesByChat),
             messagesByChat,
             loadingOlderByChat: {},
-            loadedMessageLimitByChat: Object.fromEntries(sortedChats.map((chat) => [chat.id, INITIAL_MESSAGE_LIMIT] as const)),
+            loadedMessageLimitByChat: Object.fromEntries(sortedChats.map((chat) => [chat.id, 0] as const)),
             activeDesktopChatId,
             unreadByChatId: Object.fromEntries(sortedChats.map((chat) => [chat.id, chat.unreadCount] as const)),
             initializing: false
@@ -496,6 +561,7 @@ export const useChatStore = create<ChatStore>()(
             onStatusChange: (status) => set({ websocketStatus: status }),
             getActiveConversationId: () => parseNumericId(useChatStore.getState().activeConversationId)
           });
+          startConversationSyncTimer(get);
 
           await useAuthStore.getState().setCurrentUserFromApi(session.token);
         } catch (error) {
@@ -506,9 +572,100 @@ export const useChatStore = create<ChatStore>()(
       refreshChats: async () => {
         await get().initializeForSession();
       },
+      syncConversations: async (force = false) => {
+        const session = useAuthStore.getState().session;
+        if (!session) {
+          return;
+        }
+        const now = Date.now();
+        if (!force) {
+          if (conversationSyncInFlight) {
+            return;
+          }
+          if (now - lastConversationSyncAt < CONVERSATION_SYNC_THROTTLE_MS) {
+            return;
+          }
+        }
+
+        conversationSyncInFlight = true;
+        lastConversationSyncAt = now;
+        try {
+          const apiConversations = await conversationsApi.list(session.token, { limit: 100, offset: 0 });
+          const state = get();
+          const usersById: Record<string, User> = Object.fromEntries(state.users.map((user) => [user.id, user] as const));
+          const unreadByChatId = { ...state.unreadByChatId };
+          const messagesByChat = { ...state.messagesByChat };
+          const loadedMessageLimitByChat = { ...state.loadedMessageLimitByChat };
+          const existingById = new Map(state.chats.map((chat) => [chat.id, chat] as const));
+          const newChatIds: string[] = [];
+
+          const mappedChats = apiConversations.map((conversation) => {
+            const chatId = String(conversation.id);
+            const existing = existingById.get(chatId);
+            if (!existing) {
+              newChatIds.push(chatId);
+              if (unreadByChatId[chatId] == null) {
+                unreadByChatId[chatId] = 0;
+              }
+              if (!messagesByChat[chatId]) {
+                messagesByChat[chatId] = [];
+              }
+              if (loadedMessageLimitByChat[chatId] == null) {
+                loadedMessageLimitByChat[chatId] = 0;
+              }
+            }
+            existingById.delete(chatId);
+            return mapApiConversationToChat(conversation, usersById, state.currentUserId || session.userId, {
+              unreadCount: unreadByChatId[chatId] ?? existing?.unreadCount ?? 0,
+              typingUserIds: existing?.typingUserIds ?? [],
+              lastMessageId: existing?.lastMessageId
+            });
+          });
+
+          if (newChatIds.length > 0) {
+            const latestByConversation = await Promise.all(
+              newChatIds.map(async (chatId) => {
+                const conversationId = parseNumericId(chatId);
+                if (!conversationId) {
+                  return { conversationId: chatId, latest: null };
+                }
+                const latest = await messagesApi.getLatestByConversation(session.token, conversationId);
+                return { conversationId: chatId, latest };
+              })
+            );
+            latestByConversation.forEach((row) => {
+              if (!row.latest) {
+                return;
+              }
+              messagesByChat[row.conversationId] = [mapApiMessageToChatMessage(row.latest)];
+            });
+          }
+
+          const mergedChats = [...mappedChats, ...existingById.values()];
+          const sortedChats = nextChatsWithUnread(mergedChats, unreadByChatId, messagesByChat);
+
+          if (newChatIds.length > 0) {
+            newChatIds.forEach((chatId) => {
+              const numericId = parseNumericId(chatId);
+              if (numericId) {
+                realtimeSocketClient.send("join_conversation", { conversation_id: numericId });
+              }
+            });
+          }
+
+          set({
+            chats: sortedChats,
+            messagesByChat,
+            unreadByChatId,
+            sharedFiles: deriveSharedFiles(messagesByChat),
+            loadedMessageLimitByChat
+          });
+        } finally {
+          conversationSyncInFlight = false;
+        }
+      },
       setActiveFilter: (filter) => set({ activeFilter: filter }),
       setChatSearchQuery: (query) => set({ chatSearchQuery: query }),
-      setMessageSearchQuery: (query) => set({ messageSearchQuery: query }),
       setActiveDesktopChatId: (chatId) => set({ activeDesktopChatId: chatId }),
       setActiveConversationId: (chatId) => {
         const normalizedChatId = chatId || "";
@@ -530,6 +687,11 @@ export const useChatStore = create<ChatStore>()(
 
         if (normalizedChatId) {
           get().markConversationRead(normalizedChatId).catch(() => undefined);
+          const loadedLimit = state.loadedMessageLimitByChat[normalizedChatId] ?? 0;
+          const loadingOlder = state.loadingOlderByChat[normalizedChatId] ?? false;
+          if (loadedLimit === 0 && !loadingOlder) {
+            get().loadOlderMessages(normalizedChatId).catch(() => undefined);
+          }
         }
       },
       setAppVisibility: (visible) => {
@@ -547,6 +709,7 @@ export const useChatStore = create<ChatStore>()(
         if (!visible) {
           realtimeSocketClient.send("active_conversation", { conversation_id: null });
           presenceApi.setActiveConversation(token, null).catch(() => undefined);
+          stopConversationSyncTimer();
           return;
         }
 
@@ -554,11 +717,13 @@ export const useChatStore = create<ChatStore>()(
         const numericId = parseNumericId(activeConversationId);
         realtimeSocketClient.send("active_conversation", { conversation_id: numericId });
         presenceApi.setActiveConversation(token, numericId).catch(() => undefined);
+        startConversationSyncTimer(get);
+        get().syncConversations(true).catch(() => undefined);
         if (activeConversationId) {
           useChatStore.getState().markConversationRead(activeConversationId).catch(() => undefined);
         }
       },
-      handleSocketEvent: (envelope) => {
+        handleSocketEvent: (envelope) => {
         const event = envelope.event;
         const payload = envelope.payload ?? {};
         const state = get();
@@ -570,6 +735,8 @@ export const useChatStore = create<ChatStore>()(
               users: updateUsersOnlineState(state.users, new Set(onlineRaw))
             });
           }
+          startConversationSyncTimer(get);
+          get().syncConversations(true).catch(() => undefined);
           return;
         }
 
@@ -606,25 +773,38 @@ export const useChatStore = create<ChatStore>()(
           return;
         }
 
-        if (event === "typing_start" || event === "typing_stop") {
-          const conversationIdRaw = (payload as { conversation_id?: unknown }).conversation_id;
-          const typingRaw = (payload as { typing_users?: unknown }).typing_users;
-          if (
-            typeof conversationIdRaw !== "number" ||
-            !Array.isArray(typingRaw) ||
-            !typingRaw.every((item) => typeof item === "number")
-          ) {
+          if (event === "typing_start" || event === "typing_stop") {
+            const conversationIdRaw = (payload as { conversation_id?: unknown }).conversation_id;
+            const typingRaw = (payload as { typing_users?: unknown }).typing_users;
+            if (
+              typeof conversationIdRaw !== "number" ||
+              !Array.isArray(typingRaw) ||
+              !typingRaw.every((item) => typeof item === "number")
+            ) {
+              return;
+            }
+            const conversationId = String(conversationIdRaw);
+            const typingUsers = typingRaw.map((item) => String(item));
+            if (typingUsers.length > 0) {
+              const activity = typingActivityByChat.get(conversationId) ?? new Map<string, number>();
+              const now = Date.now();
+              typingUsers.forEach((userId) => {
+                activity.set(userId, now);
+              });
+              typingActivityByChat.set(conversationId, activity);
+              const activeIds = Array.from(activity.entries())
+                .filter(([, lastSeen]) => now - lastSeen <= TYPING_DISPLAY_TTL_MS)
+                .map(([userId]) => userId);
+              set({
+                chats: updateChatById(state.chats, conversationId, (chat) => ({
+                  ...chat,
+                  typingUserIds: activeIds
+                }))
+              });
+            }
+            scheduleTypingCleanup(conversationId);
             return;
           }
-          const conversationId = String(conversationIdRaw);
-          set({
-            chats: updateChatById(state.chats, conversationId, (chat) => ({
-              ...chat,
-              typingUserIds: typingRaw.map((item) => String(item))
-            }))
-          });
-          return;
-        }
 
         if (event === "message_persisted" || event === "message_edited" || event === "message_deleted") {
           const apiMessage = payload as unknown as ApiMessage;
@@ -741,15 +921,31 @@ export const useChatStore = create<ChatStore>()(
           });
         }
       },
-      sendTypingEvent: (chatId, isTyping) => {
-        const conversationId = parseNumericId(chatId);
-        if (!conversationId) {
-          return;
-        }
-        realtimeSocketClient.send(isTyping ? "typing_start" : "typing_stop", {
-          conversation_id: conversationId
-        });
-      },
+        sendTypingEvent: (chatId, isTyping) => {
+          const conversationId = parseNumericId(chatId);
+          if (!conversationId) {
+            return;
+          }
+          if (isTyping) {
+            const now = Date.now();
+            const lastSent = lastTypingStartSentAtByChat.get(chatId) ?? 0;
+            if (!typingActiveByChat.has(chatId) || now - lastSent >= TYPING_START_THROTTLE_MS) {
+              realtimeSocketClient.send("typing_start", {
+                conversation_id: conversationId
+              });
+              lastTypingStartSentAtByChat.set(chatId, now);
+              typingActiveByChat.add(chatId);
+            }
+            return;
+          }
+          if (typingActiveByChat.has(chatId)) {
+            realtimeSocketClient.send("typing_stop", {
+              conversation_id: conversationId
+            });
+            typingActiveByChat.delete(chatId);
+            lastTypingStartSentAtByChat.delete(chatId);
+          }
+        },
       sendMessage: async (payload) => {
         const { token, userId } = withSession();
         const conversationId = parseNumericId(payload.chatId);
@@ -778,16 +974,47 @@ export const useChatStore = create<ChatStore>()(
           };
         });
 
-        const uploaded = payload.attachment ? await uploadAttachment(token, payload.attachment) : null;
-        const attachments = uploaded ? [mapUploadAttachmentToApi(uploaded)] : [];
+        try {
+          const requiresAttachment = payload.type !== "text" && payload.type !== "system";
+          if (requiresAttachment && !payload.attachment) {
+            throw new Error("Attachment is required for this message.");
+          }
+          const uploaded = payload.attachment ? await uploadAttachment(token, payload.attachment) : null;
+          if (requiresAttachment && !uploaded) {
+            throw new Error("Unable to upload attachment.");
+          }
+          const attachments = uploaded ? [mapUploadAttachmentToApi(uploaded)] : [];
 
-        realtimeSocketClient.send("send_message", {
-          conversation_id: conversationId,
-          content: payload.body || null,
-          type: payload.type,
-          client_message_id: clientMessageId,
-          attachments
-        });
+          realtimeSocketClient.send("send_message", {
+            conversation_id: conversationId,
+            content: payload.body || null,
+            type: payload.type,
+            client_message_id: clientMessageId,
+            attachments
+          });
+        } catch (error) {
+          set((state) => {
+            const currentMessages = state.messagesByChat[payload.chatId] ?? [];
+            const nextMessages = currentMessages.filter((message) => message.id !== optimistic.id);
+            const messagesByChat = {
+              ...state.messagesByChat,
+              [payload.chatId]: nextMessages
+            };
+            const lastMessageId = nextMessages.at(-1)?.id ?? "";
+            return {
+              messagesByChat,
+              chats: sortChatsByLastActivity(
+                updateChatById(state.chats, payload.chatId, (chat) => ({
+                  ...chat,
+                  lastMessageId: lastMessageId || chat.lastMessageId
+                })),
+                messagesByChat
+              ),
+              sharedFiles: deriveSharedFiles(messagesByChat)
+            };
+          });
+          throw error;
+        }
       },
       editMessage: async (chatId, messageId, content) => {
         const { token } = withSession();
@@ -844,18 +1071,6 @@ export const useChatStore = create<ChatStore>()(
           message_id: numericMessageId
         });
         messagesApi.deleteMessage(token, numericMessageId).catch(() => undefined);
-      },
-      forwardMessage: async (sourceChatId, messageId, targetChatId) => {
-        const sourceMessage = get().messagesByChat[sourceChatId]?.find((message) => message.id === messageId);
-        if (!sourceMessage || sourceMessage.isDeleted) {
-          return;
-        }
-        await get().sendMessage({
-          chatId: targetChatId,
-          body: sourceMessage.body,
-          type: "text",
-          priority: "normal"
-        });
       },
       loadOlderMessages: async (chatId) => {
         const state = get();
@@ -928,8 +1143,7 @@ export const useChatStore = create<ChatStore>()(
           lastReadMessageIdByChatId: lastRead,
           chats: updateChatById(state.chats, chatId, (chat) => ({
             ...chat,
-            unreadCount: 0,
-            hasMentions: false
+            unreadCount: 0
           })),
           messagesByChat: {
             ...state.messagesByChat,
@@ -954,53 +1168,6 @@ export const useChatStore = create<ChatStore>()(
           }
         }
       },
-      togglePin: (chatId) =>
-        set((state) => {
-          const nextPinned = !(state.pinnedByChatId[chatId] ?? false);
-          return {
-            pinnedByChatId: {
-              ...state.pinnedByChatId,
-              [chatId]: nextPinned
-            },
-            chats: updateChatById(state.chats, chatId, (chat) => ({
-              ...chat,
-              pinned: nextPinned
-            }))
-          };
-        }),
-      toggleMute: (chatId) =>
-        set((state) => {
-          const nextMuted = !(state.mutedByChatId[chatId] ?? false);
-          return {
-            mutedByChatId: {
-              ...state.mutedByChatId,
-              [chatId]: nextMuted
-            },
-            chats: updateChatById(state.chats, chatId, (chat) => ({
-              ...chat,
-              muted: nextMuted
-            }))
-          };
-        }),
-      toggleArchive: (chatId) =>
-        set((state) => {
-          const nextArchived = !(state.archivedByChatId[chatId] ?? false);
-          const chats = updateChatById(state.chats, chatId, (chat) => ({
-            ...chat,
-            archived: nextArchived
-          }));
-          return {
-            archivedByChatId: {
-              ...state.archivedByChatId,
-              [chatId]: nextArchived
-            },
-            chats,
-            activeDesktopChatId:
-              state.activeDesktopChatId === chatId && nextArchived
-                ? chats.find((chat) => !chat.archived)?.id ?? ""
-                : state.activeDesktopChatId
-          };
-        }),
       startDirectConversation: async (userId) => {
         const { token, userId: currentUserId } = withSession();
         const state = get();
@@ -1024,9 +1191,6 @@ export const useChatStore = create<ChatStore>()(
         });
         const usersById = Object.fromEntries(state.users.map((user) => [user.id, user] as const));
         const chat = mapApiConversationToChat(conversation, usersById, currentUserId, {
-          pinned: false,
-          archived: false,
-          muted: false,
           unreadCount: 0
         });
         const messagesByChat = {
@@ -1038,6 +1202,10 @@ export const useChatStore = create<ChatStore>()(
           messagesByChat,
           unreadByChatId: {
             ...state.unreadByChatId,
+            [chat.id]: 0
+          },
+          loadedMessageLimitByChat: {
+            ...state.loadedMessageLimitByChat,
             [chat.id]: 0
           }
         });
@@ -1060,12 +1228,9 @@ export const useChatStore = create<ChatStore>()(
         });
         const usersById = Object.fromEntries(state.users.map((user) => [user.id, user] as const));
         const mapped = mapApiConversationToChat(conversation, usersById, userId, {
-          pinned: false,
-          archived: false,
-          muted: false,
           unreadCount: 0
         });
-        const chat = payload.kind === "group" ? mapped : { ...mapped, kind: payload.kind };
+        const chat = mapped;
         const messagesByChat = {
           ...state.messagesByChat,
           [chat.id]: []
@@ -1078,20 +1243,17 @@ export const useChatStore = create<ChatStore>()(
             ...state.unreadByChatId,
             [chat.id]: 0
           },
-          chatKindByConversationId:
-            payload.kind === "group"
-              ? state.chatKindByConversationId
-              : {
-                  ...state.chatKindByConversationId,
-                  [chat.id]: payload.kind
-                }
+          loadedMessageLimitByChat: {
+            ...state.loadedMessageLimitByChat,
+            [chat.id]: 0
+          }
         });
         realtimeSocketClient.send("join_conversation", {
           conversation_id: Number(chat.id)
         });
         return chat.id;
       },
-      updateCurrentUserProfile: async (payload) => {
+        updateCurrentUserProfile: async (payload) => {
         const { token, userId } = withSession();
         const numericUserId = parseNumericId(userId);
         if (!numericUserId) {
@@ -1137,21 +1299,17 @@ export const useChatStore = create<ChatStore>()(
                 }
               : state.currentUser
         }));
-      }
-    }),
+        }
+      };
+    },
     {
       name: "business-messenger-chat",
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        pinnedByChatId: state.pinnedByChatId,
-        archivedByChatId: state.archivedByChatId,
-        mutedByChatId: state.mutedByChatId,
-        chatKindByConversationId: state.chatKindByConversationId,
         unreadByChatId: state.unreadByChatId,
         lastReadMessageIdByChatId: state.lastReadMessageIdByChatId,
         activeFilter: state.activeFilter,
         chatSearchQuery: state.chatSearchQuery,
-        messageSearchQuery: state.messageSearchQuery,
         activeDesktopChatId: state.activeDesktopChatId
       }),
       onRehydrateStorage: () => (state) => {

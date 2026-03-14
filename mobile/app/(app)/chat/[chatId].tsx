@@ -30,6 +30,6 @@ const styles = StyleSheet.create({
   },
   webPanel: {
     alignSelf: "center",
-    maxWidth: 1120
+    maxWidth: 480
   }
 });

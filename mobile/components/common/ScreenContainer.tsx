@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
   },
   webContent: {
     alignSelf: "center",
-    maxWidth: 1120,
+    maxWidth: 480,
     width: "100%"
   }
 });

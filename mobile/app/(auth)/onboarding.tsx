@@ -7,9 +7,9 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuthStore } from "@/store/authStore";
 
 const highlights = [
-  "Team channels for departments and announcements",
-  "Priority labels for urgent communication",
-  "Shared files, searchable history, and role-aware collaboration"
+  "Direct and group conversations for teams",
+  "Presence, read receipts, and typing indicators",
+  "Shared files, searchable chat lists, and role-aware collaboration"
 ];
 
 export default function OnboardingScreen(): JSX.Element {

@@ -1,6 +1,6 @@
 import { forwardRef } from "react";
 import type { TextInputProps } from "react-native";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
 
@@ -25,6 +25,7 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
         placeholderTextColor={theme.colors.textMuted}
         style={[
           styles.input,
+          Platform.OS === "web" ? styles.inputWeb : null,
           {
             borderColor: hasError ? theme.colors.danger : theme.colors.border,
             backgroundColor: theme.colors.surface,
@@ -58,6 +59,11 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 10
+  },
+  inputWeb: {
+    outlineStyle: "solid",
+    outlineWidth: 0,
+    outlineColor: "transparent"
   },
   error: {
     fontSize: 12,

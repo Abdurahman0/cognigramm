@@ -12,11 +12,6 @@ export interface RegisterPayload {
   department: string;
 }
 
-export interface OtpPayload {
-  email: string;
-  code: string;
-}
-
 export interface AuthSession {
   userId: ID;
   token: string;

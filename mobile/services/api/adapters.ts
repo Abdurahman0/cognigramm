@@ -130,9 +130,6 @@ export const mapApiConversationToChat = (
   usersById: Record<string, User>,
   currentUserId: string,
   preferences?: {
-    pinned?: boolean;
-    archived?: boolean;
-    muted?: boolean;
     unreadCount?: number;
     typingUserIds?: string[];
     lastMessageId?: string;
@@ -149,10 +146,6 @@ export const mapApiConversationToChat = (
       ? peerUser?.fullName ?? peer?.username ?? conversation.title ?? "Direct message"
       : conversation.title?.trim() || `Group ${conversation.id}`;
 
-  const groupDepartment = conversation.participants
-    .map((participant) => usersById[String(participant.user_id)]?.department)
-    .find((value) => Boolean(value));
-
   return {
     id: String(conversation.id),
     title,
@@ -161,12 +154,8 @@ export const mapApiConversationToChat = (
     memberIds,
     avatar: conversationKind === "direct" ? peerUser?.avatar : undefined,
     unreadCount: preferences?.unreadCount ?? 0,
-    pinned: preferences?.pinned ?? false,
-    archived: preferences?.archived ?? false,
-    muted: preferences?.muted ?? false,
     typingUserIds: preferences?.typingUserIds ?? [],
     lastMessageId: preferences?.lastMessageId,
-    departmentLabel: groupDepartment,
     createdAt: conversation.created_at
   };
 };
@@ -181,11 +170,8 @@ export const mapApiMessageToChatMessage = (message: ApiMessage): ChatMessage => 
     senderId: message.sender_id != null ? String(message.sender_id) : "system",
     body: message.deleted_at ? "" : message.content ?? bodyFromAttachment,
     type: mapMessageType(message.message_type),
-    priority: "normal",
     createdAt: message.created_at,
     editedAt: message.edited_at ?? undefined,
-    replyToMessageId: undefined,
-    forwardedFromMessageId: undefined,
     attachment: toAttachment(firstAttachment),
     status: mapDeliveryState(message.delivery_state),
     seenByIds: [],

@@ -1,4 +1,3 @@
-import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
@@ -14,8 +13,6 @@ interface ChatListItemProps {
   lastMessage?: ChatMessage;
   active?: boolean;
   onPress: () => void;
-  onLongPress?: () => void;
-  onOpenActions?: () => void;
 }
 
 const getDirectPeer = (chat: ChatSummary, users: User[], currentUserId: string): User | undefined => {
@@ -30,9 +27,7 @@ export function ChatListItem({
   chat,
   lastMessage,
   active = false,
-  onPress,
-  onLongPress,
-  onOpenActions
+  onPress
 }: ChatListItemProps): JSX.Element {
   const { theme } = useAppTheme();
   const currentUser = useCurrentUser();
@@ -44,7 +39,6 @@ export function ChatListItem({
   return (
     <Pressable
       onPress={onPress}
-      onLongPress={onLongPress}
       style={({ pressed, hovered }) => [
         styles.root,
         {
@@ -80,17 +74,10 @@ export function ChatListItem({
             {preview}
           </Text>
           <View style={styles.flags}>
-            {chat.pinned ? <Feather name="bookmark" size={14} color={theme.colors.textMuted} /> : null}
-            {chat.muted ? <Feather name="bell-off" size={14} color={theme.colors.textMuted} /> : null}
             {chat.unreadCount > 0 ? (
               <View style={[styles.badge, { backgroundColor: theme.colors.accent }]}>
                 <Text style={styles.badgeText}>{chat.unreadCount > 9 ? "9+" : chat.unreadCount}</Text>
               </View>
-            ) : null}
-            {onOpenActions ? (
-              <Pressable onPress={onOpenActions} hitSlop={8} style={styles.moreBtn}>
-                <Feather name="more-vertical" size={14} color={theme.colors.textMuted} />
-              </Pressable>
             ) : null}
           </View>
         </View>
@@ -142,12 +129,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8
-  },
-  moreBtn: {
-    alignItems: "center",
-    height: 18,
-    justifyContent: "center",
-    width: 18
   },
   badge: {
     alignItems: "center",

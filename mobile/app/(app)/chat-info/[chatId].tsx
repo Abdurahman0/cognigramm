@@ -1,16 +1,14 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import {
-  AppButton,
   Avatar,
   EmptyState,
   ScreenContainer,
   SearchBar,
   SectionHeader,
-  ToggleItem,
   UserCard
 } from "@/components/common";
 import { PRESENCE_LABELS } from "@/constants/chat";
@@ -21,26 +19,21 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useResponsive } from "@/hooks/useResponsive";
 import { useChatStore } from "@/store/chatStore";
 import type { ChatSummary, User } from "@/types";
-import { formatRelative } from "@/utils/date";
 import { useShallow } from "zustand/react/shallow";
 
 type FeatherName = React.ComponentProps<typeof Feather>["name"];
-type QuickActionId = "message" | "call" | "mute" | "search" | "more" | "members" | "files" | "important";
+type QuickActionId = "message" | "members" | "files";
 
 const adminRoles = new Set(["ceo", "cto", "manager", "hr"]);
 
 const kindTitleMap: Record<ChatSummary["kind"], string> = {
   direct: "Profile",
-  group: "Group Info",
-  channel: "Channel Info",
-  announcement: "Announcement Info"
+  group: "Group Info"
 };
 
 const kindLabelMap: Record<ChatSummary["kind"], string> = {
   direct: "Direct",
-  group: "Group",
-  channel: "Channel",
-  announcement: "Announcement"
+  group: "Group"
 };
 
 const formatCalendarDate = (iso?: string): string => {
@@ -136,20 +129,16 @@ export default function ChatInfoScreen(): JSX.Element {
     chats,
     users,
     sharedFiles,
-    messagesByChat,
-    toggleMute
+    messagesByChat
   } = useChatStore(
     useShallow((state) => ({
       chats: state.chats,
       users: state.users,
       sharedFiles: state.sharedFiles,
-      messagesByChat: state.messagesByChat,
-      toggleMute: state.toggleMute
+      messagesByChat: state.messagesByChat
     }))
   );
 
-  const [mentionsOnly, setMentionsOnly] = useState(false);
-  const [fileAlerts, setFileAlerts] = useState(true);
   const [memberQuery, setMemberQuery] = useState("");
 
   const chat = useMemo(() => chats.find((item) => item.id === chatId), [chats, chatId]);
@@ -173,20 +162,6 @@ export default function ChatInfoScreen(): JSX.Element {
       }, 0),
     [messages]
   );
-  const importantPosts = useMemo(
-    () =>
-      messages
-        .filter(
-          (message) =>
-            !message.isDeleted &&
-            message.type !== "system" &&
-            (message.priority === "important" || message.priority === "urgent")
-        )
-        .slice(-4)
-        .reverse(),
-    [messages]
-  );
-
   const members = useMemo(
     () => (chat ? users.filter((user) => chat.memberIds.includes(user.id)) : []),
     [chat, users]
@@ -218,6 +193,13 @@ export default function ChatInfoScreen(): JSX.Element {
   }, [memberQuery, orderedMembers]);
 
   if (!chat) {
+    const handleClose = () => {
+      if (Platform.OS === "web") {
+        router.replace("/(app)/(tabs)/chats");
+        return;
+      }
+      router.back();
+    };
     return (
       <ScreenContainer scroll padded={false}>
         <View style={[styles.screen, isDesktop && styles.screenDesktop]}>
@@ -225,7 +207,7 @@ export default function ChatInfoScreen(): JSX.Element {
             title="Chat Info"
             subtitle="Details"
             rightSlot={
-              <Pressable onPress={() => router.back()} style={styles.headerIconBtn}>
+              <Pressable onPress={handleClose} style={styles.headerIconBtn}>
                 <Feather name="x" size={20} color={theme.colors.textPrimary} />
               </Pressable>
             }
@@ -252,43 +234,24 @@ export default function ChatInfoScreen(): JSX.Element {
   const heroSubtitle =
     chat.kind === "direct"
       ? `${ROLE_LABELS[directPeer?.role ?? currentUser.role]} - ${directPeer?.department ?? currentUser.department}`
-      : `${chat.memberIds.length} members - ${chat.departmentLabel ?? "Cross-functional"}`;
+      : chat.subtitle ?? `${chat.memberIds.length} members`;
   const heroDescription =
     chat.kind === "direct"
-      ? directPeer?.about ?? "Internal direct communication channel."
-      : chat.subtitle ?? "Internal workspace for team collaboration.";
+      ? directPeer?.about ?? "Direct message with a teammate."
+      : "Group chat for team collaboration.";
+  const handleClose = () => {
+    if (Platform.OS === "web") {
+      router.replace("/(app)/(tabs)/chats");
+      return;
+    }
+    router.back();
+  };
 
   const quickActionMap: Record<QuickActionId, { icon: FeatherName; label: string; onPress: () => void; active?: boolean }> = {
     message: {
       icon: "message-square",
       label: "Message",
       onPress: () => router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: chat.id } })
-    },
-    call: {
-      icon: "phone-call",
-      label: "Call",
-      onPress: () => toast.info("Call placeholder", "Live voice/video is ready for API integration.")
-    },
-    mute: {
-      icon: chat.muted ? "bell-off" : "bell",
-      label: chat.muted ? "Muted" : "Mute",
-      onPress: () => toggleMute(chat.id),
-      active: chat.muted
-    },
-    search: {
-      icon: "search",
-      label: "Search",
-      onPress: () => router.push("/(app)/search")
-    },
-    more: {
-      icon: "more-horizontal",
-      label: "More",
-      onPress: () => {
-        Alert.alert("Conversation tools", "Choose an action", [
-          { text: "Open Shared Files", onPress: () => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } }) },
-          { text: "Cancel", style: "cancel" }
-        ]);
-      }
     },
     members: {
       icon: "users",
@@ -299,41 +262,11 @@ export default function ChatInfoScreen(): JSX.Element {
       icon: "paperclip",
       label: "Files",
       onPress: () => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })
-    },
-    important: {
-      icon: "bookmark",
-      label: "Important",
-      onPress: () => toast.info("Important posts", `${importantPosts.length} highlighted messages in this conversation.`)
     }
   };
 
   const quickActionOrder: QuickActionId[] =
-    chat.kind === "direct"
-      ? ["message", "call", "mute", "search", "more"]
-      : ["search", "mute", "call", "members", "files", "important"];
-
-  const handleClearChat = () => {
-    Alert.alert("Clear chat history", "This action is not yet available from the backend API.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Continue",
-        style: "destructive",
-        onPress: () => toast.info("Not available", "Clear chat endpoint is not implemented in backend yet.")
-      }
-    ]);
-  };
-
-  const handleLeave = () => {
-    const label = chat.kind === "group" ? "group" : "channel";
-    Alert.alert(`Leave ${label}`, `Are you sure you want to leave ${heroTitle}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Leave",
-        style: "destructive",
-        onPress: () => toast.info("Not available", `Leave ${label} endpoint is not implemented in backend yet.`)
-      }
-    ]);
-  };
+    chat.kind === "direct" ? ["message", "files"] : ["message", "members", "files"];
 
   return (
     <ScreenContainer scroll padded={false}>
@@ -342,7 +275,7 @@ export default function ChatInfoScreen(): JSX.Element {
           title={kindTitleMap[chat.kind]}
           subtitle={heroTitle}
           rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.headerIconBtn}>
+            <Pressable onPress={handleClose} style={styles.headerIconBtn}>
               <Feather name="x" size={20} color={theme.colors.textPrimary} />
             </Pressable>
           }
@@ -413,7 +346,6 @@ export default function ChatInfoScreen(): JSX.Element {
             <>
               <InfoRow icon="users" label="Members" value={`${chat.memberIds.length} members`} />
               <InfoRow icon="shield" label="Owner" value={owner ? `${owner.fullName} (${ROLE_LABELS[owner.role]})` : "Not available"} />
-              <InfoRow icon="layers" label="Department" value={chat.departmentLabel ?? "Cross-functional"} />
               <InfoRow icon="calendar" label="Created" value={formatCalendarDate(chat.createdAt)} />
               <InfoRow icon="file-text" label="Description" value={heroDescription} />
             </>
@@ -459,71 +391,12 @@ export default function ChatInfoScreen(): JSX.Element {
             value={`${files.length} files`}
             onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}
           />
-          <InfoRow icon="link" label="Shared links" value={`${linksCount} links`} onPress={() => router.push("/(app)/search")} />
-
-          {importantPosts.length > 0 ? (
-            <View style={styles.importantList}>
-              <Text style={[styles.sectionMeta, { color: theme.colors.textMuted }]}>Pinned / Important preview</Text>
-              {importantPosts.map((message) => {
-                const sender = users.find((user) => user.id === message.senderId);
-                return (
-                  <View
-                    key={message.id}
-                    style={[styles.importantCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-                  >
-                    <Text numberOfLines={2} style={[styles.importantBody, { color: theme.colors.textPrimary }]}>
-                      {message.body}
-                    </Text>
-                    <Text style={[styles.importantMeta, { color: theme.colors.textMuted }]}>
-                      {sender?.fullName ?? "Unknown"} - {formatRelative(message.createdAt)}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Preferences</Text>
-          <ToggleItem
-            title="Mute notifications"
-            description="Silence push alerts for this conversation."
-            value={chat.muted}
-            onValueChange={() => toggleMute(chat.id)}
-          />
-          <ToggleItem
-            title="Mentions only"
-            description="Only alert on direct mentions and replies."
-            value={mentionsOnly}
-            onValueChange={setMentionsOnly}
-          />
-          <ToggleItem
-            title="Files and media alerts"
-            description="Notify when new documents are shared."
-            value={fileAlerts}
-            onValueChange={setFileAlerts}
-          />
-        </View>
-
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Actions</Text>
-          <AppButton label="Search In Conversation" variant="secondary" onPress={() => router.push("/(app)/search")} />
-          <AppButton
-            label="Open Shared Files"
-            variant="secondary"
+          <InfoRow
+            icon="link"
+            label="Shared links"
+            value={`${linksCount} links`}
             onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}
           />
-          <AppButton label="Clear Chat" variant="danger" onPress={handleClearChat} />
-          {chat.kind === "direct" ? (
-            <AppButton
-              label="Report User (Placeholder)"
-              variant="ghost"
-              onPress={() => toast.info("Report flow", "Compliance report flow will connect to backend queue.")}
-            />
-          ) : (
-            <AppButton label={chat.kind === "group" ? "Leave Group" : "Hide Channel"} variant="ghost" onPress={handleLeave} />
-          )}
         </View>
       </View>
     </ScreenContainer>
@@ -679,23 +552,5 @@ const styles = StyleSheet.create({
   },
   membersList: {
     gap: 10
-  },
-  importantList: {
-    gap: 8
-  },
-  importantCard: {
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 10
-  },
-  importantBody: {
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: "600"
-  },
-  importantMeta: {
-    fontSize: 11
   }
 });

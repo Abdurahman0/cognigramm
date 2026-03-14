@@ -23,8 +23,6 @@ export default function AuthLayout(): JSX.Element {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
-      <Stack.Screen name="forgot-password" />
-      <Stack.Screen name="otp" />
     </Stack>
   );
 }

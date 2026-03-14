@@ -60,13 +60,6 @@ export default function SettingsScreen(): JSX.Element {
           onValueChange={setCompactMode}
         />
 
-        <Pressable
-          onPress={() => router.push("/(app)/settings/notifications")}
-          style={[styles.linkRow, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-        >
-          <Text style={[styles.linkLabel, { color: theme.colors.textPrimary }]}>Notification Preferences</Text>
-          <Feather name="chevron-right" size={18} color={theme.colors.textMuted} />
-        </Pressable>
       </View>
     </ScreenContainer>
   );
@@ -93,18 +86,5 @@ const styles = StyleSheet.create({
     minHeight: 46,
     alignItems: "center",
     justifyContent: "center"
-  },
-  linkRow: {
-    alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 54,
-    paddingHorizontal: 14
-  },
-  linkLabel: {
-    fontSize: 15,
-    fontWeight: "600"
   }
 });

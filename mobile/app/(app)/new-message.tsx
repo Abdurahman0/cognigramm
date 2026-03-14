@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { AppButton, Avatar, ScreenContainer, SearchBar, SectionHeader } from "@/components/common";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -10,7 +10,7 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 
-type ComposeMode = "direct" | "group" | "channel";
+type ComposeMode = "direct" | "group";
 
 export default function NewMessageScreen(): JSX.Element {
   const router = useRouter();
@@ -70,10 +70,9 @@ export default function NewMessageScreen(): JSX.Element {
       }
       const id = await createGroupConversation({
         title: title.trim(),
-        memberIds: selectedIds,
-        kind: mode === "channel" ? "channel" : "group"
+        memberIds: selectedIds
       });
-      toast.success(mode === "channel" ? "Channel created" : "Group created");
+      toast.success("Group created");
       router.replace({ pathname: "/(app)/chat/[chatId]", params: { chatId: id } });
     } catch (error) {
       toast.error("Unable to create conversation", error instanceof Error ? error.message : "Unexpected error");
@@ -85,7 +84,7 @@ export default function NewMessageScreen(): JSX.Element {
       <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
         <SectionHeader
           title="New Conversation"
-          subtitle="Start direct chats, groups, or channels"
+          subtitle="Start direct chats or groups"
           rightSlot={
             <Pressable onPress={() => router.back()} style={styles.closeBtn}>
               <Feather name="x" size={20} color={theme.colors.textPrimary} />
@@ -98,8 +97,7 @@ export default function NewMessageScreen(): JSX.Element {
         <View style={styles.modeTabs}>
           {([
             { key: "direct", label: "Direct" },
-            { key: "group", label: "Group" },
-            { key: "channel", label: "Channel" }
+            { key: "group", label: "Group" }
           ] as const).map((item) => {
             const active = mode === item.key;
             return (
@@ -129,10 +127,11 @@ export default function NewMessageScreen(): JSX.Element {
           <TextInput
             value={title}
             onChangeText={setTitle}
-            placeholder={mode === "channel" ? "Channel name" : "Group name"}
+            placeholder="Group name"
             placeholderTextColor={theme.colors.textMuted}
             style={[
               styles.titleInput,
+              Platform.OS === "web" ? styles.titleInputWeb : null,
               {
                 color: theme.colors.textPrimary,
                 borderColor: theme.colors.border,
@@ -177,11 +176,7 @@ export default function NewMessageScreen(): JSX.Element {
 
         <AppButton
           label={
-            mode === "direct"
-              ? "Start chat"
-              : mode === "channel"
-              ? `Create channel (${selectedIds.length})`
-              : `Create group (${selectedIds.length})`
+            mode === "direct" ? "Start chat" : `Create group (${selectedIds.length})`
           }
           onPress={handleCreate}
         />
@@ -224,6 +219,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 46,
     paddingHorizontal: 12
+  },
+  titleInputWeb: {
+    outlineStyle: "solid",
+    outlineWidth: 0,
+    outlineColor: "transparent"
   },
   row: {
     alignItems: "center",

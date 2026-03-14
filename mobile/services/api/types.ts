@@ -89,22 +89,6 @@ export interface ApiMessage {
   deleted_at: string | null;
 }
 
-export interface ApiMessageSearchResult {
-  message: ApiMessage;
-  rank: number;
-}
-
-export interface ApiDeliveryReceipt {
-  id: number;
-  message_id: number;
-  user_id: number;
-  state: ApiDeliveryState;
-  queued_at: string | null;
-  persisted_at: string | null;
-  delivered_at: string | null;
-  read_at: string | null;
-  updated_at: string;
-}
 
 export interface ApiPresignedUploadRequest {
   filename: string;
@@ -138,11 +122,6 @@ export interface ApiPresenceState {
   sessions: number;
   last_seen: string | null;
   updated_at: string | null;
-}
-
-export interface ApiTypingState {
-  conversation_id: number;
-  user_ids: number[];
 }
 
 export interface ApiSocketEnvelope<TPayload = Record<string, unknown>> {

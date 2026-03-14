@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { EmptyState, ScreenContainer, SectionHeader } from "@/components/common";
+import { ScreenContainer, SectionHeader } from "@/components/common";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAppToast } from "@/hooks/useAppToast";
@@ -51,13 +51,6 @@ export default function StatusScreen(): JSX.Element {
           })}
         </View>
 
-        <View style={{ marginTop: 18 }}>
-          <EmptyState
-            title="Company stories (internal)"
-            description="Status updates, launch snapshots, and office moments can appear here in a future phase."
-            icon="activity"
-          />
-        </View>
       </View>
     </ScreenContainer>
   );

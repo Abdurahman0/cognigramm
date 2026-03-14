@@ -18,19 +18,5 @@ export const registerSchema = z
     path: ["confirmPassword"]
   });
 
-export const forgotSchema = z.object({
-  email: z.string().email("Enter your work email")
-});
-
-export const otpSchema = z.object({
-  code: z
-    .string()
-    .min(6, "Code must be 6 digits")
-    .max(6, "Code must be 6 digits")
-    .regex(/^\d+$/, "Only digits are allowed")
-});
-
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
-export type ForgotFormValues = z.infer<typeof forgotSchema>;
-export type OtpFormValues = z.infer<typeof otpSchema>;

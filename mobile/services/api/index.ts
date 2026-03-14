@@ -2,19 +2,16 @@ import { apiRequest } from "@/services/api/httpClient";
 import type {
   ApiConversation,
   ApiDeliveryState,
-  ApiDeliveryReceipt,
   ApiLocalUploadResponse,
   ApiMessage,
   ApiMessageAttachmentOut,
   ApiMessageAttachmentIn,
   ApiMessageType,
-  ApiMessageSearchResult,
   ApiPresignedUploadRequest,
   ApiPresignedUploadResponse,
   ApiPresenceState,
   ApiSocketEnvelope,
   ApiTokenResponse,
-  ApiTypingState,
   ApiUser
 } from "@/services/api/types";
 
@@ -102,13 +99,6 @@ export const usersApi = {
       token,
       body: payload
     });
-  },
-  updateMyStatus(token: string, status: ApiUser["status"]): Promise<ApiUser> {
-    return apiRequest<ApiUser>("/users/me/status", {
-      method: "PATCH",
-      token,
-      body: { status }
-    });
   }
 };
 
@@ -160,21 +150,6 @@ export const messagesApi = {
   getLatestByConversation(token: string, conversationId: number): Promise<ApiMessage | null> {
     return apiRequest<ApiMessage | null>(`/conversations/${conversationId}/messages/latest`, { token });
   },
-  searchConversation(
-    token: string,
-    conversationId: number,
-    query: string,
-    params: ListParams = {}
-  ): Promise<ApiMessageSearchResult[]> {
-    return apiRequest<ApiMessageSearchResult[]>(`/conversations/${conversationId}/messages/search`, {
-      token,
-      query: {
-        q: query,
-        limit: params.limit ?? 25,
-        offset: params.offset ?? 0
-      }
-    });
-  },
   editMessage(token: string, messageId: number, content: string): Promise<ApiMessage> {
     return apiRequest<ApiMessage>(`/messages/${messageId}`, {
       method: "PATCH",
@@ -193,9 +168,6 @@ export const messagesApi = {
       method: "POST",
       token
     });
-  },
-  listDelivery(token: string, messageId: number): Promise<ApiDeliveryReceipt[]> {
-    return apiRequest<ApiDeliveryReceipt[]>(`/messages/${messageId}/delivery`, { token });
   },
   createUploadUrl(token: string, payload: ApiPresignedUploadRequest): Promise<ApiPresignedUploadResponse> {
     return apiRequest<ApiPresignedUploadResponse>("/files/presign", {
@@ -223,9 +195,6 @@ export const presenceApi = {
   getUserPresence(token: string, userId: number): Promise<ApiPresenceState> {
     return apiRequest<ApiPresenceState>(`/presence/users/${userId}`, { token });
   },
-  getTyping(token: string, conversationId: number): Promise<ApiTypingState> {
-    return apiRequest<ApiTypingState>(`/presence/conversations/${conversationId}/typing`, { token });
-  },
   setActiveConversation(token: string, conversationId: number | null): Promise<ApiPresenceState> {
     return apiRequest<ApiPresenceState>("/presence/active-conversation", {
       method: "POST",
@@ -240,16 +209,13 @@ export const presenceApi = {
 export type {
   ApiConversation,
   ApiDeliveryState,
-  ApiDeliveryReceipt,
   ApiMessage,
   ApiMessageAttachmentIn,
   ApiMessageAttachmentOut,
   ApiMessageType,
-  ApiMessageSearchResult,
   ApiPresenceState,
   ApiSocketEnvelope,
   ApiTokenResponse,
-  ApiTypingState,
   ApiUser
 } from "@/services/api/types";
 
