@@ -1,10 +1,7 @@
 import Constants from 'expo-constants'
-import { Platform } from 'react-native'
 
-const DEFAULT_API_BASE_URL =
-	Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000'
-const DEFAULT_WS_BASE_URL =
-	Platform.OS === 'android' ? 'ws://10.0.2.2:8001' : 'ws://localhost:8001'
+const DEFAULT_API_BASE_URL = 'https://messanger.cognilabs.org'
+const DEFAULT_WS_BASE_URL = 'wss://messanger.cognilabs.org'
 
 const normalizeBaseUrl = (
 	value: string | undefined,

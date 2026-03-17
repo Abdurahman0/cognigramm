@@ -1,6 +1,6 @@
-# Company Messenger (Expo + React Native + Web)
+# Qora Qarg'a (Expo + React Native + Web)
 
-Internal company messenger with shared Android + web codebase connected to the Python backend API and WebSocket gateway.
+Internal messenger with shared Android + web codebase connected to the Python backend API and WebSocket gateway.
 
 ## Stack
 

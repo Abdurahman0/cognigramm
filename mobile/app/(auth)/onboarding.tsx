@@ -1,6 +1,5 @@
-import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton, ScreenContainer } from "@/components/common";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -24,15 +23,19 @@ export default function OnboardingScreen(): JSX.Element {
           style={[
             styles.logoWrap,
             {
-              backgroundColor: theme.colors.accentMuted,
+              backgroundColor: theme.colors.surface,
               borderColor: theme.colors.border
             }
           ]}
         >
-          <Feather name="briefcase" size={26} color={theme.colors.accent} />
+          <Image
+            source={require("../../assets/logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Company Messenger</Text>
+        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Qora Qarg'a</Text>
         <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
           Premium internal communication for teams, managers, and leadership.
         </Text>
@@ -77,6 +80,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 24,
     width: 72
+  },
+  logoImage: {
+    height: 44,
+    width: 44
   },
   title: {
     fontSize: 30,

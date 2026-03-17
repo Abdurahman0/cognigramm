@@ -1,29 +1,33 @@
 {
   "expo": {
-    "name": "Company Messenger",
-    "slug": "company-messenger",
+    "name": "Qora Qarg'a",
+    "slug": "qora-qaraga",
     "version": "1.0.0",
     "orientation": "portrait",
-    "scheme": "companymessenger",
+    "scheme": "qoraqarga",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/logo.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.company.messenger"
+      "bundleIdentifier": "com.company.messenger",
+      "icon": "./assets/logo.png"
     },
     "android": {
       "package": "com.company.messenger",
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#0B1220"
       }
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/logo.png"
     },
     "plugins": [
       "expo-router",
@@ -31,6 +35,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4490cd62-27f2-4590-b128-010a9899c60b"
+      }
+    },
+    "owner": "abdurahmanrahmanbekov"
   }
 }

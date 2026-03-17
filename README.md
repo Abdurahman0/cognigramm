@@ -1,4 +1,4 @@
-# Messenger Backend
+# Qora Qarg'a Backend
 
 ## Distributed Architecture
 

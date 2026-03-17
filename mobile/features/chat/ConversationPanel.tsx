@@ -21,7 +21,7 @@ import {
 import { FlatList } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { ChatComposer, MessageBubble } from '@/components/chat'
+import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { useAppToast } from '@/hooks/useAppToast'
@@ -638,21 +638,14 @@ export function ConversationPanel({
 	const typingFirstNames = typingMembers.map(
 		user => user.fullName.split(' ')[0] ?? user.fullName,
 	)
-	const joinedTypingNames = typingFirstNames.join(', ')
-	const typingSubtitle =
-		typingMembers.length === 0
-			? null
-			: chat.kind === 'direct'
-				? `${typingFirstNames[0] ?? 'Someone'} typing...`
-				: typingMembers.length > 3 || joinedTypingNames.length > 26
-					? `${typingMembers.length} people typing...`
-					: `${joinedTypingNames} ${typingMembers.length === 1 ? 'is' : 'are'} typing...`
-
+	const typingLabel =
+		typingFirstNames.length > 0
+			? `${typingFirstNames[0]} typing`
+			: 'Typing'
 	const headerSubtitle =
-		typingSubtitle ??
-		(chat.kind === 'direct'
+		chat.kind === 'direct'
 			? 'Direct message'
-			: `${chat.memberIds.length} members`)
+			: `${chat.memberIds.length} members`
 	const unreadMarkerIndex =
 		entryUnreadCount > 0 && entryFirstUnreadMessageId
 			? messages.findIndex(message => message.id === entryFirstUnreadMessageId)
@@ -948,6 +941,20 @@ export function ConversationPanel({
 					onSendAttachment={handleAttachmentPick}
 				/>
 			</Animated.View>
+			{typingMembers.length > 0 ? (
+				<Animated.View
+					pointerEvents='none'
+					style={[
+						styles.typingDock,
+						{
+							bottom: composerBottomInset + composerHeight + 6,
+							transform: [{ translateY: composerTranslateY }],
+						},
+					]}
+				>
+					<TypingIndicator label={typingLabel} />
+				</Animated.View>
+			) : null}
 		</KeyboardAvoidingView>
 	)
 }
@@ -1023,6 +1030,12 @@ const styles = StyleSheet.create({
 	composerDock: {
 		bottom: 0,
 		left: 0,
+		position: 'absolute',
+		right: 0,
+	},
+	typingDock: {
+		left: 0,
+		paddingHorizontal: 12,
 		position: 'absolute',
 		right: 0,
 	},
