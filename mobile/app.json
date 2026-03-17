@@ -7,27 +7,35 @@
     "scheme": "qoraqarga",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "icon": "./assets/logo.png",
+    "icon": "./mobile/assets/logo.png",
+    "splash": {
+      "image": "./mobile/assets/logo.png",
+      // Use "contain" so the logo stays fully visible on all aspect ratios.
+      "resizeMode": "contain",
+      // Black background matches brand tone and avoids visible edge halos.
+      "backgroundColor": "#000000"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.company.messenger",
-      "icon": "./assets/logo.png"
+      "icon": "./mobile/assets/logo.png"
     },
     "android": {
       "package": "com.company.messenger",
       "softwareKeyboardLayoutMode": "resize",
+      // Android adaptive icons are masked by the system, so a foreground image prevents cropping.
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.png",
-        "backgroundColor": "#0B1220"
+        "foregroundImage": "./mobile/assets/logo.png",
+        "backgroundColor": "#000000"
       }
     },
     "web": {
       "bundler": "metro",
       "output": "single",
-      "favicon": "./assets/logo.png"
+      "favicon": "./mobile/assets/logo.png"
     },
     "plugins": [
       "expo-router",
