@@ -8,9 +8,9 @@ const config: ExpoConfig = {
   scheme: "qoraqarga",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
-  icon: "./mobile/assets/logo.png",
+  icon: "./assets/logo.png",
   splash: {
-    image: "./mobile/assets/logo.png",
+    image: "./assets/logo.png",
     // Use "contain" so the logo stays fully visible on all aspect ratios.
     resizeMode: "contain",
     // Black background matches brand tone and avoids visible edge halos.
@@ -22,7 +22,7 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.company.messenger",
-    icon: "./mobile/assets/logo.png"
+    icon: "./assets/logo.png"
   },
   android: {
     package: "com.company.messenger",
@@ -30,7 +30,7 @@ const config: ExpoConfig = {
     versionCode: 2,
     // Android adaptive icons are masked by the system, so a foreground image prevents cropping.
     adaptiveIcon: {
-      foregroundImage: "./mobile/assets/logo.png",
+      foregroundImage: "./assets/logo.png",
       // Black background keeps the mask edge clean around the logo.
       backgroundColor: "#000000"
     }
@@ -38,7 +38,7 @@ const config: ExpoConfig = {
   web: {
     bundler: "metro",
     output: "single",
-    favicon: "./mobile/assets/logo.png"
+    favicon: "./assets/logo.png"
   },
   plugins: [
     "expo-router",
