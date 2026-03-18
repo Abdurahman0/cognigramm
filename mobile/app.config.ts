@@ -42,6 +42,16 @@ const config: ExpoConfig = {
 		'expo-router',
 		'expo-system-ui',
 		[
+			'expo-build-properties',
+			{
+				android: {
+					compileSdkVersion: 36,
+					targetSdkVersion: 36,
+					buildToolsVersion: '36.0.0',
+				},
+			},
+		],
+		[
 			'expo-av',
 			{
 				microphonePermission:
