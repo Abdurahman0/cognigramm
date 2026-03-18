@@ -1,7 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  type NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  type TextInputKeyPressEventData,
+  View
+} from "react-native";
 
 import { AppButton, AppInput, ScreenContainer } from "@/components/common";
 import { LoginFormValues, loginSchema } from "@/features/auth/schemas";
@@ -38,6 +46,14 @@ export default function LoginScreen(): JSX.Element {
     }
   });
 
+  const handleWebEnterSubmit = (event: NativeSyntheticEvent<TextInputKeyPressEventData>): void => {
+    if (Platform.OS !== "web" || event.nativeEvent.key !== "Enter") {
+      return;
+    }
+    (event as unknown as { preventDefault?: () => void }).preventDefault?.();
+    submit();
+  };
+
   return (
     <ScreenContainer scroll padded>
       <View style={styles.root}>
@@ -57,6 +73,8 @@ export default function LoginScreen(): JSX.Element {
                 keyboardType="email-address"
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.email?.message}
               />
             )}
@@ -70,6 +88,8 @@ export default function LoginScreen(): JSX.Element {
                 secureTextEntry
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.password?.message}
               />
             )}

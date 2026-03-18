@@ -10,11 +10,13 @@ import {
 	Easing,
 	Keyboard,
 	KeyboardAvoidingView,
+	Modal,
 	PanResponder,
 	Platform,
 	Pressable,
 	StyleSheet,
 	Text,
+	TextInput,
 	View,
 	type KeyboardEvent,
 	type LayoutChangeEvent,
@@ -115,6 +117,9 @@ export function ConversationPanel({
 	const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState('')
 	const [entryScrollReady, setEntryScrollReady] = useState(false)
 	const [uploadingAttachment, setUploadingAttachment] = useState(false)
+	const [editModalVisible, setEditModalVisible] = useState(false)
+	const [editingMessageId, setEditingMessageId] = useState('')
+	const [editDraft, setEditDraft] = useState('')
 	const [newIncomingCount, setNewIncomingCount] = useState(0)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
@@ -380,6 +385,19 @@ export function ConversationPanel({
 		}
 		markConversationRead(chatId)
 	}, [chatId, markConversationRead, messages.length])
+
+	useEffect(() => {
+		if (!editModalVisible || !editingMessageId) {
+			return
+		}
+		const exists = messages.some(message => message.id === editingMessageId)
+		if (exists) {
+			return
+		}
+		setEditModalVisible(false)
+		setEditingMessageId('')
+		setEditDraft('')
+	}, [editModalVisible, editingMessageId, messages])
 
 	useEffect(() => {
 		if (!entryScrollReady) {
@@ -695,9 +713,9 @@ export function ConversationPanel({
 					)
 					return
 				}
-				const updated = `${message.body} (edited)`
-				editMessage(chat.id, message.id, updated)
-				toast.success('Message updated')
+				setEditingMessageId(message.id)
+				setEditDraft(message.body)
+				setEditModalVisible(true)
 			}
 			if (action === 'delete') {
 				if (
@@ -710,6 +728,11 @@ export function ConversationPanel({
 						'Only owners or managers can delete this message.',
 					)
 					return
+				}
+				if (editingMessageId === message.id) {
+					setEditModalVisible(false)
+					setEditingMessageId('')
+					setEditDraft('')
 				}
 				deleteMessage(chat.id, message.id)
 				toast.success('Message deleted')
@@ -845,6 +868,24 @@ export function ConversationPanel({
 
 	const typingIndicatorReserve = typingMembers.length > 0 ? 44 : 0
 	const listBottomGap = (keyboardVisible ? 24 : 8) + typingIndicatorReserve
+	const closeEditModal = () => {
+		setEditModalVisible(false)
+		setEditingMessageId('')
+		setEditDraft('')
+	}
+	const submitEdit = () => {
+		const nextText = editDraft.trim()
+		if (!editingMessageId) {
+			return
+		}
+		if (!nextText) {
+			toast.info('Edit restricted', 'Message text cannot be empty.')
+			return
+		}
+		editMessage(chat.id, editingMessageId, nextText).catch(() => undefined)
+		closeEditModal()
+		toast.success('Message updated')
+	}
 
 	return (
 		<KeyboardAvoidingView
@@ -936,23 +977,6 @@ export function ConversationPanel({
 							name='chevron-right'
 							size={16}
 							color={theme.colors.textMuted}
-						/>
-					</Pressable>
-				</View>
-				<View style={styles.headerActions}>
-					<Pressable
-						onPress={() =>
-							router.push({
-								pathname: '/(app)/media/[chatId]',
-								params: { chatId },
-							})
-						}
-						style={styles.actionButton}
-					>
-						<Feather
-							name='paperclip'
-							size={18}
-							color={theme.colors.textSecondary}
 						/>
 					</Pressable>
 				</View>
@@ -1081,6 +1105,8 @@ export function ConversationPanel({
 				<ChatComposer
 					keyboardVisible={keyboardVisible}
 					sendingLocked={uploadingAttachment}
+					autoFocus={Platform.OS === 'web'}
+					focusSignal={chatId}
 					onTypingStart={() => sendTypingEvent(chat.id, true)}
 					onTypingStop={() => sendTypingEvent(chat.id, false)}
 					onSend={body => {
@@ -1123,6 +1149,84 @@ export function ConversationPanel({
 					</Text>
 				</Pressable>
 			) : null}
+			<Modal
+				visible={editModalVisible}
+				transparent
+				animationType='fade'
+				onRequestClose={closeEditModal}
+			>
+				<View style={styles.editOverlay}>
+					<View
+						style={[
+							styles.editSheet,
+							{
+								backgroundColor: theme.colors.surface,
+								borderColor: theme.colors.border,
+							},
+						]}
+					>
+						<Text
+							style={[
+								styles.editTitle,
+								{ color: theme.colors.textPrimary },
+							]}
+						>
+							Edit message
+						</Text>
+						<TextInput
+							autoFocus
+							multiline
+							value={editDraft}
+							onChangeText={setEditDraft}
+							placeholder='Update message text'
+							placeholderTextColor={theme.colors.textMuted}
+							style={[
+								styles.editInput,
+								{
+									color: theme.colors.textPrimary,
+									borderColor: theme.colors.border,
+									backgroundColor: theme.colors.background,
+								},
+							]}
+						/>
+						<View style={styles.editActions}>
+							<Pressable
+								onPress={closeEditModal}
+								style={[
+									styles.editActionButton,
+									{
+										backgroundColor: theme.colors.surfaceMuted,
+										borderColor: theme.colors.border,
+									},
+								]}
+							>
+								<Text
+									style={[
+										styles.editActionText,
+										{ color: theme.colors.textSecondary },
+									]}
+								>
+									Cancel
+								</Text>
+							</Pressable>
+							<Pressable
+								onPress={submitEdit}
+								style={[
+									styles.editActionButton,
+									{
+										backgroundColor: theme.colors.accent,
+										borderColor: theme.colors.accent,
+									},
+								]}
+							>
+								<Text style={[styles.editActionText, { color: '#FFFFFF' }]}>
+									Save
+								</Text>
+							</Pressable>
+						</View>
+					</View>
+				</View>
+			</Modal>
 			{typingMembers.length > 0 ? (
 				<Animated.View
 					pointerEvents='none'
@@ -1245,6 +1349,52 @@ const styles = StyleSheet.create({
 	newMessagesFabText: {
 		color: '#FFFFFF',
 		fontSize: 12,
+		fontWeight: '700',
+	},
+	editOverlay: {
+		alignItems: 'center',
+		backgroundColor: 'rgba(0, 0, 0, 0.42)',
+		flex: 1,
+		justifyContent: 'center',
+		paddingHorizontal: 16,
+	},
+	editSheet: {
+		borderRadius: 14,
+		borderWidth: 1,
+		gap: 10,
+		maxWidth: 480,
+		padding: 14,
+		width: '100%',
+	},
+	editTitle: {
+		fontSize: 16,
+		fontWeight: '700',
+	},
+	editInput: {
+		borderRadius: 10,
+		borderWidth: 1,
+		fontSize: 15,
+		maxHeight: 220,
+		minHeight: 86,
+		paddingHorizontal: 10,
+		paddingVertical: 8,
+		textAlignVertical: 'top',
+	},
+	editActions: {
+		flexDirection: 'row',
+		gap: 10,
+		justifyContent: 'flex-end',
+	},
+	editActionButton: {
+		alignItems: 'center',
+		borderRadius: 10,
+		borderWidth: 1,
+		minWidth: 90,
+		paddingHorizontal: 14,
+		paddingVertical: 9,
+	},
+	editActionText: {
+		fontSize: 13,
 		fontWeight: '700',
 	},
 	emptyStateWrap: {

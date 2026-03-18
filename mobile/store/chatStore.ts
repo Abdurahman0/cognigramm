@@ -158,7 +158,12 @@ const initialPersisted: PersistedFields = {
 	activeDesktopChatId: '',
 }
 
-const parseNumericId = (value: string): number | null => {
+const parseNumericId = (
+	value: string | number | null | undefined,
+): number | null => {
+	if (value == null) {
+		return null
+	}
 	const parsed = Number(value)
 	if (!Number.isFinite(parsed) || parsed <= 0) {
 		return null
@@ -410,6 +415,46 @@ const applyApiMessage = (
 > => {
 	const chatId = String(apiMessage.conversation_id)
 	const mapped = mapApiMessageToChatMessage(apiMessage)
+	if (mapped.isDeleted) {
+		const existing = state.messagesByChat[chatId] ?? []
+		const nextMessages = existing.filter(message => {
+			if (message.id === mapped.id) {
+				return false
+			}
+			if (
+				mapped.clientMessageId &&
+				message.clientMessageId === mapped.clientMessageId
+			) {
+				return false
+			}
+			return true
+		})
+		const messagesByChat = {
+			...state.messagesByChat,
+			[chatId]: nextMessages,
+		}
+		const unreadByChatId = {
+			...state.unreadByChatId,
+		}
+		if (state.activeConversationId === chatId && state.appVisible) {
+			unreadByChatId[chatId] = 0
+		}
+		const lastMessageId = nextMessages.at(-1)?.id
+		const chats = nextChatsWithUnread(
+			updateChatById(state.chats, chatId, chat => ({
+				...chat,
+				lastMessageId: lastMessageId ?? '',
+			})),
+			unreadByChatId,
+			messagesByChat,
+		)
+		return {
+			messagesByChat,
+			chats,
+			unreadByChatId,
+			sharedFiles: deriveSharedFiles(messagesByChat),
+		}
+	}
 	const existing = state.messagesByChat[chatId] ?? []
 	const wasExisting = existing.some(
 		message =>
@@ -653,9 +698,14 @@ export const useChatStore = create<ChatStore>()(
 
 						const messagesByChat: Record<string, ChatMessage[]> = {}
 						latestByConversation.forEach(row => {
-							messagesByChat[row.conversationId] = row.latest
-								? [mapApiMessageToChatMessage(row.latest)]
-								: []
+							if (!row.latest) {
+								messagesByChat[row.conversationId] = []
+								return
+							}
+							const mappedLatest = mapApiMessageToChatMessage(row.latest)
+							messagesByChat[row.conversationId] = mappedLatest.isDeleted
+								? []
+								: [mappedLatest]
 						})
 
 						const sortedChats = nextChatsWithUnread(
@@ -793,9 +843,10 @@ export const useChatStore = create<ChatStore>()(
 								if (!row.latest) {
 									return
 								}
-								messagesByChat[row.conversationId] = [
-									mapApiMessageToChatMessage(row.latest),
-								]
+								const mappedLatest = mapApiMessageToChatMessage(row.latest)
+								messagesByChat[row.conversationId] = mappedLatest.isDeleted
+									? []
+									: [mappedLatest]
 							})
 						}
 
@@ -1136,9 +1187,6 @@ export const useChatStore = create<ChatStore>()(
 									current.activeConversationId ===
 										String(apiMessage.conversation_id) && current.appVisible
 								if (isActive) {
-									realtimeSocketClient.send('read_receipt', {
-										message_id: apiMessage.id,
-									})
 									current
 										.markConversationRead(String(apiMessage.conversation_id))
 										.catch(() => undefined)
@@ -1155,17 +1203,18 @@ export const useChatStore = create<ChatStore>()(
 							payload as { client_message_id?: unknown }
 						).client_message_id
 						const stateRaw = (payload as { state?: unknown }).state
+						const parsedMessageId =
+							typeof messageIdRaw === 'number' || typeof messageIdRaw === 'string'
+								? parseNumericId(messageIdRaw)
+								: null
 						if (
-							(
-								typeof messageIdRaw !== 'number' &&
-								typeof clientMessageIdRaw !== 'string'
-							) ||
+							(parsedMessageId == null &&
+								typeof clientMessageIdRaw !== 'string') ||
 							typeof stateRaw !== 'string'
 						) {
 							return
 						}
-						const messageId =
-							typeof messageIdRaw === 'number' ? String(messageIdRaw) : ''
+						const messageId = parsedMessageId != null ? String(parsedMessageId) : ''
 						const clientMessageId =
 							typeof clientMessageIdRaw === 'string'
 								? clientMessageIdRaw
@@ -1204,31 +1253,62 @@ export const useChatStore = create<ChatStore>()(
 					if (event === 'message_read') {
 						const messageIdRaw = (payload as { message_id?: unknown })
 							.message_id
-						const userIdRaw = (payload as { user_id?: unknown }).user_id
-						if (
-							typeof messageIdRaw !== 'number' ||
-							typeof userIdRaw !== 'number'
-						) {
+						const userIdRaw =
+							(payload as { user_id?: unknown }).user_id ??
+							(payload as { reader_id?: unknown }).reader_id
+						const parsedMessageId =
+							typeof messageIdRaw === 'number' || typeof messageIdRaw === 'string'
+								? parseNumericId(messageIdRaw)
+								: null
+						const parsedReaderId =
+							typeof userIdRaw === 'number' || typeof userIdRaw === 'string'
+								? parseNumericId(userIdRaw)
+								: null
+						if (parsedMessageId == null || parsedReaderId == null) {
 							return
 						}
-						const messageId = String(messageIdRaw)
-						const readerId = String(userIdRaw)
+						const messageId = String(parsedMessageId)
+						const readerId = String(parsedReaderId)
 						const messagesByChat: Record<string, ChatMessage[]> = {}
 						let changed = false
 						Object.entries(state.messagesByChat).forEach(
 							([chatId, messages]) => {
+								const readMessageIndex = messages.findIndex(
+									message => message.id === messageId,
+								)
+								if (readMessageIndex < 0) {
+									messagesByChat[chatId] = messages
+									return
+								}
 								let localChanged = false
-								const nextMessages = messages.map(message => {
-									if (message.id !== messageId) {
+								const nextMessages = messages.map((message, index) => {
+									const isTargetMessage = message.id === messageId
+									const shouldBackfillSeen =
+										readerId !== state.currentUserId &&
+										index <= readMessageIndex &&
+										message.senderId === state.currentUserId &&
+										!message.isDeleted &&
+										message.status !== 'seen'
+									if (!isTargetMessage && !shouldBackfillSeen) {
 										return message
 									}
-									localChanged = true
 									const seenByIds = message.seenByIds.includes(readerId)
 										? message.seenByIds
 										: [...message.seenByIds, readerId]
+									const nextStatus =
+										isTargetMessage || shouldBackfillSeen
+											? ('seen' as ChatMessage['status'])
+											: message.status
+									if (
+										nextStatus === message.status &&
+										seenByIds.length === message.seenByIds.length
+									) {
+										return message
+									}
+									localChanged = true
 									return {
 										...message,
-										status: 'seen' as ChatMessage['status'],
+										status: nextStatus,
 										seenByIds,
 									}
 								})
@@ -1449,21 +1529,28 @@ export const useChatStore = create<ChatStore>()(
 						return
 					}
 
-					set(state => ({
-						messagesByChat: {
+					set(state => {
+						const currentMessages = state.messagesByChat[chatId] ?? []
+						const nextMessages = currentMessages.filter(
+							message => message.id !== messageId,
+						)
+						const messagesByChat = {
 							...state.messagesByChat,
-							[chatId]: (state.messagesByChat[chatId] ?? []).map(message =>
-								message.id === messageId
-									? {
-											...message,
-											body: '',
-											isDeleted: true,
-											status: 'seen' as ChatMessage['status'],
-										}
-									: message,
+							[chatId]: nextMessages,
+						}
+						const lastMessageId = nextMessages.at(-1)?.id ?? ''
+						return {
+							messagesByChat,
+							chats: sortChatsByLastActivity(
+								updateChatById(state.chats, chatId, chat => ({
+									...chat,
+									lastMessageId: lastMessageId || chat.lastMessageId,
+								})),
+								messagesByChat,
 							),
-						},
-					}))
+							sharedFiles: deriveSharedFiles(messagesByChat),
+						}
+					})
 
 					realtimeSocketClient.send('delete_message', {
 						message_id: numericMessageId,
@@ -1505,7 +1592,9 @@ export const useChatStore = create<ChatStore>()(
 						const messagesByChat = {
 							...get().messagesByChat,
 							[chatId]: sortMessages(
-								apiMessages.map(mapApiMessageToChatMessage),
+								apiMessages
+									.map(mapApiMessageToChatMessage)
+									.filter(message => !message.isDeleted),
 							),
 						}
 						set({
@@ -1529,14 +1618,22 @@ export const useChatStore = create<ChatStore>()(
 					const { token, userId } = withSession()
 					const state = get()
 					const messages = state.messagesByChat[chatId] ?? []
-					const latestUnread = [...messages]
-						.reverse()
-						.find(
-							message =>
-								message.senderId !== userId &&
-								!message.isDeleted &&
-								message.status !== 'seen',
-						)
+					const unreadMessageIds = Array.from(
+						new Set(
+							messages
+								.filter(
+									message =>
+										message.senderId !== userId &&
+										!message.isDeleted &&
+										message.status !== 'seen',
+								)
+								.map(message => parseNumericId(message.id))
+								.filter(
+									(messageId): messageId is number =>
+										typeof messageId === 'number',
+								),
+						),
+					)
 
 					const unreadByChatId = {
 						...state.unreadByChatId,
@@ -1560,7 +1657,7 @@ export const useChatStore = create<ChatStore>()(
 						messagesByChat: {
 							...state.messagesByChat,
 							[chatId]: messages.map(message =>
-								message.senderId !== userId
+								message.senderId !== userId && !message.isDeleted
 									? {
 											...message,
 											status: 'seen' as ChatMessage['status'],
@@ -1570,15 +1667,12 @@ export const useChatStore = create<ChatStore>()(
 						},
 					})
 
-					if (latestUnread) {
-						const numericId = parseNumericId(latestUnread.id)
-						if (numericId) {
-							realtimeSocketClient.send('read_receipt', {
-								message_id: numericId,
-							})
-							messagesApi.markRead(token, numericId).catch(() => undefined)
-						}
-					}
+					unreadMessageIds.forEach(messageId => {
+						realtimeSocketClient.send('read_receipt', {
+							message_id: messageId,
+						})
+						messagesApi.markRead(token, messageId).catch(() => undefined)
+					})
 				},
 				startDirectConversation: async userId => {
 					const { token, userId: currentUserId } = withSession()

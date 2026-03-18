@@ -2,11 +2,13 @@ import { Feather } from '@expo/vector-icons'
 import { useEffect, useRef, useState } from 'react'
 import {
 	Keyboard,
+	type NativeSyntheticEvent,
 	Platform,
 	Pressable,
 	StyleSheet,
 	Text,
 	TextInput,
+	type TextInputKeyPressEventData,
 	View,
 } from 'react-native'
 
@@ -15,6 +17,8 @@ import { useAppTheme } from '@/hooks/useAppTheme'
 interface ChatComposerProps {
 	keyboardVisible?: boolean
 	sendingLocked?: boolean
+	autoFocus?: boolean
+	focusSignal?: string
 	onTypingStart?: () => void
 	onTypingStop?: () => void
 	onSend: (body: string) => void
@@ -43,6 +47,8 @@ const emojiCatalog = [
 export function ChatComposer({
 	keyboardVisible = false,
 	sendingLocked = false,
+	autoFocus = false,
+	focusSignal = '',
 	onTypingStart,
 	onTypingStop,
 	onSend,
@@ -55,6 +61,7 @@ export function ChatComposer({
 	const [text, setText] = useState('')
 	const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
 	const [inputHeight, setInputHeight] = useState(minInputHeight)
+	const inputRef = useRef<TextInput>(null)
 	const typingActiveRef = useRef(false)
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -99,6 +106,21 @@ export function ChatComposer({
 		[onTypingStop],
 	)
 
+	useEffect(() => {
+		if (!autoFocus || Platform.OS !== 'web') {
+			return
+		}
+		const focusInput = () => {
+			inputRef.current?.focus()
+		}
+		const frame = requestAnimationFrame(focusInput)
+		const timer = setTimeout(focusInput, 60)
+		return () => {
+			cancelAnimationFrame(frame)
+			clearTimeout(timer)
+		}
+	}, [autoFocus, focusSignal])
+
 	const handleTextChange = (value: string) => {
 		setText(value)
 		if (value.trim().length === 0) {
@@ -122,6 +144,26 @@ export function ChatComposer({
 		setEmojiPickerOpen(false)
 		stopTyping()
 		Keyboard.dismiss()
+	}
+
+	const handleWebEnterPress = (
+		event: NativeSyntheticEvent<TextInputKeyPressEventData>,
+	) => {
+		if (Platform.OS !== 'web') {
+			return
+		}
+		if (event.nativeEvent.key !== 'Enter') {
+			return
+		}
+		const shiftKey = Boolean(
+			(event.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean })
+				.shiftKey,
+		)
+		if (shiftKey) {
+			return
+		}
+		;(event as unknown as { preventDefault?: () => void }).preventDefault?.()
+		handleSend()
 	}
 
 	const appendEmoji = (emoji: string) => {
@@ -198,11 +240,14 @@ export function ChatComposer({
 					]}
 				>
 					<TextInput
+						ref={inputRef}
+						autoFocus={autoFocus && Platform.OS === 'web'}
 						value={text}
 						onChangeText={handleTextChange}
 						placeholder='Type a message'
 						placeholderTextColor={theme.colors.textMuted}
 						multiline
+						onKeyPress={handleWebEnterPress}
 						blurOnSubmit={false}
 						onFocus={() => setEmojiPickerOpen(false)}
 						onBlur={stopTyping}

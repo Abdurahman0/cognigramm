@@ -1,7 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  type NativeSyntheticEvent,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  type TextInputKeyPressEventData,
+  View
+} from "react-native";
 
 import { AppButton, AppInput, ScreenContainer } from "@/components/common";
 import { RegisterFormValues, registerSchema } from "@/features/auth/schemas";
@@ -46,6 +54,14 @@ export default function RegisterScreen(): JSX.Element {
     }
   });
 
+  const handleWebEnterSubmit = (event: NativeSyntheticEvent<TextInputKeyPressEventData>): void => {
+    if (Platform.OS !== "web" || event.nativeEvent.key !== "Enter") {
+      return;
+    }
+    (event as unknown as { preventDefault?: () => void }).preventDefault?.();
+    submit();
+  };
+
   return (
     <ScreenContainer scroll padded>
       <View style={styles.root}>
@@ -63,6 +79,8 @@ export default function RegisterScreen(): JSX.Element {
                 placeholder="Full name"
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.fullName?.message}
               />
             )}
@@ -77,6 +95,8 @@ export default function RegisterScreen(): JSX.Element {
                 onChangeText={field.onChange}
                 autoCapitalize="none"
                 keyboardType="email-address"
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.email?.message}
               />
             )}
@@ -89,6 +109,8 @@ export default function RegisterScreen(): JSX.Element {
                 placeholder="Department"
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.department?.message}
               />
             )}
@@ -102,6 +124,8 @@ export default function RegisterScreen(): JSX.Element {
                 secureTextEntry
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.password?.message}
               />
             )}
@@ -115,6 +139,8 @@ export default function RegisterScreen(): JSX.Element {
                 secureTextEntry
                 value={field.value}
                 onChangeText={field.onChange}
+                onSubmitEditing={submit}
+                onKeyPress={handleWebEnterSubmit}
                 error={errors.confirmPassword?.message}
               />
             )}
