@@ -232,7 +232,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16
   },
   rightPane: {
-    flex: 1
+    flex: 1,
+    minWidth: 0
   },
   emptyPane: {
     flex: 1,

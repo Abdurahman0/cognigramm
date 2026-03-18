@@ -10,6 +10,7 @@ import {
 	Easing,
 	Keyboard,
 	KeyboardAvoidingView,
+	PanResponder,
 	Platform,
 	Pressable,
 	StyleSheet,
@@ -114,9 +115,47 @@ export function ConversationPanel({
 	const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState('')
 	const [entryScrollReady, setEntryScrollReady] = useState(false)
 	const [uploadingAttachment, setUploadingAttachment] = useState(false)
+	const [newIncomingCount, setNewIncomingCount] = useState(0)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
 	const shouldRunInitialScrollRef = useRef(true)
+	const swipeBackTriggeredRef = useRef(false)
+	const shouldEnableSwipeBack = compact && Platform.OS !== 'web'
+	const swipeBackResponder = useMemo(
+		() =>
+			PanResponder.create({
+				onStartShouldSetPanResponder: () => false,
+				onMoveShouldSetPanResponder: (_event, gestureState) => {
+					if (!shouldEnableSwipeBack) {
+						return false
+					}
+					const movedRight = gestureState.dx > 14
+					const mostlyHorizontal =
+						Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.4
+					const startedFromLeftEdge = gestureState.x0 < 42
+					return movedRight && mostlyHorizontal && startedFromLeftEdge
+				},
+				onPanResponderGrant: () => {
+					swipeBackTriggeredRef.current = false
+				},
+				onPanResponderMove: (_event, gestureState) => {
+					if (!shouldEnableSwipeBack || swipeBackTriggeredRef.current) {
+						return
+					}
+					if (gestureState.dx > 86 && Math.abs(gestureState.dy) < 52) {
+						swipeBackTriggeredRef.current = true
+						router.back()
+					}
+				},
+				onPanResponderRelease: () => {
+					swipeBackTriggeredRef.current = false
+				},
+				onPanResponderTerminate: () => {
+					swipeBackTriggeredRef.current = false
+				},
+			}),
+		[router, shouldEnableSwipeBack],
+	)
 
 	const scrollToBottom = useCallback((animated: boolean, ensure = false) => {
 		const run = (withAnimation: boolean) => {
@@ -187,6 +226,7 @@ export function ConversationPanel({
 	useFocusEffect(
 		useCallback(() => {
 			setEntryScrollReady(false)
+			setNewIncomingCount(0)
 			const state = useChatStore.getState()
 			const unreadAtEntry =
 				state.chats.find(item => item.id === chatId)?.unreadCount ?? 0
@@ -209,6 +249,7 @@ export function ConversationPanel({
 				setEntryUnreadCount(0)
 				setEntryFirstUnreadMessageId('')
 				setEntryScrollReady(false)
+				setNewIncomingCount(0)
 			}
 		}, [
 			chatId,
@@ -305,13 +346,24 @@ export function ConversationPanel({
 		if (!previousMessageId) {
 			return
 		}
+		if (previousMessageId === nextLastMessage.id) {
+			return
+		}
+
+		const incomingFromOtherUser =
+			nextLastMessage.senderId !== currentUser.id &&
+			nextLastMessage.senderId !== 'system'
 
 		const shouldStickToBottom =
 			isNearBottomRef.current || nextLastMessage.senderId === currentUser.id
 		if (!shouldStickToBottom) {
+			if (incomingFromOtherUser) {
+				setNewIncomingCount(count => count + 1)
+			}
 			return
 		}
 
+		setNewIncomingCount(0)
 		scrollToBottom(true)
 	}, [
 		currentUser.id,
@@ -513,12 +565,13 @@ export function ConversationPanel({
 				Dimensions.get('window').height - (event.endCoordinates?.height ?? 0)
 
 			measureComposerBottom(currentBottom => {
-				const keyboardGap =
-					Platform.OS === 'android' ? baselineBottomInsetRef.current : 0
 				const baselineBottom =
 					baselineComposerBottomRef.current ?? currentBottom
-				const referenceBottom = Math.max(currentBottom, baselineBottom)
-				const overlap = referenceBottom + keyboardGap - keyboardTop
+				const referenceBottom =
+					Platform.OS === 'android'
+						? currentBottom
+						: Math.max(currentBottom, baselineBottom)
+				const overlap = referenceBottom - keyboardTop
 				const duration =
 					typeof event.duration === 'number' && event.duration > 0
 						? event.duration
@@ -583,6 +636,37 @@ export function ConversationPanel({
 			})
 		})
 	}, [insets.bottom])
+
+	useEffect(() => {
+		if (Platform.OS !== 'web' || typeof document === 'undefined') {
+			return
+		}
+		const docElement = document.documentElement
+		const body = document.body
+		const previousDocOverflow = docElement.style.overflow
+		const previousBodyOverflow = body.style.overflow
+		const previousDocOverscroll = docElement.style.overscrollBehavior
+		const previousBodyOverscroll = body.style.overscrollBehavior
+
+		if (keyboardVisible) {
+			docElement.style.overflow = 'hidden'
+			body.style.overflow = 'hidden'
+			docElement.style.overscrollBehavior = 'none'
+			body.style.overscrollBehavior = 'none'
+		} else {
+			docElement.style.overflow = previousDocOverflow
+			body.style.overflow = previousBodyOverflow
+			docElement.style.overscrollBehavior = previousDocOverscroll
+			body.style.overscrollBehavior = previousBodyOverscroll
+		}
+
+		return () => {
+			docElement.style.overflow = previousDocOverflow
+			body.style.overflow = previousBodyOverflow
+			docElement.style.overscrollBehavior = previousDocOverscroll
+			body.style.overscrollBehavior = previousBodyOverscroll
+		}
+	}, [keyboardVisible])
 
 	if (!chat) {
 		return (
@@ -668,9 +752,17 @@ export function ConversationPanel({
 		typingFirstNames.length > 0
 			? `${typingFirstNames[0]} typing`
 			: 'Typing'
+	const directPeer =
+		chat.kind === 'direct'
+			? users.find(
+					user => chat.memberIds.includes(user.id) && user.id !== currentUser.id,
+				)
+			: undefined
 	const headerSubtitle =
 		chat.kind === 'direct'
-			? 'Direct message'
+			? directPeer?.isOnline
+				? 'Online'
+				: 'Offline'
 			: `${chat.memberIds.length} members`
 	const unreadMarkerIndex =
 		entryUnreadCount > 0 && entryFirstUnreadMessageId
@@ -751,12 +843,16 @@ export function ConversationPanel({
 		})
 	}
 
+	const typingIndicatorReserve = typingMembers.length > 0 ? 44 : 0
+	const listBottomGap = (keyboardVisible ? 24 : 8) + typingIndicatorReserve
+
 	return (
 		<KeyboardAvoidingView
 			style={[styles.root, { backgroundColor: theme.colors.background }]}
 			enabled={Platform.OS === 'ios'}
 			behavior='padding'
 			keyboardVerticalOffset={0}
+			{...(shouldEnableSwipeBack ? swipeBackResponder.panHandlers : {})}
 		>
 			<View
 				style={[
@@ -812,15 +908,29 @@ export function ConversationPanel({
 							>
 								{header.title}
 							</Text>
-							<Text
-								numberOfLines={1}
-								style={[
-									styles.headerSubtitle,
-									{ color: theme.colors.textMuted },
-								]}
-							>
-								{headerSubtitle}
-							</Text>
+							<View style={styles.headerSubtitleRow}>
+								{chat.kind === 'direct' ? (
+									<View
+										style={[
+											styles.presenceDot,
+											{
+												backgroundColor: directPeer?.isOnline
+													? theme.colors.online
+													: theme.colors.textMuted,
+											},
+										]}
+									/>
+								) : null}
+								<Text
+									numberOfLines={1}
+									style={[
+										styles.headerSubtitle,
+										{ color: theme.colors.textMuted },
+									]}
+								>
+									{headerSubtitle}
+								</Text>
+							</View>
 						</View>
 						<Feather
 							name='chevron-right'
@@ -863,7 +973,11 @@ export function ConversationPanel({
 					const distanceFromBottom =
 						nativeEvent.contentSize.height -
 						(nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height)
-					isNearBottomRef.current = distanceFromBottom < 88
+					const nearBottom = distanceFromBottom < 88
+					isNearBottomRef.current = nearBottom
+					if (nearBottom && newIncomingCount > 0) {
+						setNewIncomingCount(0)
+					}
 				}}
 				contentContainerStyle={[
 					styles.messagesContainer,
@@ -875,7 +989,7 @@ export function ConversationPanel({
 				ListFooterComponent={
 					<View
 						style={{
-							height: composerHeight + 8,
+							height: composerHeight + listBottomGap,
 						}}
 					/>
 				}
@@ -985,6 +1099,30 @@ export function ConversationPanel({
 					onSendAttachment={handleAttachmentPick}
 				/>
 			</Animated.View>
+			{newIncomingCount > 0 ? (
+				<Pressable
+					onPress={() => {
+						setNewIncomingCount(0)
+						isNearBottomRef.current = true
+						scrollToBottom(true, true)
+					}}
+					style={[
+						styles.newMessagesFab,
+						{
+							backgroundColor: theme.colors.accent,
+							bottom:
+								composerBottomInset +
+								composerHeight +
+								(typingMembers.length > 0 ? 58 : 16),
+						},
+					]}
+				>
+					<Feather name='chevron-down' size={14} color='#FFFFFF' />
+					<Text style={styles.newMessagesFabText}>
+						{newIncomingCount} new
+					</Text>
+				</Pressable>
+			) : null}
 			{typingMembers.length > 0 ? (
 				<Animated.View
 					pointerEvents='none'
@@ -1039,6 +1177,16 @@ const styles = StyleSheet.create({
 	headerSubtitle: {
 		fontSize: 12,
 	},
+	headerSubtitleRow: {
+		alignItems: 'center',
+		flexDirection: 'row',
+		gap: 6,
+	},
+	presenceDot: {
+		borderRadius: 999,
+		height: 7,
+		width: 7,
+	},
 	headerActions: {
 		alignItems: 'center',
 		flexDirection: 'row',
@@ -1082,6 +1230,22 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 12,
 		position: 'absolute',
 		right: 0,
+	},
+	newMessagesFab: {
+		alignItems: 'center',
+		borderRadius: 18,
+		flexDirection: 'row',
+		gap: 4,
+		paddingHorizontal: 10,
+		paddingVertical: 7,
+		position: 'absolute',
+		right: 14,
+		zIndex: 20,
+	},
+	newMessagesFabText: {
+		color: '#FFFFFF',
+		fontSize: 12,
+		fontWeight: '700',
 	},
 	emptyStateWrap: {
 		flex: 1,

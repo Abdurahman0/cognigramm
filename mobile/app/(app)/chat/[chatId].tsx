@@ -26,10 +26,12 @@ export default function ChatDetailsScreen(): JSX.Element {
 const styles = StyleSheet.create({
   panelWrap: {
     flex: 1,
+    minWidth: 0,
     width: "100%"
   },
   webPanel: {
     alignSelf: "center",
-    maxWidth: 480
+    maxWidth: 480,
+    width: "100%"
   }
 });

@@ -1014,8 +1014,99 @@ export const useChatStore = create<ChatStore>()(
 						return
 					}
 
+					if (event === 'message_persisted_ack') {
+						const clientMessageIdRaw = (
+							payload as { client_message_id?: unknown }
+						).client_message_id
+						const messageIdRaw = (payload as { message_id?: unknown }).message_id
+						const conversationIdRaw = (
+							payload as { conversation_id?: unknown }
+						).conversation_id
+						if (
+							typeof clientMessageIdRaw !== 'string' ||
+							typeof messageIdRaw !== 'number' ||
+							typeof conversationIdRaw !== 'number'
+						) {
+							return
+						}
+						const chatId = String(conversationIdRaw)
+						const serverMessageId = String(messageIdRaw)
+						const currentMessages = state.messagesByChat[chatId] ?? []
+						let changed = false
+						const nextMessages = currentMessages.map(message => {
+							if (message.clientMessageId !== clientMessageIdRaw) {
+								return message
+							}
+							changed = true
+							return {
+								...message,
+								id: serverMessageId,
+								status: 'sent' as ChatMessage['status'],
+							}
+						})
+						if (!changed) {
+							return
+						}
+						const messagesByChat = {
+							...state.messagesByChat,
+							[chatId]: sortMessages(nextMessages),
+						}
+						set({
+							messagesByChat,
+							chats: sortChatsByLastActivity(
+								updateChatById(state.chats, chatId, chat => ({
+									...chat,
+									lastMessageId: serverMessageId,
+								})),
+								messagesByChat,
+							),
+							sharedFiles: deriveSharedFiles(messagesByChat),
+						})
+						return
+					}
+
+					if (event === 'message_failed') {
+						const clientMessageIdRaw = (
+							payload as { client_message_id?: unknown }
+						).client_message_id
+						if (typeof clientMessageIdRaw !== 'string') {
+							return
+						}
+						const messagesByChat: Record<string, ChatMessage[]> = {}
+						let changed = false
+						Object.entries(state.messagesByChat).forEach(
+							([chatId, messages]) => {
+								const nextMessages = messages.filter(message => {
+									if (message.clientMessageId !== clientMessageIdRaw) {
+										return true
+									}
+									if (message.status !== 'sending') {
+										return true
+									}
+									changed = true
+									return false
+								})
+								messagesByChat[chatId] = nextMessages
+							},
+						)
+						if (!changed) {
+							return
+						}
+						set({
+							messagesByChat,
+							chats: nextChatsWithUnread(
+								state.chats,
+								state.unreadByChatId,
+								messagesByChat,
+							),
+							sharedFiles: deriveSharedFiles(messagesByChat),
+						})
+						return
+					}
+
 					if (
 						event === 'message_persisted' ||
+						event === 'new_message' ||
 						event === 'message_edited' ||
 						event === 'message_deleted'
 					) {
@@ -1024,11 +1115,12 @@ export const useChatStore = create<ChatStore>()(
 							return
 						}
 						const partial = applyApiMessage(state, apiMessage, {
-							incrementUnread: event === 'message_persisted',
+							incrementUnread:
+								event === 'message_persisted' || event === 'new_message',
 						})
 						set(partial)
 
-						if (event === 'message_persisted') {
+						if (event === 'message_persisted' || event === 'new_message') {
 							const senderId =
 								apiMessage.sender_id != null
 									? String(apiMessage.sender_id)

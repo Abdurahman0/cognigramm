@@ -8,12 +8,17 @@ import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuthStore } from "@/store/authStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import type { ThemeMode } from "@/types";
+
+const themeModes: ThemeMode[] = ["light", "dark", "system"];
 
 export default function ProfileScreen(): JSX.Element {
   const router = useRouter();
   const { theme } = useAppTheme();
   const user = useCurrentUser();
   const logout = useAuthStore((state) => state.logout);
+  const themeMode = useSettingsStore((state) => state.themeMode);
+  const setThemeMode = useSettingsStore((state) => state.setThemeMode);
   const compactMode = useSettingsStore((state) => state.compactMode);
   const setCompactMode = useSettingsStore((state) => state.setCompactMode);
 
@@ -39,6 +44,36 @@ export default function ProfileScreen(): JSX.Element {
             </Text>
             <Text style={[styles.department, { color: theme.colors.textMuted }]}>{user.department} Department</Text>
           </View>
+        </View>
+
+        <ToggleItem
+          title="Dark mode"
+          description="Choose your preferred appearance."
+          value={themeMode === "dark"}
+          onValueChange={(enabled) => setThemeMode(enabled ? "dark" : "light")}
+        />
+
+        <View style={styles.themeTabs}>
+          {themeModes.map((mode) => {
+            const active = themeMode === mode;
+            return (
+              <Pressable
+                key={mode}
+                onPress={() => setThemeMode(mode)}
+                style={[
+                  styles.themeBtn,
+                  {
+                    backgroundColor: active ? theme.colors.accent : theme.colors.surface,
+                    borderColor: active ? theme.colors.accent : theme.colors.border
+                  }
+                ]}
+              >
+                <Text style={{ color: active ? "#FFFFFF" : theme.colors.textSecondary, fontWeight: "600" }}>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <ToggleItem
@@ -83,6 +118,18 @@ const styles = StyleSheet.create({
   },
   profileCopy: {
     flex: 1,
+    justifyContent: "center"
+  },
+  themeTabs: {
+    flexDirection: "row",
+    gap: 10
+  },
+  themeBtn: {
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 42,
+    alignItems: "center",
     justifyContent: "center"
   },
   name: {

@@ -5,9 +5,8 @@ import { useAuthStore } from "@/store/authStore";
 
 export default function AuthLayout(): JSX.Element {
   const session = useAuthStore((state) => state.session);
-  const hasSeenOnboarding = useAuthStore((state) => state.hasSeenOnboarding);
 
-  if (session && hasSeenOnboarding) {
+  if (session) {
     return <Redirect href="/(app)/(tabs)/chats" />;
   }
 
@@ -20,7 +19,6 @@ export default function AuthLayout(): JSX.Element {
         gestureEnabled: true
       }}
     >
-      <Stack.Screen name="onboarding" />
       <Stack.Screen name="login" />
       <Stack.Screen name="register" />
     </Stack>

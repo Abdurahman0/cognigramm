@@ -23,11 +23,6 @@ const modalScreenOptions: NativeStackNavigationOptions = {
 
 export default function AppLayout(): JSX.Element {
   const session = useAuthStore((state) => state.session);
-  const hasSeenOnboarding = useAuthStore((state) => state.hasSeenOnboarding);
-
-  if (!hasSeenOnboarding) {
-    return <Redirect href="/(auth)/onboarding" />;
-  }
 
   if (!session) {
     return <Redirect href="/(auth)/login" />;

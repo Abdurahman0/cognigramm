@@ -59,7 +59,12 @@ export default function RegisterScreen(): JSX.Element {
             control={control}
             name="fullName"
             render={({ field }) => (
-              <AppInput label="Full name" value={field.value} onChangeText={field.onChange} error={errors.fullName?.message} />
+              <AppInput
+                placeholder="Full name"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.fullName?.message}
+              />
             )}
           />
           <Controller
@@ -67,7 +72,7 @@ export default function RegisterScreen(): JSX.Element {
             name="email"
             render={({ field }) => (
               <AppInput
-                label="Work email"
+                placeholder="Work email"
                 value={field.value}
                 onChangeText={field.onChange}
                 autoCapitalize="none"
@@ -81,7 +86,7 @@ export default function RegisterScreen(): JSX.Element {
             name="department"
             render={({ field }) => (
               <AppInput
-                label="Department"
+                placeholder="Department"
                 value={field.value}
                 onChangeText={field.onChange}
                 error={errors.department?.message}
@@ -93,7 +98,7 @@ export default function RegisterScreen(): JSX.Element {
             name="password"
             render={({ field }) => (
               <AppInput
-                label="Password"
+                placeholder="Password"
                 secureTextEntry
                 value={field.value}
                 onChangeText={field.onChange}
@@ -106,7 +111,7 @@ export default function RegisterScreen(): JSX.Element {
             name="confirmPassword"
             render={({ field }) => (
               <AppInput
-                label="Confirm password"
+                placeholder="Confirm password"
                 secureTextEntry
                 value={field.value}
                 onChangeText={field.onChange}
