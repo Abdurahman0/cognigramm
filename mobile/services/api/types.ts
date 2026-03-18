@@ -112,7 +112,7 @@ export interface ApiLocalUploadResponse {
   original_name: string;
   mime_type: string;
   size_bytes: number;
-  public_url: string;
+  public_url: string | null;
 }
 
 export interface ApiPresenceState {

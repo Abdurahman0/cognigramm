@@ -14,6 +14,7 @@ import { useAppTheme } from '@/hooks/useAppTheme'
 
 interface ChatComposerProps {
 	keyboardVisible?: boolean
+	sendingLocked?: boolean
 	onTypingStart?: () => void
 	onTypingStop?: () => void
 	onSend: (body: string) => void
@@ -41,6 +42,7 @@ const emojiCatalog = [
 
 export function ChatComposer({
 	keyboardVisible = false,
+	sendingLocked = false,
 	onTypingStart,
 	onTypingStop,
 	onSend,
@@ -107,6 +109,9 @@ export function ChatComposer({
 	}
 
 	const handleSend = () => {
+		if (sendingLocked) {
+			return
+		}
 		const value = text.trim()
 		if (!value) {
 			return
@@ -221,10 +226,11 @@ export function ChatComposer({
 				</View>
 
 				<Pressable
-					onPress={onSendAttachment}
+					onPress={sendingLocked ? undefined : onSendAttachment}
 					style={[
 						styles.iconButton,
 						keyboardVisible && styles.iconButtonKeyboardOpen,
+						sendingLocked && styles.buttonDisabled,
 					]}
 					hitSlop={8}
 				>
@@ -236,16 +242,17 @@ export function ChatComposer({
 				</Pressable>
 
 				<Pressable
-					onPress={handleSend}
+					onPress={sendingLocked ? undefined : handleSend}
 					style={[
 						styles.sendButton,
 						keyboardVisible && styles.sendButtonKeyboardOpen,
 						{
 							backgroundColor:
-								text.trim().length > 0
+								!sendingLocked && text.trim().length > 0
 									? theme.colors.accent
 									: theme.colors.textMuted,
 						},
+						sendingLocked && styles.buttonDisabled,
 					]}
 					hitSlop={8}
 				>
@@ -335,6 +342,9 @@ const styles = StyleSheet.create({
 	},
 	sendButtonKeyboardOpen: {
 		alignSelf: 'center',
+	},
+	buttonDisabled: {
+		opacity: 0.6,
 	},
 	emojiPanel: {
 		borderRadius: 12,

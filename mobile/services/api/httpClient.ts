@@ -67,6 +67,22 @@ const parseResponsePayload = async (response: Response): Promise<unknown> => {
   return response.text();
 };
 
+const isFormDataBody = (body: unknown): body is FormData => {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+  if (typeof FormData !== "undefined" && body instanceof FormData) {
+    return true;
+  }
+
+  // React Native / polyfilled FormData can fail `instanceof` checks.
+  const candidate = body as { append?: unknown; getParts?: unknown };
+  const hasAppend = typeof candidate.append === "function";
+  const hasParts = typeof candidate.getParts === "function";
+  const tag = Object.prototype.toString.call(body);
+  return tag === "[object FormData]" || (hasAppend && hasParts);
+};
+
 export async function apiRequest<TResponse>(path: string, options: ApiRequestOptions = {}): Promise<TResponse> {
   const query = buildQueryString(options.query);
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}${query}`;
@@ -79,7 +95,7 @@ export async function apiRequest<TResponse>(path: string, options: ApiRequestOpt
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const isFormData = isFormDataBody(options.body);
   const hasJsonBody = options.body !== undefined && options.body !== null && !isFormData;
 
   if (hasJsonBody && !headers["Content-Type"]) {

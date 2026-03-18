@@ -27,6 +27,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { useAppToast } from '@/hooks/useAppToast'
 import { useAppTheme } from '@/hooks/useAppTheme'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { ApiRequestError } from '@/services/api/httpClient'
 import { useChatStore } from '@/store/chatStore'
 import type { ChatMessage, ChatSummary } from '@/types'
 import { useShallow } from 'zustand/react/shallow'
@@ -63,6 +64,30 @@ const formatFileSize = (size?: number): string => {
 	return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+const getAttachmentErrorMessage = (error: unknown): string => {
+	if (error instanceof ApiRequestError) {
+		if (error.status === 401) {
+			return 'Session expired. Please log in again.'
+		}
+		if (error.status === 413) {
+			return 'File is too large. Max allowed size is 25 MB.'
+		}
+		if (error.status === 503) {
+			return 'Upload service is not configured.'
+		}
+		if (error.status === 502) {
+			return 'Upload provider failed. Please retry.'
+		}
+		return error.message
+	}
+	if (error instanceof Error) {
+		return error.message
+	}
+	return 'Network error while uploading. Please retry.'
+}
+
 export function ConversationPanel({
 	chatId,
 	compact = false,
@@ -88,6 +113,7 @@ export function ConversationPanel({
 	const [entryUnreadCount, setEntryUnreadCount] = useState(0)
 	const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState('')
 	const [entryScrollReady, setEntryScrollReady] = useState(false)
+	const [uploadingAttachment, setUploadingAttachment] = useState(false)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
 	const shouldRunInitialScrollRef = useRef(true)
@@ -658,10 +684,13 @@ export function ConversationPanel({
 	}
 
 	const handleAttachmentPick = async () => {
+		if (uploadingAttachment) {
+			return
+		}
 		try {
 			const result = await DocumentPicker.getDocumentAsync({
 				multiple: false,
-				copyToCacheDirectory: false,
+				copyToCacheDirectory: true,
 			})
 
 			if (result.canceled || result.assets.length === 0) {
@@ -672,24 +701,38 @@ export function ConversationPanel({
 			if (!file) {
 				return
 			}
+			if (typeof file.size === 'number' && file.size > MAX_ATTACHMENT_BYTES) {
+				toast.error('Unable to send file', 'File is too large. Max allowed size is 25 MB.')
+				return
+			}
+			const mimeType = file.mimeType ?? 'application/octet-stream'
+			const messageType = mimeType.startsWith('image/') ? 'image' : 'file'
+			const webFile =
+				Platform.OS === 'web'
+					? (file as unknown as { file?: Blob }).file
+					: undefined
+			setUploadingAttachment(true)
 			await sendMessage({
 				chatId: chat.id,
 				body: file.name,
-				type: 'file',
+				type: messageType,
 				attachment: {
 					id: `attachment_${Date.now()}`,
 					name: file.name,
 					sizeLabel: formatFileSize(file.size),
-					mimeType: file.mimeType ?? 'application/octet-stream',
+					sizeBytes: file.size,
+					mimeType,
 					uri: file.uri,
+					webFile,
+					originalName: file.name,
+					publicUrl: null,
 				},
 			})
 			toast.success('File sent', file.name)
 		} catch (error) {
-			toast.error(
-				'Unable to send file',
-				error instanceof Error ? error.message : 'Unexpected upload error.',
-			)
+			toast.error('Unable to send file', getAttachmentErrorMessage(error))
+		} finally {
+			setUploadingAttachment(false)
 		}
 	}
 
@@ -923,6 +966,7 @@ export function ConversationPanel({
 			>
 				<ChatComposer
 					keyboardVisible={keyboardVisible}
+					sendingLocked={uploadingAttachment}
 					onTypingStart={() => sendTypingEvent(chat.id, true)}
 					onTypingStop={() => sendTypingEvent(chat.id, false)}
 					onSend={body => {

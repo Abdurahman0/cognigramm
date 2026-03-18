@@ -83,12 +83,18 @@ const toAttachment = (attachment: ApiMessageAttachmentOut | undefined): FileAtta
   if (!attachment) {
     return undefined;
   }
+  const publicUrl = attachment.public_url ?? null;
   return {
     id: String(attachment.id),
     name: attachment.original_name,
     sizeLabel: formatBytes(attachment.size_bytes),
+    sizeBytes: attachment.size_bytes,
     mimeType: attachment.mime_type,
-    uri: attachment.public_url ?? undefined
+    uri: publicUrl ?? undefined,
+    bucket: attachment.bucket,
+    objectKey: attachment.object_key,
+    originalName: attachment.original_name,
+    publicUrl
   };
 };
 

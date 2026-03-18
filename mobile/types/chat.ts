@@ -8,8 +8,14 @@ export interface FileAttachment {
   id: ID;
   name: string;
   sizeLabel: string;
+  sizeBytes?: number;
   mimeType: string;
   uri?: string;
+  webFile?: Blob;
+  bucket?: string;
+  objectKey?: string;
+  originalName?: string;
+  publicUrl?: string | null;
 }
 
 export interface ChatMessage {

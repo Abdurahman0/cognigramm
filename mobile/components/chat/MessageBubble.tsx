@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ChatMessage } from "@/types";
@@ -28,6 +28,16 @@ export function MessageBubble({
   const { theme } = useAppTheme();
   const bubbleColor = isMine ? theme.colors.messageMine : theme.colors.messageOther;
   const textColor = isMine ? "#FFFFFF" : theme.colors.textPrimary;
+  const attachmentUrl = message.attachment?.publicUrl ?? null;
+  const mimeType = (message.attachment?.mimeType ?? "").toLowerCase();
+  const isImageAttachment = mimeType.startsWith("image/") || message.type === "image";
+
+  const openAttachment = (): void => {
+    if (!attachmentUrl) {
+      return;
+    }
+    Linking.openURL(attachmentUrl).catch(() => undefined);
+  };
 
   return (
     <View style={[styles.row, { justifyContent: isMine ? "flex-end" : "flex-start" }]}>
@@ -52,17 +62,34 @@ export function MessageBubble({
             <Feather name="mic" size={14} color={textColor} />
             <Text style={[styles.body, { color: textColor }]}>Voice note (placeholder)</Text>
           </View>
-        ) : message.type === "image" ? (
-          <View style={styles.voiceRow}>
-            <Feather name="image" size={14} color={textColor} />
-            <Text style={[styles.body, { color: textColor }]}>Image shared (placeholder)</Text>
-          </View>
-        ) : message.type === "file" ? (
-          <View style={styles.voiceRow}>
-            <Feather name="file-text" size={14} color={textColor} />
-            <Text style={[styles.body, { color: textColor }]}>
-              {message.attachment?.name ?? "Document"} • {message.attachment?.sizeLabel ?? "0.0 MB"}
-            </Text>
+        ) : isImageAttachment ? (
+          attachmentUrl ? (
+            <Pressable onPress={openAttachment} style={styles.imageWrap}>
+              <Image source={{ uri: attachmentUrl }} style={styles.imagePreview} resizeMode="cover" />
+            </Pressable>
+          ) : (
+            <View style={styles.voiceRow}>
+              <Feather name="image" size={14} color={textColor} />
+              <Text style={[styles.body, { color: textColor }]}>Unavailable attachment</Text>
+            </View>
+          )
+        ) : message.type === "file" || message.attachment ? (
+          <View style={styles.fileWrap}>
+            <View style={styles.voiceRow}>
+              <Feather name="file-text" size={14} color={textColor} />
+              <Text style={[styles.body, { color: textColor }]}>
+                {message.attachment?.name ?? "Document"} - {message.attachment?.sizeLabel ?? "0.0 MB"}
+              </Text>
+            </View>
+            {attachmentUrl ? (
+              <Text style={[styles.fileLink, { color: textColor }]} onPress={openAttachment}>
+                Download file
+              </Text>
+            ) : (
+              <Text style={[styles.metaText, { color: isMine ? "#DCE7FF" : theme.colors.textMuted }]}>
+                Unavailable attachment
+              </Text>
+            )}
           </View>
         ) : (
           <Text style={[styles.body, { color: textColor }]}>{message.body}</Text>
@@ -106,6 +133,22 @@ const styles = StyleSheet.create({
   deletedText: {
     fontSize: 13,
     fontStyle: "italic"
+  },
+  imageWrap: {
+    borderRadius: 10,
+    overflow: "hidden"
+  },
+  imagePreview: {
+    borderRadius: 10,
+    height: 180,
+    width: 180
+  },
+  fileWrap: {
+    gap: 4
+  },
+  fileLink: {
+    fontSize: 12,
+    textDecorationLine: "underline"
   },
   metaRow: {
     alignItems: "center",

@@ -289,6 +289,19 @@ const createOptimisticMessage = (
 	}
 }
 
+const formatAttachmentSize = (sizeBytes?: number | null): string => {
+	if (!sizeBytes || Number.isNaN(sizeBytes)) {
+		return 'Unknown size'
+	}
+	if (sizeBytes < 1024) {
+		return `${sizeBytes} B`
+	}
+	if (sizeBytes < 1024 * 1024) {
+		return `${(sizeBytes / 1024).toFixed(1)} KB`
+	}
+	return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 const uploadAttachment = async (
 	token: string,
 	attachment: FileAttachment,
@@ -300,14 +313,20 @@ const uploadAttachment = async (
 	size_bytes: number
 	public_url?: string | null
 } | null> => {
-	if (!attachment.uri) {
+	if (!attachment.uri && !attachment.webFile) {
 		return null
 	}
 
 	const fileName = attachment.name || `file-${Date.now()}`
-	const mimeType = attachment.mimeType || 'application/octet-stream'
+	const mimeType =
+		attachment.mimeType ||
+		attachment.webFile?.type ||
+		'application/octet-stream'
 
 	if (Platform.OS !== 'web') {
+		if (!attachment.uri) {
+			return null
+		}
 		const formData = new FormData()
 		formData.append('file', {
 			uri: attachment.uri,
@@ -325,8 +344,16 @@ const uploadAttachment = async (
 		}
 	}
 
-	const fileResponse = await fetch(attachment.uri)
-	const blob = await fileResponse.blob()
+	let blob: Blob
+	if (attachment.webFile) {
+		blob = attachment.webFile
+	} else {
+		if (!attachment.uri) {
+			return null
+		}
+		const fileResponse = await fetch(attachment.uri)
+		blob = await fileResponse.blob()
+	}
 	const sizeBytes = typeof blob.size === 'number' ? blob.size : 0
 	if (sizeBytes <= 0) {
 		return null
@@ -1032,14 +1059,25 @@ export const useChatStore = create<ChatStore>()(
 					if (event === 'message_delivery_state') {
 						const messageIdRaw = (payload as { message_id?: unknown })
 							.message_id
+						const clientMessageIdRaw = (
+							payload as { client_message_id?: unknown }
+						).client_message_id
 						const stateRaw = (payload as { state?: unknown }).state
 						if (
-							typeof messageIdRaw !== 'number' ||
+							(
+								typeof messageIdRaw !== 'number' &&
+								typeof clientMessageIdRaw !== 'string'
+							) ||
 							typeof stateRaw !== 'string'
 						) {
 							return
 						}
-						const messageId = String(messageIdRaw)
+						const messageId =
+							typeof messageIdRaw === 'number' ? String(messageIdRaw) : ''
+						const clientMessageId =
+							typeof clientMessageIdRaw === 'string'
+								? clientMessageIdRaw
+								: ''
 						const deliveryState = stateRaw as ApiMessage['delivery_state']
 						const messagesByChat: Record<string, ChatMessage[]> = {}
 						let changed = false
@@ -1047,7 +1085,12 @@ export const useChatStore = create<ChatStore>()(
 							([chatId, messages]) => {
 								let localChanged = false
 								const nextMessages = messages.map(message => {
-									if (message.id !== messageId) {
+									const matchesById =
+										messageId.length > 0 && message.id === messageId
+									const matchesByClientId =
+										clientMessageId.length > 0 &&
+										message.clientMessageId === clientMessageId
+									if (!matchesById && !matchesByClientId) {
 										return message
 									}
 									localChanged = true
@@ -1205,6 +1248,40 @@ export const useChatStore = create<ChatStore>()(
 							: null
 						if (requiresAttachment && !uploaded) {
 							throw new Error('Unable to upload attachment.')
+						}
+						if (uploaded) {
+							const uploadedAttachment: FileAttachment = {
+								id: payload.attachment?.id ?? `attachment_${clientMessageId}`,
+								name: uploaded.original_name,
+								sizeLabel: formatAttachmentSize(uploaded.size_bytes),
+								sizeBytes: uploaded.size_bytes,
+								mimeType: uploaded.mime_type,
+								uri: uploaded.public_url ?? payload.attachment?.uri,
+								bucket: uploaded.bucket,
+								objectKey: uploaded.object_key,
+								originalName: uploaded.original_name,
+								publicUrl: uploaded.public_url ?? null,
+							}
+							set(state => {
+								const currentMessages = state.messagesByChat[payload.chatId] ?? []
+								const nextMessages = currentMessages.map(message =>
+									message.id === optimistic.id
+										? {
+												...message,
+												body: message.body || uploaded.original_name,
+												attachment: uploadedAttachment,
+											}
+										: message,
+								)
+								const messagesByChat = {
+									...state.messagesByChat,
+									[payload.chatId]: nextMessages,
+								}
+								return {
+									messagesByChat,
+									sharedFiles: deriveSharedFiles(messagesByChat),
+								}
+							})
 						}
 						const attachments = uploaded
 							? [mapUploadAttachmentToApi(uploaded)]
