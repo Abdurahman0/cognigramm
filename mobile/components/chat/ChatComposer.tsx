@@ -1,5 +1,5 @@
 import { Feather } from '@expo/vector-icons'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
 	Keyboard,
 	type NativeSyntheticEvent,
@@ -19,6 +19,7 @@ interface ChatComposerProps {
 	sendingLocked?: boolean
 	autoFocus?: boolean
 	focusSignal?: string
+	mediaActionsSlot?: ReactNode
 	onTypingStart?: () => void
 	onTypingStop?: () => void
 	onSend: (body: string) => void
@@ -49,6 +50,7 @@ export function ChatComposer({
 	sendingLocked = false,
 	autoFocus = false,
 	focusSignal = '',
+	mediaActionsSlot,
 	onTypingStart,
 	onTypingStop,
 	onSend,
@@ -208,6 +210,7 @@ export function ChatComposer({
 					))}
 				</View>
 			) : null}
+			{mediaActionsSlot ? <View style={styles.mediaActionsWrap}>{mediaActionsSlot}</View> : null}
 
 			<View
 				style={[
@@ -398,6 +401,9 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		gap: 6,
 		padding: 8,
+	},
+	mediaActionsWrap: {
+		paddingHorizontal: 4,
 	},
 	emojiButton: {
 		alignItems: 'center',

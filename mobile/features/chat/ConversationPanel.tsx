@@ -27,12 +27,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
+import {
+	MediaMessageComposerActions,
+	useSendMediaMessage,
+	useVideoNoteRecorder,
+	useVoiceMessageRecorder,
+	type PreparedMediaDraft,
+} from '@/features/chat/media-messages'
+import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import { useAppToast } from '@/hooks/useAppToast'
 import { useAppTheme } from '@/hooks/useAppTheme'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ApiRequestError } from '@/services/api/httpClient'
+import { useCallsStore } from '@/store/callsStore'
 import { useChatStore } from '@/store/chatStore'
-import type { ChatMessage, ChatSummary } from '@/types'
+import type { CallType, ChatMessage, ChatSummary } from '@/types'
 import { useShallow } from 'zustand/react/shallow'
 
 interface ConversationPanelProps {
@@ -223,6 +232,14 @@ export function ConversationPanel({
 	)
 
 	const chat = chats.find(item => item.id === chatId)
+	const activeCall = useCallsStore(state => state.currentCall)
+	const startCall = useCallsStore(state => state.startCall)
+	const voiceRecorder = useVoiceMessageRecorder()
+	const videoRecorder = useVideoNoteRecorder()
+	const mediaSender = useSendMediaMessage({
+		chatId,
+		sendMessage,
+	})
 	const selectedMessage = useMemo(
 		() => messages.find(message => message.id === selectedMessageId),
 		[messages, selectedMessageId],
@@ -262,6 +279,19 @@ export function ConversationPanel({
 			sendTypingEvent,
 			setActiveConversationId,
 		]),
+	)
+
+	const cancelVoiceRecorder = voiceRecorder.cancel
+	const cancelVideoRecorder = videoRecorder.cancel
+	const resetMediaSender = mediaSender.reset
+
+	useEffect(
+		() => () => {
+			cancelVoiceRecorder().catch(() => undefined)
+			cancelVideoRecorder().catch(() => undefined)
+			resetMediaSender()
+		},
+		[cancelVoiceRecorder, cancelVideoRecorder, resetMediaSender],
 	)
 
 	const loadingOlder = useChatStore(
@@ -797,9 +827,49 @@ export function ConversationPanel({
 			params: { chatId: chat.id },
 		})
 	}
+	const activeCallForConversation =
+		activeCall?.conversationId === chat.id &&
+		(activeCall.state === 'ringing' || activeCall.state === 'active')
+	const openCallSession = (callId: string) => {
+		router.push({
+			pathname: CALL_ROUTE_CONFIG.detailsPathname as never,
+			params: { callId } as never,
+		})
+	}
+
+	const beginCall = (callType: CallType) => {
+		if (activeCallForConversation && activeCall) {
+			openCallSession(activeCall.id)
+			return
+		}
+		startCall({
+			conversationId: chat.id,
+			callType,
+		})
+			.then(callId => {
+				toast.info(
+					callType === 'video' ? 'Starting video call' : 'Starting audio call',
+					header.title,
+				)
+				openCallSession(callId)
+			})
+			.catch(error => {
+				toast.error(
+					'Unable to start call',
+					error instanceof Error ? error.message : 'Unexpected error',
+				)
+			})
+	}
 
 	const handleAttachmentPick = async () => {
-		if (uploadingAttachment) {
+		if (uploadingAttachment || mediaSender.isSending) {
+			return
+		}
+		if (activeMediaDraft) {
+			toast.info(
+				'Draft ready',
+				'Send or discard the recorded media before attaching another file.',
+			)
 			return
 		}
 		try {
@@ -851,6 +921,54 @@ export function ConversationPanel({
 		}
 	}
 
+	const sendMediaDraft = async (draft: PreparedMediaDraft) => {
+		const result = await mediaSender.sendDraft(draft)
+		if (!result.ok) {
+			toast.error(
+				'Unable to send media message',
+				result.errorMessage ??
+					mediaSender.state.errorMessage ??
+					'Please try again.',
+			)
+			return
+		}
+		toast.success(
+			draft.type === 'voice' ? 'Voice message sent' : 'Video note sent',
+		)
+		voiceRecorder.reset()
+		videoRecorder.reset()
+		mediaSender.reset()
+		isNearBottomRef.current = true
+	}
+
+	const handleVoiceRecordPress = () => {
+		if (voiceRecorder.isRecording) {
+			voiceRecorder.stop().catch(() => undefined)
+			return
+		}
+		voiceRecorder.start().catch(() => undefined)
+	}
+
+	const handleVideoRecordPress = () => {
+		if (videoRecorder.needsStopAction) {
+			videoRecorder.stop().catch(() => undefined)
+			return
+		}
+		videoRecorder.start().catch(() => undefined)
+	}
+
+	useEffect(() => {
+		if (voiceRecorder.state.step === 'error' && voiceRecorder.state.errorMessage) {
+			toast.error('Voice recorder', voiceRecorder.state.errorMessage)
+		}
+	}, [toast, voiceRecorder.state.errorMessage, voiceRecorder.state.step])
+
+	useEffect(() => {
+		if (videoRecorder.state.step === 'error' && videoRecorder.state.errorMessage) {
+			toast.error('Video recorder', videoRecorder.state.errorMessage)
+		}
+	}, [toast, videoRecorder.state.errorMessage, videoRecorder.state.step])
+
 	const handleComposerLayout = (event: LayoutChangeEvent) => {
 		const nextHeight = event.nativeEvent.layout.height
 		if (nextHeight !== composerHeight) {
@@ -868,6 +986,12 @@ export function ConversationPanel({
 
 	const typingIndicatorReserve = typingMembers.length > 0 ? 44 : 0
 	const listBottomGap = (keyboardVisible ? 24 : 8) + typingIndicatorReserve
+	const activeMediaDraft = videoRecorder.draft ?? voiceRecorder.draft
+	const composerLocked =
+		uploadingAttachment ||
+		mediaSender.isSending ||
+		voiceRecorder.isBusy ||
+		videoRecorder.isBusy
 	const closeEditModal = () => {
 		setEditModalVisible(false)
 		setEditingMessageId('')
@@ -977,6 +1101,46 @@ export function ConversationPanel({
 							name='chevron-right'
 							size={16}
 							color={theme.colors.textMuted}
+						/>
+					</Pressable>
+				</View>
+				<View style={styles.headerActions}>
+					<Pressable
+						onPress={() => beginCall('audio')}
+						accessibilityRole='button'
+						accessibilityLabel='Start audio call'
+						style={({ pressed }) => [
+							styles.actionButton,
+							{
+								backgroundColor: pressed
+									? theme.colors.accentMuted
+									: theme.colors.surfaceMuted,
+							},
+						]}
+					>
+						<Feather
+							name='phone'
+							size={16}
+							color={theme.colors.textSecondary}
+						/>
+					</Pressable>
+					<Pressable
+						onPress={() => beginCall('video')}
+						accessibilityRole='button'
+						accessibilityLabel='Start video call'
+						style={({ pressed }) => [
+							styles.actionButton,
+							{
+								backgroundColor: pressed
+									? theme.colors.accentMuted
+									: theme.colors.surfaceMuted,
+							},
+						]}
+					>
+						<Feather
+							name='video'
+							size={16}
+							color={theme.colors.textSecondary}
 						/>
 					</Pressable>
 				</View>
@@ -1104,12 +1268,52 @@ export function ConversationPanel({
 			>
 				<ChatComposer
 					keyboardVisible={keyboardVisible}
-					sendingLocked={uploadingAttachment}
+					sendingLocked={composerLocked}
 					autoFocus={Platform.OS === 'web'}
 					focusSignal={chatId}
+					mediaActionsSlot={
+						<MediaMessageComposerActions
+							voiceDraft={voiceRecorder.draft}
+							videoDraft={videoRecorder.draft}
+							voiceRecording={voiceRecorder.isRecording}
+							voiceBusy={voiceRecorder.isBusy}
+							videoRecording={videoRecorder.isRecording}
+							videoNeedsStopAction={videoRecorder.needsStopAction}
+							videoBusy={videoRecorder.isBusy}
+							isSending={mediaSender.isSending}
+							sendErrorMessage={mediaSender.state.errorMessage}
+							onStartVoiceRecording={handleVoiceRecordPress}
+							onStopVoiceRecording={handleVoiceRecordPress}
+							onCancelVoiceRecording={() => {
+								voiceRecorder.cancel().catch(() => undefined)
+								mediaSender.reset()
+							}}
+							onStartVideoRecording={handleVideoRecordPress}
+							onStopVideoRecording={handleVideoRecordPress}
+							onCancelVideoRecording={() => {
+								videoRecorder.cancel().catch(() => undefined)
+								mediaSender.reset()
+							}}
+							onSendDraft={draft => {
+								sendMediaDraft(draft).catch(() => undefined)
+							}}
+							onDiscardDraft={() => {
+								voiceRecorder.reset()
+								videoRecorder.reset()
+								mediaSender.reset()
+							}}
+						/>
+					}
 					onTypingStart={() => sendTypingEvent(chat.id, true)}
 					onTypingStop={() => sendTypingEvent(chat.id, false)}
 					onSend={body => {
+						if (activeMediaDraft) {
+							toast.info(
+								'Draft ready',
+								'Send or discard the recorded media before sending text.',
+							)
+							return
+						}
 						sendMessage({
 							chatId: chat.id,
 							body,

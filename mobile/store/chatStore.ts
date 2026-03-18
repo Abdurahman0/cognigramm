@@ -4,11 +4,13 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { useAuthStore } from '@/store/authStore'
+import { useCallsStore } from '@/store/callsStore'
 import {
 	conversationsApi,
 	messagesApi,
 	presenceApi,
 	usersApi,
+	type ApiMessageAttachmentIn,
 	type ApiMessage,
 	type ApiSocketEnvelope,
 	type ApiUser,
@@ -22,6 +24,7 @@ import {
 	sortChatsByLastActivity,
 } from '@/services/api/adapters'
 import { USE_LOCAL_MEDIA_UPLOAD } from '@/services/api/config'
+import { uploadMediaMessage } from '@/features/chat/media-messages/services/uploadMediaMessage'
 import {
 	realtimeSocketClient,
 	type SocketStatus,
@@ -41,9 +44,11 @@ export type ChatFilterKey = 'all' | 'unread' | 'groups'
 
 interface SendMessageInput {
 	chatId: string
-	body: string
+	body: string | null
 	type: MessageType
 	attachment?: FileAttachment
+	clientMessageId?: string
+	preUploadedAttachment?: ApiMessageAttachmentIn
 }
 
 interface CreateGroupConversationInput {
@@ -284,7 +289,7 @@ const createOptimisticMessage = (
 		clientMessageId,
 		chatId: payload.chatId,
 		senderId,
-		body: payload.body,
+		body: payload.body ?? '',
 		type: payload.type,
 		createdAt: now,
 		attachment: payload.attachment,
@@ -317,6 +322,7 @@ const uploadAttachment = async (
 	mime_type: string
 	size_bytes: number
 	public_url?: string | null
+	metadata_json?: Record<string, unknown> | null
 } | null> => {
 	if (!attachment.uri && !attachment.webFile) {
 		return null
@@ -328,17 +334,14 @@ const uploadAttachment = async (
 		attachment.webFile?.type ||
 		'application/octet-stream'
 
-	if (Platform.OS !== 'web') {
-		if (!attachment.uri) {
-			return null
+	if (USE_LOCAL_MEDIA_UPLOAD) {
+		const localFile = {
+			uri: attachment.uri ?? '',
+			fileName,
+			mimeType,
+			webFile: attachment.webFile,
 		}
-		const formData = new FormData()
-		formData.append('file', {
-			uri: attachment.uri,
-			name: fileName,
-			type: mimeType,
-		} as unknown as Blob)
-		const result = await messagesApi.uploadLocalAttachment(token, formData)
+		const result = await uploadMediaMessage(token, localFile)
 		return {
 			bucket: result.bucket,
 			object_key: result.object_key,
@@ -346,6 +349,9 @@ const uploadAttachment = async (
 			mime_type: result.mime_type,
 			size_bytes: result.size_bytes,
 			public_url: result.public_url,
+			metadata_json:
+				(attachment.metadataJson as Record<string, unknown> | null | undefined) ??
+				null,
 		}
 	}
 
@@ -362,20 +368,6 @@ const uploadAttachment = async (
 	const sizeBytes = typeof blob.size === 'number' ? blob.size : 0
 	if (sizeBytes <= 0) {
 		return null
-	}
-
-	if (USE_LOCAL_MEDIA_UPLOAD) {
-		const formData = new FormData()
-		formData.append('file', blob, fileName)
-		const result = await messagesApi.uploadLocalAttachment(token, formData)
-		return {
-			bucket: result.bucket,
-			object_key: result.object_key,
-			original_name: result.original_name,
-			mime_type: result.mime_type,
-			size_bytes: result.size_bytes,
-			public_url: result.public_url,
-		}
 	}
 
 	const presigned = await messagesApi.createUploadUrl(token, {
@@ -400,6 +392,9 @@ const uploadAttachment = async (
 		mime_type: mimeType,
 		size_bytes: sizeBytes,
 		public_url: presigned.public_url,
+		metadata_json:
+			(attachment.metadataJson as Record<string, unknown> | null | undefined) ??
+			null,
 	}
 }
 
@@ -601,6 +596,7 @@ export const useChatStore = create<ChatStore>()(
 					const session = useAuthStore.getState().session
 					if (!session) {
 						realtimeSocketClient.disconnect()
+						useCallsStore.getState().clear()
 						stopConversationSyncTimer()
 						conversationSyncInFlight = false
 						lastConversationSyncAt = 0
@@ -634,6 +630,7 @@ export const useChatStore = create<ChatStore>()(
 								token: session.token,
 								onEvent: envelope => {
 									useChatStore.getState().handleSocketEvent(envelope)
+									useCallsStore.getState().handleSocketEvent(envelope)
 								},
 								onStatusChange: status => set({ websocketStatus: status }),
 								getActiveConversationId: () =>
@@ -744,6 +741,7 @@ export const useChatStore = create<ChatStore>()(
 							token: session.token,
 							onEvent: envelope => {
 								useChatStore.getState().handleSocketEvent(envelope)
+								useCallsStore.getState().handleSocketEvent(envelope)
 							},
 							onStatusChange: status => set({ websocketStatus: status }),
 							getActiveConversationId: () =>
@@ -1116,6 +1114,50 @@ export const useChatStore = create<ChatStore>()(
 						return
 					}
 
+					if (event === 'message_queued') {
+						const clientMessageIdRaw = (
+							payload as { client_message_id?: unknown }
+						).client_message_id
+						const messageIdRaw = (payload as { message_id?: unknown }).message_id
+						if (
+							typeof clientMessageIdRaw !== 'string' &&
+							typeof messageIdRaw !== 'number'
+						) {
+							return
+						}
+						const nextMessageId =
+							typeof messageIdRaw === 'number' ? String(messageIdRaw) : ''
+						const messagesByChat: Record<string, ChatMessage[]> = {}
+						let changed = false
+						Object.entries(state.messagesByChat).forEach(
+							([chatId, messages]) => {
+								let localChanged = false
+								const nextMessages = messages.map(message => {
+									const matchesByClientId =
+										typeof clientMessageIdRaw === 'string' &&
+										message.clientMessageId === clientMessageIdRaw
+									const matchesById =
+										nextMessageId.length > 0 && message.id === nextMessageId
+									if (!matchesByClientId && !matchesById) {
+										return message
+									}
+									localChanged = true
+									return {
+										...message,
+										id: nextMessageId || message.id,
+										status: 'sending' as ChatMessage['status'],
+									}
+								})
+								messagesByChat[chatId] = localChanged ? nextMessages : messages
+								changed = changed || localChanged
+							},
+						)
+						if (changed) {
+							set({ messagesByChat })
+						}
+						return
+					}
+
 					if (event === 'message_failed') {
 						const clientMessageIdRaw = (
 							payload as { client_message_id?: unknown }
@@ -1384,7 +1426,7 @@ export const useChatStore = create<ChatStore>()(
 						throw new Error('Invalid chat id.')
 					}
 
-					const clientMessageId = createId('msg')
+					const clientMessageId = payload.clientMessageId ?? createId('msg')
 					const optimistic = createOptimisticMessage(
 						payload,
 						userId,
@@ -1415,9 +1457,11 @@ export const useChatStore = create<ChatStore>()(
 						if (requiresAttachment && !payload.attachment) {
 							throw new Error('Attachment is required for this message.')
 						}
-						const uploaded = payload.attachment
-							? await uploadAttachment(token, payload.attachment)
-							: null
+						const uploaded =
+							payload.preUploadedAttachment ??
+							(payload.attachment
+								? await uploadAttachment(token, payload.attachment)
+								: null)
 						if (requiresAttachment && !uploaded) {
 							throw new Error('Unable to upload attachment.')
 						}
@@ -1433,6 +1477,13 @@ export const useChatStore = create<ChatStore>()(
 								objectKey: uploaded.object_key,
 								originalName: uploaded.original_name,
 								publicUrl: uploaded.public_url ?? null,
+								metadataJson:
+									(uploaded.metadata_json as
+										| Record<string, unknown>
+										| null
+										| undefined) ??
+									payload.attachment?.metadataJson ??
+									null,
 							}
 							set(state => {
 								const currentMessages = state.messagesByChat[payload.chatId] ?? []
@@ -1458,10 +1509,14 @@ export const useChatStore = create<ChatStore>()(
 						const attachments = uploaded
 							? [mapUploadAttachmentToApi(uploaded)]
 							: []
+						const content =
+							payload.type === 'voice' || payload.type === 'video_note'
+								? null
+								: payload.body || null
 
 						realtimeSocketClient.send('send_message', {
 							conversation_id: conversationId,
-							content: payload.body || null,
+							content,
 							type: payload.type,
 							client_message_id: clientMessageId,
 							attachments,

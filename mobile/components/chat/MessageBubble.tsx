@@ -2,6 +2,8 @@ import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { VideoNoteBubble } from "@/features/chat/media-messages/components/VideoNoteBubble";
+import { VoiceMessageBubble } from "@/features/chat/media-messages/components/VoiceMessageBubble";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ChatMessage } from "@/types";
 import { formatMessageDate } from "@/utils/date";
@@ -68,10 +70,18 @@ export function MessageBubble({
               This message was deleted
             </Text>
           ) : message.type === "voice" ? (
-            <View style={styles.voiceRow}>
-              <Feather name="mic" size={14} color={textColor} />
-              <Text style={[styles.body, { color: textColor }]}>Voice note (placeholder)</Text>
-            </View>
+            <VoiceMessageBubble
+              message={message}
+              textColor={textColor}
+              mutedTextColor={isMine ? "#DCE7FF" : theme.colors.textMuted}
+              accentColor={theme.colors.accent}
+            />
+          ) : message.type === "video_note" ? (
+            <VideoNoteBubble
+              message={message}
+              textColor={textColor}
+              mutedTextColor={isMine ? "#DCE7FF" : theme.colors.textMuted}
+            />
           ) : isImageAttachment ? (
             attachmentUrl ? (
               <Pressable onPress={openImagePreview} style={styles.imageWrap}>

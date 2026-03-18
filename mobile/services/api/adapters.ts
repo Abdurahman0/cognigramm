@@ -1,4 +1,5 @@
 import type {
+  ApiCallSession,
   ApiConversation,
   ApiDeliveryState,
   ApiMessage,
@@ -8,6 +9,8 @@ import type {
   ApiUser
 } from "@/services/api";
 import type {
+  CallSession,
+  CallDirection,
   ChatKind,
   ChatMessage,
   ChatSummary,
@@ -20,6 +23,7 @@ import type {
   User,
   UserPresence
 } from "@/types";
+import { mapBackendStateToStatus } from "@/features/calls/utils/statusMapper";
 
 const ROLE_BY_ID: Record<number, EmployeeRole> = {
   1: "ceo",
@@ -94,7 +98,8 @@ const toAttachment = (attachment: ApiMessageAttachmentOut | undefined): FileAtta
     bucket: attachment.bucket,
     objectKey: attachment.object_key,
     originalName: attachment.original_name,
-    publicUrl
+    publicUrl,
+    metadataJson: attachment.metadata_json ?? null
   };
 };
 
@@ -194,6 +199,7 @@ export const mapUploadAttachmentToApi = (
     mime_type: string;
     size_bytes: number;
     public_url?: string | null;
+    metadata_json?: Record<string, unknown> | null;
   }
 ): ApiMessageAttachmentIn => ({
   bucket: upload.bucket,
@@ -201,8 +207,39 @@ export const mapUploadAttachmentToApi = (
   original_name: upload.original_name,
   mime_type: upload.mime_type,
   size_bytes: upload.size_bytes,
-  public_url: upload.public_url ?? null
+  public_url: upload.public_url ?? null,
+  metadata_json: upload.metadata_json ?? null
 });
+
+export const mapApiCallToCallSession = (
+  call: ApiCallSession,
+  currentUserId?: string
+): CallSession => {
+  const initiatorId = String(call.initiator_id);
+  const direction: CallDirection =
+    currentUserId && currentUserId === initiatorId ? "outgoing" : "incoming";
+  return {
+    id: call.id,
+    conversationId: String(call.conversation_id),
+    initiatorId,
+    callType: call.call_type,
+    state: call.state,
+    status: mapBackendStateToStatus(call.state, direction),
+    direction,
+    startedAt: call.started_at ?? undefined,
+    endedAt: call.ended_at ?? undefined,
+    createdAt: call.created_at,
+    updatedAt: call.updated_at,
+    participants: call.participants.map((participant) => ({
+      userId: String(participant.user_id),
+      state: participant.state,
+      isOnlineWhenInvited: participant.is_online_when_invited,
+      joinedAt: participant.joined_at ?? undefined,
+      leftAt: participant.left_at ?? undefined,
+      createdAt: participant.created_at
+    }))
+  };
+};
 
 export const sortChatsByLastActivity = (
   chats: ChatSummary[],
@@ -232,6 +269,8 @@ export const deriveSharedFiles = (messagesByChat: Record<string, ChatMessage[]>)
       const fileType =
         message.type === "voice"
           ? "voice"
+          : message.type === "video_note"
+          ? "video_note"
           : message.type === "image" || mime.startsWith("image/")
           ? "image"
           : mime.includes("spreadsheet")

@@ -33,8 +33,9 @@ export default function AppLayout(): JSX.Element {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[chatId]" options={pushScreenOptions} />
       <Stack.Screen name="chat-info/[chatId]" options={pushScreenOptions} />
+      <Stack.Screen name="calls/[callId]" options={pushScreenOptions} />
       <Stack.Screen name="new-message" options={modalScreenOptions} />
-      <Stack.Screen name="media/[chatId]" />
+      <Stack.Screen name="resources/[chatId]" options={pushScreenOptions} />
       <Stack.Screen name="settings/index" />
       <Stack.Screen name="profile/edit" options={modalScreenOptions} />
     </Stack>

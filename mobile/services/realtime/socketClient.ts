@@ -15,7 +15,12 @@ export type SocketOutgoingEvent =
   | "join_conversation"
   | "leave_conversation"
   | "active_conversation"
-  | "sync_missed";
+  | "sync_missed"
+  | "call_invite"
+  | "call_accept"
+  | "call_reject"
+  | "call_end"
+  | "call_signal";
 
 interface ConnectOptions {
   token: string;

@@ -10,9 +10,10 @@ import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 
+import { IncomingCallPrompt } from "@/features/calls/components/IncomingCallPrompt";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
-import { useAuthStore, useChatStore, useSettingsStore } from "@/store";
+import { useAuthStore, useCallsStore, useChatStore, useSettingsStore } from "@/store";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
@@ -24,6 +25,7 @@ export default function RootLayout(): JSX.Element {
   const session = useAuthStore((state) => state.session);
   const chatHydrated = useChatStore((state) => state.hydrated);
   const initializeChats = useChatStore((state) => state.initializeForSession);
+  const initializeCalls = useCallsStore((state) => state.initializeForSession);
   const settingsHydrated = useSettingsStore((state) => state.hydrated);
 
   useEffect(() => {
@@ -59,6 +61,13 @@ export default function RootLayout(): JSX.Element {
     initializeChats().catch(() => undefined);
   }, [authHydrated, chatHydrated, initializeChats, session?.token]);
 
+  useEffect(() => {
+    if (!authHydrated) {
+      return;
+    }
+    initializeCalls().catch(() => undefined);
+  }, [authHydrated, initializeCalls, session?.token]);
+
   const ready = authHydrated && chatHydrated && settingsHydrated;
 
   if (!ready) {
@@ -81,6 +90,7 @@ export default function RootLayout(): JSX.Element {
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(app)" />
           </Stack>
+          <IncomingCallPrompt />
           <Toast position="top" topOffset={52} />
         </View>
       </QueryClientProvider>

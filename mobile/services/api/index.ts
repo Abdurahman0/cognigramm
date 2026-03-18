@@ -1,5 +1,7 @@
 import { apiRequest } from "@/services/api/httpClient";
 import type {
+  ApiCallsHistoryResponse,
+  ApiCallSession,
   ApiConversation,
   ApiDeliveryState,
   ApiLocalUploadResponse,
@@ -45,7 +47,7 @@ interface CreateConversationPayload {
 interface SendMessagePayload {
   conversation_id: number;
   content: string | null;
-  type: "text" | "image" | "file" | "voice" | "system";
+  type: "text" | "image" | "file" | "voice" | "video_note" | "system";
   client_message_id: string;
   attachments: ApiMessageAttachmentIn[];
 }
@@ -206,7 +208,24 @@ export const presenceApi = {
   }
 };
 
+export const callsApi = {
+  getHistory(token: string, params: ListParams = {}): Promise<ApiCallsHistoryResponse> {
+    return apiRequest<ApiCallsHistoryResponse>("/calls/history", {
+      token,
+      query: {
+        limit: params.limit ?? 30,
+        offset: params.offset ?? 0
+      }
+    });
+  },
+  getById(token: string, callId: string): Promise<ApiCallSession> {
+    return apiRequest<ApiCallSession>(`/calls/${encodeURIComponent(callId)}`, { token });
+  }
+};
+
 export type {
+  ApiCallsHistoryResponse,
+  ApiCallSession,
   ApiConversation,
   ApiDeliveryState,
   ApiMessage,

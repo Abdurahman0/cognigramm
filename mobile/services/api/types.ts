@@ -1,9 +1,11 @@
 export type ApiConversationType = "direct" | "group";
 export type ApiParticipantRole = "admin" | "member";
 export type ApiUserStatus = "available" | "in_meeting" | "busy" | "on_break" | "offline" | "remote";
-export type ApiMessageType = "text" | "image" | "file" | "voice" | "system";
+export type ApiMessageType = "text" | "image" | "file" | "voice" | "video_note" | "system";
 export type ApiMessageStatus = "sent" | "failed";
 export type ApiDeliveryState = "queued" | "persisted" | "delivered" | "read" | "failed";
+export type ApiCallType = "audio" | "video";
+export type ApiCallState = "ringing" | "active" | "ended" | "missed" | "rejected" | "cancelled" | "failed";
 
 export interface ApiTokenResponse {
   access_token: string;
@@ -52,6 +54,7 @@ export interface ApiMessageAttachmentIn {
   mime_type: string;
   size_bytes: number;
   public_url?: string | null;
+  metadata_json?: Record<string, unknown> | null;
 }
 
 export interface ApiMessageAttachmentOut {
@@ -62,6 +65,7 @@ export interface ApiMessageAttachmentOut {
   mime_type: string;
   size_bytes: number;
   public_url: string | null;
+  metadata_json?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -122,6 +126,33 @@ export interface ApiPresenceState {
   sessions: number;
   last_seen: string | null;
   updated_at: string | null;
+}
+
+export interface ApiCallParticipant {
+  user_id: number;
+  state: string;
+  is_online_when_invited: boolean;
+  joined_at: string | null;
+  left_at: string | null;
+  created_at: string;
+}
+
+export interface ApiCallSession {
+  id: string;
+  conversation_id: number;
+  initiator_id: number;
+  call_type: ApiCallType;
+  state: ApiCallState;
+  started_at: string | null;
+  ended_at: string | null;
+  created_at: string;
+  updated_at: string;
+  participants: ApiCallParticipant[];
+}
+
+export interface ApiCallsHistoryResponse {
+  total: number;
+  calls: ApiCallSession[];
 }
 
 export interface ApiSocketEnvelope<TPayload = Record<string, unknown>> {

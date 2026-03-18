@@ -16,6 +16,9 @@ export const resolveMessagePreview = (message?: ChatMessage): string => {
   if (message.type === "voice") {
     return "Voice note";
   }
+  if (message.type === "video_note") {
+    return "Video note";
+  }
   if (message.type === "system") {
     return message.body;
   }

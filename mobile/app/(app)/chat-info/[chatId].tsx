@@ -151,7 +151,9 @@ export default function ChatInfoScreen(): JSX.Element {
     [chat, sharedFiles]
   );
   const mediaCount = useMemo(
-    () => files.filter((file) => file.type === "image").length + messages.filter((message) => message.type === "image").length,
+    () =>
+      files.filter((file) => file.type === "image" || file.type === "video_note").length +
+      messages.filter((message) => message.type === "image" || message.type === "video_note").length,
     [files, messages]
   );
   const linksCount = useMemo(
@@ -246,6 +248,12 @@ export default function ChatInfoScreen(): JSX.Element {
     }
     router.back();
   };
+  const openMediaScreen = () => {
+    router.push({
+      pathname: "/(app)/resources/[chatId]" as never,
+      params: { chatId: chat.id } as never
+    });
+  };
 
   const quickActionMap: Record<QuickActionId, { icon: FeatherName; label: string; onPress: () => void; active?: boolean }> = {
     message: {
@@ -261,7 +269,7 @@ export default function ChatInfoScreen(): JSX.Element {
     files: {
       icon: "paperclip",
       label: "Files",
-      onPress: () => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })
+      onPress: openMediaScreen
     }
   };
 
@@ -375,7 +383,7 @@ export default function ChatInfoScreen(): JSX.Element {
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
             <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Shared Content</Text>
-            <Pressable onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}>
+            <Pressable onPress={openMediaScreen}>
               <Text style={[styles.sectionLink, { color: theme.colors.accent }]}>Open all</Text>
             </Pressable>
           </View>
@@ -383,19 +391,19 @@ export default function ChatInfoScreen(): JSX.Element {
             icon="image"
             label="Shared media"
             value={`${mediaCount} items`}
-            onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}
+            onPress={openMediaScreen}
           />
           <InfoRow
             icon="paperclip"
             label="Shared files"
             value={`${files.length} files`}
-            onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}
+            onPress={openMediaScreen}
           />
           <InfoRow
             icon="link"
             label="Shared links"
             value={`${linksCount} links`}
-            onPress={() => router.push({ pathname: "/(app)/media/[chatId]", params: { chatId: chat.id } })}
+            onPress={openMediaScreen}
           />
         </View>
       </View>

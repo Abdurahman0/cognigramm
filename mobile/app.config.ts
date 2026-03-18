@@ -42,7 +42,28 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
-    "expo-system-ui"
+    "expo-system-ui",
+    [
+      "expo-av",
+      {
+        microphonePermission: "Allow this app to access your microphone to record voice messages."
+      }
+    ],
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Allow this app to access your photos for message attachments.",
+        cameraPermission: "Allow this app to access your camera for video notes.",
+        microphonePermission: "Allow this app to access your microphone for video notes."
+      }
+    ],
+    [
+      "@config-plugins/react-native-webrtc",
+      {
+        cameraPermission: "Allow this app to access your camera for video calls.",
+        microphonePermission: "Allow this app to access your microphone for calls."
+      }
+    ]
   ],
   experiments: {
     typedRoutes: true
