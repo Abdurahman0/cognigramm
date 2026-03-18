@@ -51,6 +51,7 @@ const config: ExpoConfig = {
 				},
 			},
 		],
+		'./plugins/withAndroidXActivityFix',
 		[
 			'expo-av',
 			{
