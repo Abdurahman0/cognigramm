@@ -2,7 +2,7 @@ import { usePathname, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
 import { Alert, Platform } from "react-native";
 
-import { CALL_FEATURE_FLAGS, CALL_ROUTE_CONFIG } from "@/features/calls/config/callConfig";
+import { CALL_FEATURE_FLAGS, CALL_ROUTE_CONFIG, CALL_TIMEOUTS_MS } from "@/features/calls/config/callConfig";
 import { useCallsStore } from "@/store/callsStore";
 import { useChatStore } from "@/store/chatStore";
 
@@ -11,6 +11,7 @@ export function IncomingCallPrompt(): null {
   const pathname = usePathname();
   const promptLockRef = useRef("");
   const activeRouteLockRef = useRef("");
+  const autoDeclineLockRef = useRef("");
   const currentCall = useCallsStore((state) => state.currentCall);
   const incomingFromUserId = useCallsStore((state) => state.incomingFromUserId);
   const rejectCall = useCallsStore((state) => state.rejectCall);
@@ -70,6 +71,39 @@ export function IncomingCallPrompt(): null {
   ]);
 
   useEffect(() => {
+    if (!currentCall || currentCall.status !== "ringing" || currentCall.direction !== "incoming") {
+      autoDeclineLockRef.current = "";
+      return;
+    }
+    if (autoDeclineLockRef.current === currentCall.id) {
+      return;
+    }
+    autoDeclineLockRef.current = currentCall.id;
+
+    const timer = setTimeout(() => {
+      const latest = useCallsStore.getState().currentCall;
+      if (
+        latest &&
+        latest.id === currentCall.id &&
+        latest.status === "ringing" &&
+        latest.direction === "incoming"
+      ) {
+        rejectCall(currentCall.id);
+      }
+    }, CALL_TIMEOUTS_MS.incomingAutoDecline);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [currentCall, rejectCall]);
+
+  useEffect(() => {
+    if (!CALL_FEATURE_FLAGS.autoNavigateIncomingCallInForeground) {
+      return;
+    }
+    if (Platform.OS === "web") {
+      return;
+    }
     const shouldOpenActiveCall =
       currentCall &&
       (currentCall.status === "connecting" || currentCall.status === "connected");

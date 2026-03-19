@@ -13,6 +13,7 @@ import {
 import { CALL_STATUS_LABELS, CALL_TYPE_LABELS } from "@/constants/calls";
 import { EmptyState, ScreenContainer, SectionHeader } from "@/components/common";
 import { CALL_ROUTE_CONFIG } from "@/features/calls/config/callConfig";
+import { formatCallDuration, getCallDurationMs } from "@/features/calls/utils/formatCallDuration";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCallsStore, useChatStore } from "@/store";
 import type { CallSession } from "@/types";
@@ -108,6 +109,7 @@ export default function CallsScreen(): JSX.Element {
         <FlatList
           data={calls}
           keyExtractor={(item) => item.id}
+          style={styles.list}
           refreshControl={
             <RefreshControl
               refreshing={refreshing || loadingHistory}
@@ -128,6 +130,8 @@ export default function CallsScreen(): JSX.Element {
           renderItem={({ item }) => {
             const tone = getStateTone(item.status, theme);
             const active = currentCall?.id === item.id && item.status === "connected";
+            const durationMs = getCallDurationMs(item);
+            const durationLabel = durationMs > 0 ? formatCallDuration(durationMs) : "";
             return (
               <Pressable
                 onPress={() => openCallDetails(item.id)}
@@ -159,6 +163,7 @@ export default function CallsScreen(): JSX.Element {
                   </Text>
                   <Text style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
                     {CALL_TYPE_LABELS[item.callType]} call - {formatRelative(item.updatedAt)}
+                    {durationLabel ? ` - ${durationLabel}` : ""}
                   </Text>
                 </View>
                 <View style={[styles.stateChip, { backgroundColor: tone.backgroundColor }]}>
@@ -202,6 +207,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
     flexGrow: 1
+  },
+  list: {
+    flex: 1
   },
   row: {
     alignItems: "center",

@@ -26,7 +26,7 @@ export function ScreenContainer({
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[
-            styles.content,
+            styles.scrollContent,
             webContentStyle,
             padded && {
               paddingHorizontal: theme.spacing.lg,
@@ -68,6 +68,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   content: {
+    flex: 1
+  },
+  scrollContent: {
     flexGrow: 1
   },
   webContent: {

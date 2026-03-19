@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -13,6 +13,8 @@ import { EmptyState, ScreenContainer, SectionHeader } from "@/components/common"
 import {
   CallControls,
   CallMediaViewport,
+  formatCallDuration,
+  getCallDurationMs,
   useCallController
 } from "@/features/calls";
 import { CALL_STATUS_LABELS, CALL_TYPE_LABELS } from "@/constants/calls";
@@ -37,6 +39,7 @@ export default function CallDetailsScreen(): JSX.Element {
   const endedRedirectedRef = useRef("");
   const chats = useChatStore((state) => state.chats);
   const users = useChatStore((state) => state.users);
+  const [durationTickMs, setDurationTickMs] = useState(() => Date.now());
 
   const {
     session,
@@ -126,6 +129,18 @@ export default function CallDetailsScreen(): JSX.Element {
     });
   }, [router, session]);
 
+  useEffect(() => {
+    if (!session || session.status !== "connected" || session.endedAt) {
+      return;
+    }
+    const timer = setInterval(() => {
+      setDurationTickMs(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, [session, session?.endedAt, session?.id, session?.status]);
+
   if (!callId) {
     return (
       <ScreenContainer scroll padded={false}>
@@ -161,6 +176,8 @@ export default function CallDetailsScreen(): JSX.Element {
   const showConnecting = runtime.status === "connecting";
   const terminal = isTerminalStatus.has(runtime.status);
   const callUpdatedAt = formatMessageDate(session.updatedAt);
+  const durationMs = getCallDurationMs(session, durationTickMs);
+  const durationLabel = durationMs > 0 ? formatCallDuration(durationMs) : "";
 
   return (
     <ScreenContainer scroll padded={false}>
@@ -186,6 +203,11 @@ export default function CallDetailsScreen(): JSX.Element {
             <Text style={[styles.summaryMeta, { color: theme.colors.textSecondary }]}>
               {statusLabel} - updated {callUpdatedAt}
             </Text>
+            {durationLabel ? (
+              <Text style={[styles.summaryMeta, { color: theme.colors.textSecondary }]}>
+                Duration: {durationLabel}
+              </Text>
+            ) : null}
             <Text style={[styles.summaryMeta, { color: theme.colors.textMuted }]}>Call ID: {session.id}</Text>
           </View>
         </View>

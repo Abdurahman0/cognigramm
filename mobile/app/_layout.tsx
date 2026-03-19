@@ -16,6 +16,7 @@ import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
 import { useAuthStore, useCallsStore, useChatStore, useSettingsStore } from "@/store";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+const WEB_SCROLLBAR_STYLE_ID = "messanger-web-scrollbar-theme";
 
 export default function RootLayout(): JSX.Element {
   const [queryClient] = useState(() => new QueryClient());
@@ -34,6 +35,45 @@ export default function RootLayout(): JSX.Element {
       document.body.style.backgroundColor = theme.colors.background;
     }
   }, [theme.colors.background]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      return;
+    }
+
+    let styleTag = document.getElementById(WEB_SCROLLBAR_STYLE_ID) as HTMLStyleElement | null;
+    if (!styleTag) {
+      styleTag = document.createElement("style");
+      styleTag.id = WEB_SCROLLBAR_STYLE_ID;
+      document.head.appendChild(styleTag);
+    }
+
+    styleTag.textContent = `
+      * {
+        scrollbar-width: thin;
+        scrollbar-color: ${theme.colors.textMuted} transparent;
+      }
+      *::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      *::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: ${theme.colors.textMuted};
+        border-radius: 999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        min-height: 28px;
+      }
+      *::-webkit-scrollbar-thumb:hover {
+        background: ${theme.colors.textSecondary};
+        border: 2px solid transparent;
+        background-clip: padding-box;
+      }
+    `;
+  }, [theme.colors.textMuted, theme.colors.textSecondary]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {

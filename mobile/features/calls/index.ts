@@ -7,4 +7,5 @@ export * from "@/features/calls/hooks/useCallPermissions";
 export * from "@/features/calls/services/signalingAdapter";
 export * from "@/features/calls/services/webrtcAdapter";
 export * from "@/features/calls/types";
+export * from "@/features/calls/utils/formatCallDuration";
 export * from "@/features/calls/utils/statusMapper";

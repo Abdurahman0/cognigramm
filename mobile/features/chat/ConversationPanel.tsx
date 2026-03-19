@@ -10,13 +10,11 @@ import {
 	Easing,
 	Keyboard,
 	KeyboardAvoidingView,
-	Modal,
 	PanResponder,
 	Platform,
 	Pressable,
 	StyleSheet,
 	Text,
-	TextInput,
 	View,
 	type KeyboardEvent,
 	type LayoutChangeEvent,
@@ -27,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
+import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
 	useSendMediaMessage,
@@ -34,7 +33,6 @@ import {
 	useVoiceMessageRecorder,
 	type PreparedMediaDraft,
 } from '@/features/chat/media-messages'
-import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import { useAppToast } from '@/hooks/useAppToast'
 import { useAppTheme } from '@/hooks/useAppTheme'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -77,6 +75,12 @@ const formatFileSize = (size?: number): string => {
 }
 
 const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+const LIVE_CALL_STATUSES = new Set([
+	'calling',
+	'ringing',
+	'connecting',
+	'connected',
+])
 
 const getAttachmentErrorMessage = (error: unknown): string => {
 	if (error instanceof ApiRequestError) {
@@ -126,9 +130,8 @@ export function ConversationPanel({
 	const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState('')
 	const [entryScrollReady, setEntryScrollReady] = useState(false)
 	const [uploadingAttachment, setUploadingAttachment] = useState(false)
-	const [editModalVisible, setEditModalVisible] = useState(false)
 	const [editingMessageId, setEditingMessageId] = useState('')
-	const [editDraft, setEditDraft] = useState('')
+	const [composerDraft, setComposerDraft] = useState('')
 	const [newIncomingCount, setNewIncomingCount] = useState(0)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
@@ -240,9 +243,9 @@ export function ConversationPanel({
 		chatId,
 		sendMessage,
 	})
-	const selectedMessage = useMemo(
-		() => messages.find(message => message.id === selectedMessageId),
-		[messages, selectedMessageId],
+	const editingMessage = useMemo(
+		() => messages.find(message => message.id === editingMessageId) ?? null,
+		[editingMessageId, messages],
 	)
 
 	useFocusEffect(
@@ -417,17 +420,20 @@ export function ConversationPanel({
 	}, [chatId, markConversationRead, messages.length])
 
 	useEffect(() => {
-		if (!editModalVisible || !editingMessageId) {
+		if (!editingMessageId) {
 			return
 		}
-		const exists = messages.some(message => message.id === editingMessageId)
-		if (exists) {
+		if (
+			editingMessage &&
+			editingMessage.type === 'text' &&
+			editingMessage.senderId === currentUser.id &&
+			!editingMessage.isDeleted
+		) {
 			return
 		}
-		setEditModalVisible(false)
 		setEditingMessageId('')
-		setEditDraft('')
-	}, [editModalVisible, editingMessageId, messages])
+		setComposerDraft('')
+	}, [currentUser.id, editingMessage, editingMessageId])
 
 	useEffect(() => {
 		if (!entryScrollReady) {
@@ -476,6 +482,23 @@ export function ConversationPanel({
 			}
 			const tag = target.tagName.toLowerCase()
 			return tag === 'input' || tag === 'textarea' || target.isContentEditable
+		}
+
+		const shouldSkipAndroidComposerLift = (event: KeyboardEvent): boolean => {
+			if (Platform.OS !== 'android') {
+				return false
+			}
+
+			const screenHeight = Dimensions.get('screen').height
+			const windowHeight = Dimensions.get('window').height
+			const keyboardHeight = event.endCoordinates?.height ?? 0
+			const windowInset = Math.max(0, screenHeight - windowHeight)
+
+			if (keyboardHeight <= 0) {
+				return windowInset > 80
+			}
+
+			return windowInset >= Math.max(80, keyboardHeight * 0.35)
 		}
 
 		const syncWebViewport = () => {
@@ -607,6 +630,15 @@ export function ConversationPanel({
 
 			keyboardVisibleRef.current = true
 			setComposerBottomInset(0)
+			const duration =
+				typeof event.duration === 'number' && event.duration > 0
+					? event.duration
+					: 220
+
+			if (shouldSkipAndroidComposerLift(event)) {
+				animateComposer(0, duration)
+				return
+			}
 
 			const keyboardTop =
 				event.endCoordinates?.screenY ??
@@ -620,10 +652,6 @@ export function ConversationPanel({
 						? currentBottom
 						: Math.max(currentBottom, baselineBottom)
 				const overlap = referenceBottom - keyboardTop
-				const duration =
-					typeof event.duration === 'number' && event.duration > 0
-						? event.duration
-						: 220
 				animateComposer(overlap > 0 ? -overlap : 0, duration)
 			})
 		}
@@ -686,35 +714,16 @@ export function ConversationPanel({
 	}, [insets.bottom])
 
 	useEffect(() => {
-		if (Platform.OS !== 'web' || typeof document === 'undefined') {
-			return
+		if (voiceRecorder.state.step === 'error' && voiceRecorder.state.errorMessage) {
+			toast.error('Voice recorder', voiceRecorder.state.errorMessage)
 		}
-		const docElement = document.documentElement
-		const body = document.body
-		const previousDocOverflow = docElement.style.overflow
-		const previousBodyOverflow = body.style.overflow
-		const previousDocOverscroll = docElement.style.overscrollBehavior
-		const previousBodyOverscroll = body.style.overscrollBehavior
+	}, [toast, voiceRecorder.state.errorMessage, voiceRecorder.state.step])
 
-		if (keyboardVisible) {
-			docElement.style.overflow = 'hidden'
-			body.style.overflow = 'hidden'
-			docElement.style.overscrollBehavior = 'none'
-			body.style.overscrollBehavior = 'none'
-		} else {
-			docElement.style.overflow = previousDocOverflow
-			body.style.overflow = previousBodyOverflow
-			docElement.style.overscrollBehavior = previousDocOverscroll
-			body.style.overscrollBehavior = previousBodyOverscroll
+	useEffect(() => {
+		if (videoRecorder.state.step === 'error' && videoRecorder.state.errorMessage) {
+			toast.error('Video recorder', videoRecorder.state.errorMessage)
 		}
-
-		return () => {
-			docElement.style.overflow = previousDocOverflow
-			body.style.overflow = previousBodyOverflow
-			docElement.style.overscrollBehavior = previousDocOverscroll
-			body.style.overscrollBehavior = previousBodyOverscroll
-		}
-	}, [keyboardVisible])
+	}, [toast, videoRecorder.state.errorMessage, videoRecorder.state.step])
 
 	if (!chat) {
 		return (
@@ -732,67 +741,109 @@ export function ConversationPanel({
 
 	const header = getChatTitleAvatar(chat, currentUser.id, users)
 
-	const openMessageActions = (message: ChatMessage) => {
-		setSelectedMessageId(message.id)
-		const runAction = (action: 'edit' | 'delete') => {
-			if (action === 'edit') {
-				if (message.senderId !== currentUser.id || message.isDeleted) {
-					toast.info(
-						'Edit restricted',
-						'Only your non-deleted messages can be edited.',
-					)
-					return
-				}
-				setEditingMessageId(message.id)
-				setEditDraft(message.body)
-				setEditModalVisible(true)
+	const canEditMessage = (message: ChatMessage): boolean =>
+		message.type === 'text' &&
+		!message.isDeleted &&
+		message.senderId === currentUser.id
+
+	const canDeleteMessage = (message: ChatMessage): boolean =>
+		(message.senderId === currentUser.id ||
+			currentUser.role === 'manager' ||
+			currentUser.role === 'ceo') &&
+		!message.isDeleted
+
+	const runMessageAction = (
+		message: ChatMessage,
+		action: 'edit' | 'delete',
+	) => {
+		if (action === 'edit') {
+			if (!canEditMessage(message)) {
+				toast.info(
+					'Edit restricted',
+					'Only your text messages can be edited.',
+				)
+				return
 			}
-			if (action === 'delete') {
-				if (
-					message.senderId !== currentUser.id &&
-					currentUser.role !== 'manager' &&
-					currentUser.role !== 'ceo'
-				) {
-					toast.error(
-						'Delete restricted',
-						'Only owners or managers can delete this message.',
-					)
-					return
-				}
-				if (editingMessageId === message.id) {
-					setEditModalVisible(false)
-					setEditingMessageId('')
-					setEditDraft('')
-				}
-				deleteMessage(chat.id, message.id)
-				toast.success('Message deleted')
-			}
+			setEditingMessageId(message.id)
+			setComposerDraft(message.body)
+			setSelectedMessageId('')
+			return
 		}
+		if (!canDeleteMessage(message)) {
+			toast.error(
+				'Delete restricted',
+				'Only owners or managers can delete this message.',
+			)
+			return
+		}
+		if (editingMessageId === message.id) {
+			setEditingMessageId('')
+			setComposerDraft('')
+		}
+		deleteMessage(chat.id, message.id)
+		toast.success('Message deleted')
+		setSelectedMessageId('')
+	}
+
+	const closeMessageActions = () => {
+		setSelectedMessageId('')
+	}
+
+	const openMessageActions = (message: ChatMessage) => {
+		if (Platform.OS === 'web') {
+			setSelectedMessageId(current =>
+				current === message.id ? '' : message.id,
+			)
+			return
+		}
+
+		const options: string[] = []
+		const handlers: ((() => void) | null)[] = []
+		const editAllowed = canEditMessage(message)
+		const deleteAllowed = canDeleteMessage(message)
+
+		if (editAllowed) {
+			options.push('Edit')
+			handlers.push(() => runMessageAction(message, 'edit'))
+		}
+		if (deleteAllowed) {
+			options.push('Delete')
+			handlers.push(() => runMessageAction(message, 'delete'))
+		}
+		options.push('Cancel')
+		handlers.push(null)
 
 		if (Platform.OS === 'ios') {
 			ActionSheetIOS.showActionSheetWithOptions(
 				{
-					options: ['Edit', 'Delete', 'Cancel'],
-					destructiveButtonIndex: 1,
-					cancelButtonIndex: 2,
+					options,
+					destructiveButtonIndex: deleteAllowed ? options.indexOf('Delete') : undefined,
+					cancelButtonIndex: options.length - 1,
 				},
 				index => {
-					if (index === 0) runAction('edit')
-					if (index === 1) runAction('delete')
+					handlers[index]?.()
 				},
 			)
 			return
 		}
 
-		Alert.alert('Message Actions', 'Choose an action', [
-			{ text: 'Edit', onPress: () => runAction('edit') },
-			{
-				text: 'Delete',
-				style: 'destructive',
-				onPress: () => runAction('delete'),
-			},
-			{ text: 'Cancel', style: 'cancel' },
-		])
+		const alertActions = options.map(option => {
+			if (option === 'Delete') {
+				return {
+					text: option,
+					style: 'destructive' as const,
+					onPress: () => runMessageAction(message, 'delete'),
+				}
+			}
+			if (option === 'Edit') {
+				return {
+					text: option,
+					onPress: () => runMessageAction(message, 'edit'),
+				}
+			}
+			return { text: option, style: 'cancel' as const }
+		})
+		Alert.alert('Message Actions', 'Choose an action', alertActions)
 	}
 
 	const typingMembers = users.filter(
@@ -827,9 +878,6 @@ export function ConversationPanel({
 			params: { chatId: chat.id },
 		})
 	}
-	const activeCallForConversation =
-		activeCall?.conversationId === chat.id &&
-		(activeCall.state === 'ringing' || activeCall.state === 'active')
 	const openCallSession = (callId: string) => {
 		router.push({
 			pathname: CALL_ROUTE_CONFIG.detailsPathname as never,
@@ -838,7 +886,18 @@ export function ConversationPanel({
 	}
 
 	const beginCall = (callType: CallType) => {
-		if (activeCallForConversation && activeCall) {
+		if (
+			activeCall &&
+			LIVE_CALL_STATUSES.has(activeCall.status) &&
+			activeCall.conversationId !== chat.id
+		) {
+			toast.info(
+				'Call already in progress',
+				'Finish the current call before starting a new one.',
+			)
+			return
+		}
+		if (activeCall && LIVE_CALL_STATUSES.has(activeCall.status)) {
 			openCallSession(activeCall.id)
 			return
 		}
@@ -957,18 +1016,6 @@ export function ConversationPanel({
 		videoRecorder.start().catch(() => undefined)
 	}
 
-	useEffect(() => {
-		if (voiceRecorder.state.step === 'error' && voiceRecorder.state.errorMessage) {
-			toast.error('Voice recorder', voiceRecorder.state.errorMessage)
-		}
-	}, [toast, voiceRecorder.state.errorMessage, voiceRecorder.state.step])
-
-	useEffect(() => {
-		if (videoRecorder.state.step === 'error' && videoRecorder.state.errorMessage) {
-			toast.error('Video recorder', videoRecorder.state.errorMessage)
-		}
-	}, [toast, videoRecorder.state.errorMessage, videoRecorder.state.step])
-
 	const handleComposerLayout = (event: LayoutChangeEvent) => {
 		const nextHeight = event.nativeEvent.layout.height
 		if (nextHeight !== composerHeight) {
@@ -987,28 +1034,15 @@ export function ConversationPanel({
 	const typingIndicatorReserve = typingMembers.length > 0 ? 44 : 0
 	const listBottomGap = (keyboardVisible ? 24 : 8) + typingIndicatorReserve
 	const activeMediaDraft = videoRecorder.draft ?? voiceRecorder.draft
+	const isEditingMessage = editingMessageId.length > 0
 	const composerLocked =
 		uploadingAttachment ||
 		mediaSender.isSending ||
 		voiceRecorder.isBusy ||
 		videoRecorder.isBusy
-	const closeEditModal = () => {
-		setEditModalVisible(false)
+	const cancelInlineEdit = () => {
 		setEditingMessageId('')
-		setEditDraft('')
-	}
-	const submitEdit = () => {
-		const nextText = editDraft.trim()
-		if (!editingMessageId) {
-			return
-		}
-		if (!nextText) {
-			toast.info('Edit restricted', 'Message text cannot be empty.')
-			return
-		}
-		editMessage(chat.id, editingMessageId, nextText).catch(() => undefined)
-		closeEditModal()
-		toast.success('Message updated')
+		setComposerDraft('')
 	}
 
 	return (
@@ -1153,10 +1187,19 @@ export function ConversationPanel({
 				style={{ flex: 1, backgroundColor: theme.colors.background }}
 				scrollEventThrottle={16}
 				keyboardShouldPersistTaps='handled'
-				keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+				keyboardDismissMode={
+					Platform.OS === 'ios'
+						? 'interactive'
+						: Platform.OS === 'web'
+							? 'none'
+							: 'on-drag'
+				}
 				onScroll={({ nativeEvent }) => {
 					if (ignoreNextScrollEventRef.current) {
 						return
+					}
+					if (selectedMessageId) {
+						setSelectedMessageId('')
 					}
 					const distanceFromBottom =
 						nativeEvent.contentSize.height -
@@ -1231,15 +1274,28 @@ export function ConversationPanel({
 							) : null}
 							<MessageBubble
 								message={item}
-								senderName={sender?.fullName ?? 'Unknown'}
+								senderName={
+									item.senderId === 'system' ? 'System' : (sender?.fullName ?? 'Unknown')
+								}
 								isMine={item.senderId === currentUser.id}
-								onLongPress={() => openMessageActions(item)}
+								onLongPress={
+									Platform.OS === 'web' ? undefined : () => openMessageActions(item)
+								}
+								onOpenActions={() => openMessageActions(item)}
+								showActionsTooltip={
+									Platform.OS === 'web' && selectedMessageId === item.id
+								}
+								canEdit={canEditMessage(item)}
+								canDelete={canDeleteMessage(item)}
+								onEdit={() => runMessageAction(item, 'edit')}
+								onDelete={() => runMessageAction(item, 'delete')}
+								onDismissActions={closeMessageActions}
 							/>
 						</View>
 					)
 				}}
 				onContentSizeChange={() => {
-					if (selectedMessage) {
+					if (selectedMessageId) {
 						setSelectedMessageId('')
 					}
 					if (isNearBottomRef.current) {
@@ -1270,43 +1326,67 @@ export function ConversationPanel({
 					keyboardVisible={keyboardVisible}
 					sendingLocked={composerLocked}
 					autoFocus={Platform.OS === 'web'}
-					focusSignal={chatId}
+					focusSignal={`${chatId}:${editingMessageId || 'new'}`}
+					draftValue={composerDraft}
+					onDraftChange={setComposerDraft}
+					editingLabel={isEditingMessage ? 'Editing message' : undefined}
+					onCancelEditing={cancelInlineEdit}
 					mediaActionsSlot={
-						<MediaMessageComposerActions
-							voiceDraft={voiceRecorder.draft}
-							videoDraft={videoRecorder.draft}
-							voiceRecording={voiceRecorder.isRecording}
-							voiceBusy={voiceRecorder.isBusy}
-							videoRecording={videoRecorder.isRecording}
-							videoNeedsStopAction={videoRecorder.needsStopAction}
-							videoBusy={videoRecorder.isBusy}
-							isSending={mediaSender.isSending}
-							sendErrorMessage={mediaSender.state.errorMessage}
-							onStartVoiceRecording={handleVoiceRecordPress}
-							onStopVoiceRecording={handleVoiceRecordPress}
-							onCancelVoiceRecording={() => {
-								voiceRecorder.cancel().catch(() => undefined)
-								mediaSender.reset()
-							}}
-							onStartVideoRecording={handleVideoRecordPress}
-							onStopVideoRecording={handleVideoRecordPress}
-							onCancelVideoRecording={() => {
-								videoRecorder.cancel().catch(() => undefined)
-								mediaSender.reset()
-							}}
-							onSendDraft={draft => {
-								sendMediaDraft(draft).catch(() => undefined)
-							}}
-							onDiscardDraft={() => {
-								voiceRecorder.reset()
-								videoRecorder.reset()
-								mediaSender.reset()
-							}}
-						/>
+						isEditingMessage ? null : (
+							<MediaMessageComposerActions
+								voiceDraft={voiceRecorder.draft}
+								videoDraft={videoRecorder.draft}
+								voiceRecording={voiceRecorder.isRecording}
+								voiceBusy={voiceRecorder.isBusy}
+								videoRecording={videoRecorder.isRecording}
+								videoNeedsStopAction={videoRecorder.needsStopAction}
+								videoBusy={videoRecorder.isBusy}
+								isSending={mediaSender.isSending}
+								sendErrorMessage={mediaSender.state.errorMessage}
+								onStartVoiceRecording={handleVoiceRecordPress}
+								onStopVoiceRecording={handleVoiceRecordPress}
+								onCancelVoiceRecording={() => {
+									voiceRecorder.cancel().catch(() => undefined)
+									mediaSender.reset()
+								}}
+								onStartVideoRecording={handleVideoRecordPress}
+								onStopVideoRecording={handleVideoRecordPress}
+								onCancelVideoRecording={() => {
+									videoRecorder.cancel().catch(() => undefined)
+									mediaSender.reset()
+								}}
+								onSendDraft={draft => {
+									sendMediaDraft(draft).catch(() => undefined)
+								}}
+								onDiscardDraft={() => {
+									voiceRecorder.reset()
+									videoRecorder.reset()
+									mediaSender.reset()
+								}}
+							/>
+						)
 					}
 					onTypingStart={() => sendTypingEvent(chat.id, true)}
 					onTypingStop={() => sendTypingEvent(chat.id, false)}
 					onSend={body => {
+						const nextText = body.trim()
+						if (!nextText) {
+							return
+						}
+						if (isEditingMessage) {
+							editMessage(chat.id, editingMessageId, nextText)
+								.then(() => {
+									toast.success('Message updated')
+									cancelInlineEdit()
+								})
+								.catch(error => {
+									toast.error(
+										'Unable to update message',
+										error instanceof Error ? error.message : 'Unexpected error',
+									)
+								})
+							return
+						}
 						if (activeMediaDraft) {
 							toast.info(
 								'Draft ready',
@@ -1316,7 +1396,7 @@ export function ConversationPanel({
 						}
 						sendMessage({
 							chatId: chat.id,
-							body,
+							body: nextText,
 							type: 'text',
 						}).catch(error => {
 							toast.error(
@@ -1326,7 +1406,13 @@ export function ConversationPanel({
 						})
 						isNearBottomRef.current = true
 					}}
-					onSendAttachment={handleAttachmentPick}
+					onSendAttachment={
+						isEditingMessage
+							? () => {
+								toast.info('Edit mode', 'Finish editing before sending files.')
+							}
+							: handleAttachmentPick
+					}
 				/>
 			</Animated.View>
 			{newIncomingCount > 0 ? (
@@ -1353,84 +1439,6 @@ export function ConversationPanel({
 					</Text>
 				</Pressable>
 			) : null}
-			<Modal
-				visible={editModalVisible}
-				transparent
-				animationType='fade'
-				onRequestClose={closeEditModal}
-			>
-				<View style={styles.editOverlay}>
-					<View
-						style={[
-							styles.editSheet,
-							{
-								backgroundColor: theme.colors.surface,
-								borderColor: theme.colors.border,
-							},
-						]}
-					>
-						<Text
-							style={[
-								styles.editTitle,
-								{ color: theme.colors.textPrimary },
-							]}
-						>
-							Edit message
-						</Text>
-						<TextInput
-							autoFocus
-							multiline
-							value={editDraft}
-							onChangeText={setEditDraft}
-							placeholder='Update message text'
-							placeholderTextColor={theme.colors.textMuted}
-							style={[
-								styles.editInput,
-								{
-									color: theme.colors.textPrimary,
-									borderColor: theme.colors.border,
-									backgroundColor: theme.colors.background,
-								},
-							]}
-						/>
-						<View style={styles.editActions}>
-							<Pressable
-								onPress={closeEditModal}
-								style={[
-									styles.editActionButton,
-									{
-										backgroundColor: theme.colors.surfaceMuted,
-										borderColor: theme.colors.border,
-									},
-								]}
-							>
-								<Text
-									style={[
-										styles.editActionText,
-										{ color: theme.colors.textSecondary },
-									]}
-								>
-									Cancel
-								</Text>
-							</Pressable>
-							<Pressable
-								onPress={submitEdit}
-								style={[
-									styles.editActionButton,
-									{
-										backgroundColor: theme.colors.accent,
-										borderColor: theme.colors.accent,
-									},
-								]}
-							>
-								<Text style={[styles.editActionText, { color: '#FFFFFF' }]}>
-									Save
-								</Text>
-							</Pressable>
-						</View>
-					</View>
-				</View>
-			</Modal>
 			{typingMembers.length > 0 ? (
 				<Animated.View
 					pointerEvents='none'
@@ -1553,52 +1561,6 @@ const styles = StyleSheet.create({
 	newMessagesFabText: {
 		color: '#FFFFFF',
 		fontSize: 12,
-		fontWeight: '700',
-	},
-	editOverlay: {
-		alignItems: 'center',
-		backgroundColor: 'rgba(0, 0, 0, 0.42)',
-		flex: 1,
-		justifyContent: 'center',
-		paddingHorizontal: 16,
-	},
-	editSheet: {
-		borderRadius: 14,
-		borderWidth: 1,
-		gap: 10,
-		maxWidth: 480,
-		padding: 14,
-		width: '100%',
-	},
-	editTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	editInput: {
-		borderRadius: 10,
-		borderWidth: 1,
-		fontSize: 15,
-		maxHeight: 220,
-		minHeight: 86,
-		paddingHorizontal: 10,
-		paddingVertical: 8,
-		textAlignVertical: 'top',
-	},
-	editActions: {
-		flexDirection: 'row',
-		gap: 10,
-		justifyContent: 'flex-end',
-	},
-	editActionButton: {
-		alignItems: 'center',
-		borderRadius: 10,
-		borderWidth: 1,
-		minWidth: 90,
-		paddingHorizontal: 14,
-		paddingVertical: 9,
-	},
-	editActionText: {
-		fontSize: 13,
 		fontWeight: '700',
 	},
 	emptyStateWrap: {

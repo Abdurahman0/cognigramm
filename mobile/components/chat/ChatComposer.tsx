@@ -19,6 +19,10 @@ interface ChatComposerProps {
 	sendingLocked?: boolean
 	autoFocus?: boolean
 	focusSignal?: string
+	draftValue?: string
+	onDraftChange?: (value: string) => void
+	editingLabel?: string
+	onCancelEditing?: () => void
 	mediaActionsSlot?: ReactNode
 	onTypingStart?: () => void
 	onTypingStop?: () => void
@@ -45,11 +49,29 @@ const emojiCatalog = [
 	'\u{23F0}',
 ]
 
+const isTouchWebDevice = (): boolean => {
+	if (Platform.OS !== 'web' || typeof window === 'undefined') {
+		return false
+	}
+
+	const coarsePointer =
+		typeof window.matchMedia === 'function' &&
+		window.matchMedia('(pointer: coarse)').matches
+	const maxTouchPoints =
+		typeof navigator !== 'undefined' ? navigator.maxTouchPoints : 0
+
+	return coarsePointer || maxTouchPoints > 0 || 'ontouchstart' in window
+}
+
 export function ChatComposer({
 	keyboardVisible = false,
 	sendingLocked = false,
 	autoFocus = false,
 	focusSignal = '',
+	draftValue,
+	onDraftChange,
+	editingLabel,
+	onCancelEditing,
 	mediaActionsSlot,
 	onTypingStart,
 	onTypingStop,
@@ -57,6 +79,7 @@ export function ChatComposer({
 	onSendAttachment,
 }: ChatComposerProps): JSX.Element {
 	const { theme } = useAppTheme()
+	const touchWebDevice = isTouchWebDevice()
 	const minInputHeight =
 		Platform.OS === 'ios' ? 22 : Platform.OS === 'web' ? 24 : 20
 	const TYPING_STOP_DELAY_MS = 0
@@ -109,7 +132,7 @@ export function ChatComposer({
 	)
 
 	useEffect(() => {
-		if (!autoFocus || Platform.OS !== 'web') {
+		if (!autoFocus || Platform.OS !== 'web' || touchWebDevice) {
 			return
 		}
 		const focusInput = () => {
@@ -121,10 +144,18 @@ export function ChatComposer({
 			cancelAnimationFrame(frame)
 			clearTimeout(timer)
 		}
-	}, [autoFocus, focusSignal])
+	}, [autoFocus, focusSignal, touchWebDevice])
+
+	useEffect(() => {
+		if (typeof draftValue !== 'string') {
+			return
+		}
+		setText(draftValue)
+	}, [draftValue])
 
 	const handleTextChange = (value: string) => {
 		setText(value)
+		onDraftChange?.(value)
 		if (value.trim().length === 0) {
 			stopTyping()
 			return
@@ -142,6 +173,7 @@ export function ChatComposer({
 		}
 		onSend(value)
 		setText('')
+		onDraftChange?.('')
 		setInputHeight(minInputHeight)
 		setEmojiPickerOpen(false)
 		stopTyping()
@@ -169,7 +201,11 @@ export function ChatComposer({
 	}
 
 	const appendEmoji = (emoji: string) => {
-		setText(current => `${current}${emoji}`)
+		setText(current => {
+			const next = `${current}${emoji}`
+			onDraftChange?.(next)
+			return next
+		})
 	}
 
 	return (
@@ -182,6 +218,19 @@ export function ChatComposer({
 				},
 			]}
 		>
+			{editingLabel ? (
+				<View style={[styles.editingBanner, { borderColor: theme.colors.border }]}>
+					<View style={styles.editingCopy}>
+						<Feather name='edit-3' size={12} color={theme.colors.accent} />
+						<Text style={[styles.editingText, { color: theme.colors.textSecondary }]}>
+							{editingLabel}
+						</Text>
+					</View>
+					<Pressable onPress={onCancelEditing} hitSlop={8} style={styles.cancelEditBtn}>
+						<Feather name='x' size={14} color={theme.colors.textMuted} />
+					</Pressable>
+				</View>
+			) : null}
 			{emojiPickerOpen ? (
 				<View
 					style={[
@@ -244,7 +293,7 @@ export function ChatComposer({
 				>
 					<TextInput
 						ref={inputRef}
-						autoFocus={autoFocus && Platform.OS === 'web'}
+						autoFocus={autoFocus && Platform.OS === 'web' && !touchWebDevice}
 						value={text}
 						onChangeText={handleTextChange}
 						placeholder='Type a message'
@@ -404,6 +453,30 @@ const styles = StyleSheet.create({
 	},
 	mediaActionsWrap: {
 		paddingHorizontal: 4,
+	},
+	editingBanner: {
+		alignItems: 'center',
+		borderRadius: 10,
+		borderWidth: 1,
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		minHeight: 34,
+		paddingHorizontal: 10,
+	},
+	editingCopy: {
+		alignItems: 'center',
+		flexDirection: 'row',
+		gap: 6,
+	},
+	editingText: {
+		fontSize: 12,
+		fontWeight: '600',
+	},
+	cancelEditBtn: {
+		alignItems: 'center',
+		height: 24,
+		justifyContent: 'center',
+		width: 24,
 	},
 	emojiButton: {
 		alignItems: 'center',

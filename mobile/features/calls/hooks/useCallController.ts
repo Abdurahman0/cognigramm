@@ -17,6 +17,7 @@ import { useCallsStore } from "@/store/callsStore";
 
 interface UseCallControllerOptions {
   callId?: string;
+  conversationId?: string;
 }
 
 const initialRuntimeState: CallRuntimeState = {
@@ -94,7 +95,7 @@ const terminalStatuses = new Set<CallStatus>([
 export const useCallController = (
   options: UseCallControllerOptions = {}
 ): UseCallControllerResult => {
-  const { callId } = options;
+  const { callId, conversationId } = options;
   const { requestForCallType } = useCallPermissions();
   const sessionUserId = useAuthStore((state) => state.session?.userId ?? "");
   const adapterRef = useRef(
@@ -124,13 +125,19 @@ export const useCallController = (
 
   const session = useMemo(() => {
     if (!callId) {
+      if (!currentCall) {
+        return null;
+      }
+      if (conversationId && currentCall.conversationId !== conversationId) {
+        return null;
+      }
       return currentCall;
     }
     if (currentCall?.id === callId) {
       return currentCall;
     }
     return history.find((row) => row.id === callId) ?? null;
-  }, [callId, currentCall, history]);
+  }, [callId, conversationId, currentCall, history]);
 
   const applyRuntimeError = useCallback((message: string) => {
     setRuntime((state) => ({
@@ -199,7 +206,7 @@ export const useCallController = (
         endTimeoutRef.current = null;
       }
     };
-  }, [session?.status]);
+  }, [session]);
 
   useEffect(() => {
     if (!session) {
@@ -227,7 +234,10 @@ export const useCallController = (
     if (!latestSignal) {
       return;
     }
-    if (session && latestSignal.callId !== session.id) {
+    if (!session) {
+      return;
+    }
+    if (latestSignal.callId !== session.id) {
       return;
     }
     adapterRef.current
@@ -244,8 +254,9 @@ export const useCallController = (
   }, [applyRuntimeError, clearLatestSignal, latestSignal, session]);
 
   useEffect(() => {
+    const adapter = adapterRef.current;
     return () => {
-      adapterRef.current.cleanup().catch(() => undefined);
+      adapter.cleanup().catch(() => undefined);
       if (endTimeoutRef.current) {
         clearTimeout(endTimeoutRef.current);
         endTimeoutRef.current = null;

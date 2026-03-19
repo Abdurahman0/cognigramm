@@ -1,6 +1,16 @@
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
-import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Image,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type GestureResponderEvent
+} from "react-native";
 
 import { VideoNoteBubble } from "@/features/chat/media-messages/components/VideoNoteBubble";
 import { VoiceMessageBubble } from "@/features/chat/media-messages/components/VoiceMessageBubble";
@@ -13,6 +23,13 @@ interface MessageBubbleProps {
   senderName: string;
   isMine: boolean;
   onLongPress?: () => void;
+  onOpenActions?: (event: GestureResponderEvent) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  onDismissActions?: () => void;
+  showActionsTooltip?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 const statusIcon: Record<ChatMessage["status"], keyof typeof Feather.glyphMap> = {
@@ -21,26 +38,94 @@ const statusIcon: Record<ChatMessage["status"], keyof typeof Feather.glyphMap> =
   delivered: "check-circle",
   seen: "eye"
 };
+const linkPattern = /((?:https?:\/\/|www\.)[^\s]+)/gi;
+
+interface TextSegment {
+  text: string;
+  url: string | null;
+}
+
+const buildTextSegments = (value: string): TextSegment[] => {
+  if (!value) {
+    return [{ text: "", url: null }];
+  }
+
+  const segments: TextSegment[] = [];
+  let lastIndex = 0;
+  let match = linkPattern.exec(value);
+
+  while (match) {
+    const startIndex = match.index ?? 0;
+    const raw = match[0];
+    if (startIndex > lastIndex) {
+      segments.push({
+        text: value.slice(lastIndex, startIndex),
+        url: null
+      });
+    }
+    const trimmedRaw = raw.replace(/[),.!?]+$/g, "");
+    const trailing = raw.slice(trimmedRaw.length);
+    const normalized =
+      trimmedRaw.startsWith("http://") || trimmedRaw.startsWith("https://")
+        ? trimmedRaw
+        : `https://${trimmedRaw}`;
+    segments.push({
+      text: trimmedRaw,
+      url: normalized
+    });
+    if (trailing) {
+      segments.push({
+        text: trailing,
+        url: null
+      });
+    }
+    lastIndex = startIndex + raw.length;
+    match = linkPattern.exec(value);
+  }
+
+  if (lastIndex < value.length) {
+    segments.push({
+      text: value.slice(lastIndex),
+      url: null
+    });
+  }
+
+  linkPattern.lastIndex = 0;
+  return segments.length > 0 ? segments : [{ text: value, url: null }];
+};
 
 export function MessageBubble({
   message,
   senderName,
   isMine,
-  onLongPress
+  onLongPress,
+  onOpenActions,
+  onEdit,
+  onDelete,
+  onDismissActions,
+  showActionsTooltip = false,
+  canEdit = false,
+  canDelete = false
 }: MessageBubbleProps): JSX.Element {
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const { theme } = useAppTheme();
   const bubbleColor = isMine ? theme.colors.messageMine : theme.colors.messageOther;
   const textColor = isMine ? "#FFFFFF" : theme.colors.textPrimary;
+  const metaColor = isMine ? "#DCE7FF" : theme.colors.textMuted;
   const attachmentUrl = message.attachment?.publicUrl ?? null;
   const mimeType = (message.attachment?.mimeType ?? "").toLowerCase();
   const isImageAttachment = mimeType.startsWith("image/") || message.type === "image";
+  const showWebActionsButton = Platform.OS === "web" && Boolean(onOpenActions);
 
   const openAttachment = (): void => {
     if (!attachmentUrl) {
       return;
     }
     Linking.openURL(attachmentUrl).catch(() => undefined);
+  };
+
+  const openLink = (url: string): void => {
+    Linking.openURL(url).catch(() => undefined);
   };
 
   const openImagePreview = (): void => {
@@ -50,11 +135,14 @@ export function MessageBubble({
     setImagePreviewVisible(true);
   };
 
+  const textSegments = buildTextSegments(message.body);
+
   return (
     <>
       <View style={[styles.row, { justifyContent: isMine ? "flex-end" : "flex-start" }]}>
         <Pressable
           onLongPress={onLongPress}
+          onPress={showActionsTooltip ? onDismissActions : undefined}
           style={[
             styles.bubble,
             {
@@ -64,9 +152,50 @@ export function MessageBubble({
             }
           ]}
         >
-          {!isMine ? <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderName}</Text> : null}
+          {!isMine || showWebActionsButton ? (
+            <View style={styles.topRow}>
+              {!isMine ? <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderName}</Text> : <View />}
+              {showWebActionsButton ? (
+                <Pressable
+                  onPress={onOpenActions}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.actionsButton, pressed && styles.actionsButtonPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open message actions"
+                >
+                  <Feather name="more-horizontal" size={14} color={metaColor} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+          {showWebActionsButton && showActionsTooltip && (canEdit || canDelete) ? (
+            <View style={[styles.tooltip, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+              {canEdit ? (
+                <Pressable
+                  onPress={onEdit}
+                  style={({ pressed }) => [
+                    styles.tooltipAction,
+                    pressed && { backgroundColor: theme.colors.surfaceMuted }
+                  ]}
+                >
+                  <Text style={[styles.tooltipActionText, { color: theme.colors.textPrimary }]}>Edit</Text>
+                </Pressable>
+              ) : null}
+              {canDelete ? (
+                <Pressable
+                  onPress={onDelete}
+                  style={({ pressed }) => [
+                    styles.tooltipAction,
+                    pressed && { backgroundColor: theme.colors.danger + "12" }
+                  ]}
+                >
+                  <Text style={[styles.tooltipActionText, { color: theme.colors.danger }]}>Delete</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           {message.isDeleted ? (
-            <Text style={[styles.deletedText, { color: isMine ? "#D7E2FF" : theme.colors.textMuted }]}>
+            <Text style={[styles.deletedText, { color: isMine ? "#D7E2FF" : metaColor }]}>
               This message was deleted
             </Text>
           ) : message.type === "voice" ? (
@@ -106,20 +235,38 @@ export function MessageBubble({
                   Download file
                 </Text>
               ) : (
-                <Text style={[styles.metaText, { color: isMine ? "#DCE7FF" : theme.colors.textMuted }]}>
+                <Text style={[styles.metaText, { color: metaColor }]}>
                   Unavailable attachment
                 </Text>
               )}
             </View>
           ) : (
-            <Text style={[styles.body, { color: textColor }]}>{message.body}</Text>
+            <Text style={[styles.body, { color: textColor }]}>
+              {textSegments.map((segment, index) =>
+                segment.url ? (
+                  <Text
+                    key={`link_${index}`}
+                    onPress={() => {
+                      if (segment.url) {
+                        openLink(segment.url);
+                      }
+                    }}
+                    style={[styles.linkText, { color: isMine ? "#FFFFFF" : theme.colors.accent }]}
+                  >
+                    {segment.text}
+                  </Text>
+                ) : (
+                  <Text key={`text_${index}`}>{segment.text}</Text>
+                )
+              )}
+            </Text>
           )}
           <View style={styles.metaRow}>
-            <Text style={[styles.metaText, { color: isMine ? "#DCE7FF" : theme.colors.textMuted }]}>
+            <Text style={[styles.metaText, { color: metaColor }]}>
               {formatMessageDate(message.createdAt)}
             </Text>
             {message.editedAt ? (
-              <Text style={[styles.metaText, { color: isMine ? "#DCE7FF" : theme.colors.textMuted }]}>edited</Text>
+              <Text style={[styles.metaText, { color: metaColor }]}>edited</Text>
             ) : null}
             {isMine ? <Feather name={statusIcon[message.status]} size={12} color="#DCE7FF" /> : null}
           </View>
@@ -165,10 +312,49 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600"
   },
+  topRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%"
+  },
+  actionsButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 22,
+    justifyContent: "center",
+    marginLeft: 8,
+    width: 22
+  },
+  actionsButtonPressed: {
+    opacity: 0.75
+  },
+  tooltip: {
+    borderRadius: 10,
+    borderWidth: 1,
+    minWidth: 110,
+    overflow: "hidden",
+    position: "absolute",
+    right: 4,
+    top: 34,
+    zIndex: 50
+  },
+  tooltipAction: {
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: 12
+  },
+  tooltipActionText: {
+    fontSize: 13,
+    fontWeight: "700"
+  },
   body: {
     flexShrink: 1,
     fontSize: 14,
     lineHeight: 19
+  },
+  linkText: {
+    textDecorationLine: "underline"
   },
   fileNameText: {
     flex: 1

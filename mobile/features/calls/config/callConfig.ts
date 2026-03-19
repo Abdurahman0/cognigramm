@@ -4,6 +4,7 @@ export const CALL_ROUTE_CONFIG = {
 } as const;
 
 export const CALL_TIMEOUTS_MS = {
+  incomingAutoDecline: 30_000,
   outgoingRing: 45_000,
   connecting: 20_000,
   endedDismiss: 1_500

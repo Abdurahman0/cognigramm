@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { mapApiCallToCallSession } from "@/services/api/adapters";
 import { callsApi, type ApiSocketEnvelope } from "@/services/api";
 import { signalingAdapter } from "@/features/calls/services/signalingAdapter";
+import { formatCallDuration, getCallDurationMs } from "@/features/calls/utils/formatCallDuration";
 import { mapBackendStateToStatus } from "@/features/calls/utils/statusMapper";
 import { callLogger } from "@/features/calls/utils/callLogger";
 import { useAuthStore } from "@/store/authStore";
@@ -42,6 +43,55 @@ const terminalStates = new Set<CallSession["status"]>([
   "failed",
   "missed"
 ]);
+
+const formatTerminalCallSummary = (session: CallSession): string => {
+  const callLabel = session.callType === "video" ? "Video call" : "Audio call";
+  if (session.status === "declined") {
+    return `${callLabel} declined`;
+  }
+  if (session.status === "missed") {
+    return `${callLabel} missed`;
+  }
+  if (session.status === "failed") {
+    return `${callLabel} failed`;
+  }
+
+  const durationMs = getCallDurationMs(session);
+  if (durationMs > 0) {
+    return `${callLabel} ended (${formatCallDuration(durationMs)})`;
+  }
+  return `${callLabel} ended`;
+};
+
+const appendCallSummaryToConversation = (session: CallSession): void => {
+  if (!terminalStates.has(session.status)) {
+    return;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const chatModule = require("@/store/chatStore") as {
+      useChatStore: {
+        getState: () => {
+          appendSystemMessage?: (payload: {
+            chatId: string;
+            body: string;
+            messageId?: string;
+            createdAt?: string;
+          }) => void;
+        };
+      };
+    };
+    chatModule.useChatStore.getState().appendSystemMessage?.({
+      chatId: session.conversationId,
+      body: formatTerminalCallSummary(session),
+      messageId: `call_summary_${session.id}_${session.status}`,
+      createdAt: session.endedAt ?? session.updatedAt
+    });
+  } catch (error) {
+    callLogger.warn("calls.appendCallSummary failed", error);
+  }
+};
 
 const parseNumericId = (value: string | number | null | undefined): number | null => {
   if (value == null) {
@@ -243,6 +293,13 @@ export const useCallsStore = create<CallsStore>((set, get) => ({
         state.currentCall?.id === callId ? "" : state.incomingFromUserId,
       lastError: ""
     }));
+    const declined =
+      get().currentCall?.id === callId
+        ? get().currentCall
+        : get().history.find((row) => row.id === callId) ?? null;
+    if (declined) {
+      appendCallSummaryToConversation(declined);
+    }
   },
   endCall: (callId) => {
     signalingAdapter.sendEndCall({ callId });
@@ -262,6 +319,13 @@ export const useCallsStore = create<CallsStore>((set, get) => ({
         state.currentCall?.id === callId ? "" : state.incomingFromUserId,
       lastError: ""
     }));
+    const ended =
+      get().currentCall?.id === callId
+        ? get().currentCall
+        : get().history.find((row) => row.id === callId) ?? null;
+    if (ended) {
+      appendCallSummaryToConversation(ended);
+    }
   },
   clearLatestSignal: () => {
     set({ latestSignal: null });
@@ -313,6 +377,7 @@ export const useCallsStore = create<CallsStore>((set, get) => ({
     }));
 
     if (terminalStates.has(incomingSession.status)) {
+      appendCallSummaryToConversation(incomingSession);
       get().refreshHistory().catch(() => undefined);
     }
   }

@@ -45,6 +45,7 @@ export default function ContactsScreen(): JSX.Element {
         <FlatList
           data={filteredUsers}
           keyExtractor={(item) => item.id}
+          style={styles.list}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
           ListEmptyComponent={
@@ -84,5 +85,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20
+  },
+  list: {
+    flex: 1
   }
 });

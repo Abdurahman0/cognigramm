@@ -48,8 +48,6 @@ export default function TabsLayout(): JSX.Element {
               ? "users"
               : route.name === "calls"
               ? "phone-call"
-              : route.name === "status"
-              ? "activity"
               : "user";
           return <Feather name={iconName} size={size} color={color} />;
         }
@@ -58,7 +56,6 @@ export default function TabsLayout(): JSX.Element {
       <Tabs.Screen name="chats" options={{ title: "Chats" }} />
       <Tabs.Screen name="contacts" options={{ title: "Directory" }} />
       <Tabs.Screen name="calls" options={{ title: "Calls" }} />
-      <Tabs.Screen name="status" options={{ title: "Status" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );

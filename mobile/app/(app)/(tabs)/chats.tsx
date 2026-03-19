@@ -79,6 +79,7 @@ export default function ChatsScreen(): JSX.Element {
     <FlatList
       data={filteredChats}
       keyExtractor={(item) => item.id}
+      style={styles.list}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -218,6 +219,9 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 8
+  },
+  list: {
+    flex: 1
   },
   desktopRoot: {
     flex: 1,

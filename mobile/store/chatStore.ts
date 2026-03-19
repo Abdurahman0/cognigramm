@@ -51,6 +51,13 @@ interface SendMessageInput {
 	preUploadedAttachment?: ApiMessageAttachmentIn
 }
 
+interface AppendSystemMessageInput {
+	chatId: string
+	body: string
+	messageId?: string
+	createdAt?: string
+}
+
 interface CreateGroupConversationInput {
 	title: string
 	memberIds: string[]
@@ -97,6 +104,7 @@ interface ChatStore extends PersistedFields {
 	setActiveConversationId: (chatId: string) => void
 	setAppVisibility: (visible: boolean) => void
 	handleSocketEvent: (envelope: ApiSocketEnvelope) => void
+	appendSystemMessage: (payload: AppendSystemMessageInput) => void
 	sendTypingEvent: (chatId: string, isTyping: boolean) => void
 	sendMessage: (payload: SendMessageInput) => Promise<void>
 	editMessage: (
@@ -1390,6 +1398,53 @@ export const useChatStore = create<ChatStore>()(
 							sharedFiles: nextState.sharedFiles,
 						})
 					}
+				},
+				appendSystemMessage: payload => {
+					const chatId = payload.chatId.trim()
+					const body = payload.body.trim()
+					if (!chatId || !body) {
+						return
+					}
+
+					const state = get()
+					const messageId = payload.messageId?.trim() || createId('sys')
+					const currentMessages = state.messagesByChat[chatId] ?? []
+					if (currentMessages.some(message => message.id === messageId)) {
+						return
+					}
+
+					const createdAt = payload.createdAt ?? new Date().toISOString()
+					const systemMessage: ChatMessage = {
+						id: messageId,
+						clientMessageId: messageId,
+						chatId,
+						senderId: 'system',
+						body,
+						type: 'system',
+						createdAt,
+						status: 'seen',
+						seenByIds: [],
+						deliveredToIds: [],
+					}
+
+					const nextMessages = sortMessages([...currentMessages, systemMessage])
+					const messagesByChat = {
+						...state.messagesByChat,
+						[chatId]: nextMessages,
+					}
+					const chats = sortChatsByLastActivity(
+						updateChatById(state.chats, chatId, chat => ({
+							...chat,
+							lastMessageId: systemMessage.id,
+						})),
+						messagesByChat,
+					)
+
+					set({
+						messagesByChat,
+						chats,
+						sharedFiles: deriveSharedFiles(messagesByChat),
+					})
 				},
 				sendTypingEvent: (chatId, isTyping) => {
 					const conversationId = parseNumericId(chatId)
