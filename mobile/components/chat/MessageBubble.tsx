@@ -45,6 +45,13 @@ interface TextSegment {
   url: string | null;
 }
 
+interface CallSummaryPresentation {
+  title: string;
+  subtitle: string;
+  icon: "phone" | "video";
+  tone: "neutral" | "danger";
+}
+
 const buildTextSegments = (value: string): TextSegment[] => {
   if (!value) {
     return [{ text: "", url: null }];
@@ -94,6 +101,61 @@ const buildTextSegments = (value: string): TextSegment[] => {
   return segments.length > 0 ? segments : [{ text: value, url: null }];
 };
 
+const getCallSummaryPresentation = (value: string): CallSummaryPresentation | null => {
+  const body = value.trim();
+  const lower = body.toLowerCase();
+  const isVideo = lower.includes("video call");
+  const isAudio = lower.includes("audio call");
+  if (!isVideo && !isAudio) {
+    return null;
+  }
+
+  const callLabel = isVideo ? "Video call" : "Audio call";
+  const icon: CallSummaryPresentation["icon"] = isVideo ? "video" : "phone";
+  const durationMatch = body.match(/\(([^)]+)\)\s*$/);
+  const duration = durationMatch?.[1] ?? "";
+
+  if (lower.includes("missed")) {
+    return {
+      title: `Missed ${callLabel.toLowerCase()}`,
+      subtitle: "No answer",
+      icon,
+      tone: "danger"
+    };
+  }
+  if (lower.includes("declined")) {
+    return {
+      title: `${callLabel} declined`,
+      subtitle: "Call was declined",
+      icon,
+      tone: "neutral"
+    };
+  }
+  if (lower.includes("failed")) {
+    return {
+      title: `${callLabel} failed`,
+      subtitle: "Connection issue",
+      icon,
+      tone: "danger"
+    };
+  }
+  if (lower.includes("ended")) {
+    return {
+      title: `${callLabel} ended`,
+      subtitle: duration ? `Duration ${duration}` : "Call finished",
+      icon,
+      tone: "neutral"
+    };
+  }
+
+  return {
+    title: callLabel,
+    subtitle: body,
+    icon,
+    tone: "neutral"
+  };
+};
+
 export function MessageBubble({
   message,
   senderName,
@@ -115,6 +177,7 @@ export function MessageBubble({
   const attachmentUrl = message.attachment?.publicUrl ?? null;
   const mimeType = (message.attachment?.mimeType ?? "").toLowerCase();
   const isImageAttachment = mimeType.startsWith("image/") || message.type === "image";
+  const callSummary = message.type === "system" ? getCallSummaryPresentation(message.body) : null;
   const showWebActionsButton = Platform.OS === "web" && Boolean(onOpenActions);
 
   const openAttachment = (): void => {
@@ -198,6 +261,55 @@ export function MessageBubble({
             <Text style={[styles.deletedText, { color: isMine ? "#D7E2FF" : metaColor }]}>
               This message was deleted
             </Text>
+          ) : callSummary ? (
+            <View
+              style={[
+                styles.callCard,
+                {
+                  backgroundColor: isMine ? "rgba(255,255,255,0.12)" : theme.colors.surfaceMuted,
+                  borderColor:
+                    callSummary.tone === "danger"
+                      ? isMine
+                        ? "rgba(255,130,130,0.65)"
+                        : `${theme.colors.danger}38`
+                      : isMine
+                        ? "rgba(255,255,255,0.24)"
+                        : theme.colors.border
+                }
+              ]}
+            >
+              <View
+                style={[
+                  styles.callIconWrap,
+                  {
+                    backgroundColor:
+                      callSummary.tone === "danger"
+                        ? isMine
+                          ? "rgba(255,130,130,0.25)"
+                          : `${theme.colors.danger}1A`
+                        : isMine
+                          ? "rgba(255,255,255,0.16)"
+                          : theme.colors.surface
+                  }
+                ]}
+              >
+                <Feather
+                  name={callSummary.icon}
+                  size={15}
+                  color={
+                    callSummary.tone === "danger"
+                      ? theme.colors.danger
+                      : isMine
+                        ? "#FFFFFF"
+                        : theme.colors.textPrimary
+                  }
+                />
+              </View>
+              <View style={styles.callCopy}>
+                <Text style={[styles.callTitle, { color: textColor }]}>{callSummary.title}</Text>
+                <Text style={[styles.callSubtitle, { color: metaColor }]}>{callSummary.subtitle}</Text>
+              </View>
+            </View>
           ) : message.type === "voice" ? (
             <VoiceMessageBubble
               message={message}
@@ -362,6 +474,34 @@ const styles = StyleSheet.create({
   deletedText: {
     fontSize: 13,
     fontStyle: "italic"
+  },
+  callCard: {
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 8
+  },
+  callIconWrap: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 28,
+    justifyContent: "center",
+    width: 28
+  },
+  callCopy: {
+    flex: 1,
+    gap: 1
+  },
+  callTitle: {
+    fontSize: 13,
+    fontWeight: "700"
+  },
+  callSubtitle: {
+    fontSize: 11,
+    fontWeight: "500"
   },
   imageWrap: {
     borderRadius: 10,

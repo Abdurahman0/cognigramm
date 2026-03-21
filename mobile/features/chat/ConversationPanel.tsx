@@ -40,6 +40,7 @@ import { ApiRequestError } from '@/services/api/httpClient'
 import { useCallsStore } from '@/store/callsStore'
 import { useChatStore } from '@/store/chatStore'
 import type { CallType, ChatMessage, ChatSummary } from '@/types'
+import { formatRelative } from '@/utils/date'
 import { useShallow } from 'zustand/react/shallow'
 
 interface ConversationPanelProps {
@@ -747,10 +748,7 @@ export function ConversationPanel({
 		message.senderId === currentUser.id
 
 	const canDeleteMessage = (message: ChatMessage): boolean =>
-		(message.senderId === currentUser.id ||
-			currentUser.role === 'manager' ||
-			currentUser.role === 'ceo') &&
-		!message.isDeleted
+		!message.isDeleted && message.senderId === currentUser.id
 
 	const runMessageAction = (
 		message: ChatMessage,
@@ -760,7 +758,7 @@ export function ConversationPanel({
 			if (!canEditMessage(message)) {
 				toast.info(
 					'Edit restricted',
-					'Only your text messages can be edited.',
+					'Only text messages can be edited.',
 				)
 				return
 			}
@@ -770,10 +768,7 @@ export function ConversationPanel({
 			return
 		}
 		if (!canDeleteMessage(message)) {
-			toast.error(
-				'Delete restricted',
-				'Only owners or managers can delete this message.',
-			)
+			toast.error('Delete restricted', 'This message cannot be deleted.')
 			return
 		}
 		if (editingMessageId === message.id) {
@@ -866,7 +861,15 @@ export function ConversationPanel({
 		chat.kind === 'direct'
 			? directPeer?.isOnline
 				? 'Online'
-				: 'Offline'
+				: directPeer?.lastSeenAt
+					? (() => {
+							try {
+								return `Last seen ${formatRelative(directPeer.lastSeenAt)}`
+							} catch {
+								return 'Offline'
+							}
+						})()
+					: 'Offline'
 			: `${chat.memberIds.length} members`
 	const unreadMarkerIndex =
 		entryUnreadCount > 0 && entryFirstUnreadMessageId
@@ -877,6 +880,21 @@ export function ConversationPanel({
 			pathname: '/(app)/chat-info/[chatId]',
 			params: { chatId: chat.id },
 		})
+	}
+	const refreshChatMessages = () => {
+		if (loadingOlder) {
+			return
+		}
+		loadOlderMessages(chat.id)
+			.then(() => {
+				toast.success('Chat refreshed')
+			})
+			.catch(error => {
+				toast.error(
+					'Unable to refresh chat',
+					error instanceof Error ? error.message : 'Unexpected error',
+				)
+			})
 	}
 	const openCallSession = (callId: string) => {
 		router.push({
@@ -1140,6 +1158,27 @@ export function ConversationPanel({
 				</View>
 				<View style={styles.headerActions}>
 					<Pressable
+						onPress={refreshChatMessages}
+						disabled={loadingOlder}
+						accessibilityRole='button'
+						accessibilityLabel='Refresh chat messages'
+						style={({ pressed }) => [
+							styles.actionButton,
+							{
+								opacity: loadingOlder ? 0.55 : 1,
+								backgroundColor: pressed
+									? theme.colors.accentMuted
+									: theme.colors.surfaceMuted,
+							},
+						]}
+					>
+						<Feather
+							name={loadingOlder ? 'loader' : 'refresh-cw'}
+							size={16}
+							color={theme.colors.textSecondary}
+						/>
+					</Pressable>
+					<Pressable
 						onPress={() => beginCall('audio')}
 						accessibilityRole='button'
 						accessibilityLabel='Start audio call'
@@ -1275,13 +1314,19 @@ export function ConversationPanel({
 							<MessageBubble
 								message={item}
 								senderName={
-									item.senderId === 'system' ? 'System' : (sender?.fullName ?? 'Unknown')
+									item.senderId === 'system'
+										? 'System'
+										: (sender?.fullName ?? 'Unknown')
 								}
 								isMine={item.senderId === currentUser.id}
 								onLongPress={
-									Platform.OS === 'web' ? undefined : () => openMessageActions(item)
+									Platform.OS === 'web' || !canDeleteMessage(item)
+										? undefined
+										: () => openMessageActions(item)
 								}
-								onOpenActions={() => openMessageActions(item)}
+								onOpenActions={
+									canDeleteMessage(item) ? () => openMessageActions(item) : undefined
+								}
 								showActionsTooltip={
 									Platform.OS === 'web' && selectedMessageId === item.id
 								}

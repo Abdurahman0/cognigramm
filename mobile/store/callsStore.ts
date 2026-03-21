@@ -76,6 +76,7 @@ const appendCallSummaryToConversation = (session: CallSession): void => {
           appendSystemMessage?: (payload: {
             chatId: string;
             body: string;
+            senderId?: string;
             messageId?: string;
             createdAt?: string;
           }) => void;
@@ -85,6 +86,7 @@ const appendCallSummaryToConversation = (session: CallSession): void => {
     chatModule.useChatStore.getState().appendSystemMessage?.({
       chatId: session.conversationId,
       body: formatTerminalCallSummary(session),
+      senderId: session.initiatorId,
       messageId: `call_summary_${session.id}_${session.status}`,
       createdAt: session.endedAt ?? session.updatedAt
     });

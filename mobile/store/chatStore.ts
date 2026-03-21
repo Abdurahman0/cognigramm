@@ -54,6 +54,7 @@ interface SendMessageInput {
 interface AppendSystemMessageInput {
 	chatId: string
 	body: string
+	senderId?: string
 	messageId?: string
 	createdAt?: string
 }
@@ -182,6 +183,128 @@ const parseNumericId = (
 		return null
 	}
 	return parsed
+}
+
+type CallSummaryStatus = 'ended' | 'missed' | 'declined' | 'failed'
+
+const parseCallSummaryBody = (
+	body: string,
+): { callType: 'audio' | 'video'; status: CallSummaryStatus; durationMs: number | null } | null => {
+	const normalized = body.trim().toLowerCase()
+	const callType = normalized.includes('video call')
+		? 'video'
+		: normalized.includes('audio call')
+			? 'audio'
+			: null
+	if (!callType) {
+		return null
+	}
+
+	const status: CallSummaryStatus = normalized.includes('missed')
+		? 'missed'
+		: normalized.includes('declined')
+			? 'declined'
+			: normalized.includes('failed')
+				? 'failed'
+				: 'ended'
+
+	const durationMatch = body.match(/\((\d{1,2}):(\d{2})\)/)
+	const durationMs =
+		durationMatch && durationMatch[1] && durationMatch[2]
+			? (Number(durationMatch[1]) * 60 + Number(durationMatch[2])) * 1000
+			: null
+
+	return {
+		callType,
+		status,
+		durationMs,
+	}
+}
+
+const getCallSessionDurationMs = (
+	startedAt?: string,
+	endedAt?: string,
+): number | null => {
+	if (!startedAt || !endedAt) {
+		return null
+	}
+	const startMs = new Date(startedAt).getTime()
+	const endMs = new Date(endedAt).getTime()
+	if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+		return null
+	}
+	return endMs - startMs
+}
+
+const resolveCallSummarySenderId = (
+	chatId: string,
+	mapped: ChatMessage,
+): string | null => {
+	if (mapped.senderId !== 'system' || mapped.type !== 'system') {
+		return null
+	}
+	const parsedSummary = parseCallSummaryBody(mapped.body)
+	if (!parsedSummary) {
+		return null
+	}
+
+	const messageTimeMs = new Date(mapped.createdAt).getTime()
+	if (!Number.isFinite(messageTimeMs)) {
+		return null
+	}
+
+	const bestMatch = useCallsStore
+		.getState()
+		.history.filter(call => {
+			if (call.conversationId !== chatId) {
+				return false
+			}
+			if (call.callType !== parsedSummary.callType) {
+				return false
+			}
+			if (call.status !== parsedSummary.status) {
+				return false
+			}
+
+			const anchor = call.endedAt ?? call.updatedAt ?? call.createdAt
+			const anchorMs = new Date(anchor).getTime()
+			if (!Number.isFinite(anchorMs)) {
+				return false
+			}
+			if (Math.abs(anchorMs - messageTimeMs) > 15 * 60 * 1000) {
+				return false
+			}
+
+			if (parsedSummary.status !== 'ended' || parsedSummary.durationMs == null) {
+				return true
+			}
+			const durationMs = getCallSessionDurationMs(call.startedAt, call.endedAt)
+			if (durationMs == null) {
+				return true
+			}
+			return Math.abs(durationMs - parsedSummary.durationMs) <= 2000
+		})
+		.sort((a, b) => {
+			const aAnchor = new Date(a.endedAt ?? a.updatedAt ?? a.createdAt).getTime()
+			const bAnchor = new Date(b.endedAt ?? b.updatedAt ?? b.createdAt).getTime()
+			return Math.abs(aAnchor - messageTimeMs) - Math.abs(bAnchor - messageTimeMs)
+		})[0]
+
+	return bestMatch?.initiatorId ?? null
+}
+
+const withResolvedSystemCallSender = (
+	chatId: string,
+	message: ChatMessage,
+): ChatMessage => {
+	const senderId = resolveCallSummarySenderId(chatId, message)
+	if (!senderId) {
+		return message
+	}
+	return {
+		...message,
+		senderId,
+	}
 }
 
 const sortMessages = (messages: ChatMessage[]): ChatMessage[] =>
@@ -417,7 +540,10 @@ const applyApiMessage = (
 	'messagesByChat' | 'chats' | 'sharedFiles' | 'unreadByChatId'
 > => {
 	const chatId = String(apiMessage.conversation_id)
-	const mapped = mapApiMessageToChatMessage(apiMessage)
+	const mapped = withResolvedSystemCallSender(
+		chatId,
+		mapApiMessageToChatMessage(apiMessage),
+	)
 	if (mapped.isDeleted) {
 		const existing = state.messagesByChat[chatId] ?? []
 		const nextMessages = existing.filter(message => {
@@ -655,6 +781,7 @@ export const useChatStore = create<ChatStore>()(
 					})
 
 					try {
+						await useCallsStore.getState().refreshHistory().catch(() => undefined)
 						const [apiSelf, apiUsers, onlineUserIds, apiConversations] =
 							await Promise.all([
 								usersApi.me(session.token),
@@ -707,7 +834,10 @@ export const useChatStore = create<ChatStore>()(
 								messagesByChat[row.conversationId] = []
 								return
 							}
-							const mappedLatest = mapApiMessageToChatMessage(row.latest)
+							const mappedLatest = withResolvedSystemCallSender(
+								row.conversationId,
+								mapApiMessageToChatMessage(row.latest),
+							)
 							messagesByChat[row.conversationId] = mappedLatest.isDeleted
 								? []
 								: [mappedLatest]
@@ -849,7 +979,10 @@ export const useChatStore = create<ChatStore>()(
 								if (!row.latest) {
 									return
 								}
-								const mappedLatest = mapApiMessageToChatMessage(row.latest)
+								const mappedLatest = withResolvedSystemCallSender(
+									row.conversationId,
+									mapApiMessageToChatMessage(row.latest),
+								)
 								messagesByChat[row.conversationId] = mappedLatest.isDeleted
 									? []
 									: [mappedLatest]
@@ -913,6 +1046,37 @@ export const useChatStore = create<ChatStore>()(
 						get()
 							.markConversationRead(normalizedChatId)
 							.catch(() => undefined)
+						const activeChat = state.chats.find(
+							chat => chat.id === normalizedChatId,
+						)
+						if (activeChat?.kind === 'direct') {
+							const currentUserId =
+								state.currentUserId || useAuthStore.getState().session?.userId
+							const peerId = activeChat.memberIds.find(
+								memberId => memberId !== currentUserId,
+							)
+							const numericPeerId = parseNumericId(peerId)
+							if (numericPeerId) {
+								presenceApi
+									.getUserPresence(token, numericPeerId)
+									.then(presence => {
+										const peerIdString = String(presence.user_id)
+										set(nextState => ({
+											users: nextState.users.map(user =>
+												user.id === peerIdString
+													? {
+															...user,
+															isOnline: presence.is_online,
+															lastSeenAt:
+																presence.last_seen ?? user.lastSeenAt,
+														}
+													: user,
+											),
+										}))
+									})
+									.catch(() => undefined)
+							}
+						}
 						const loadedLimit =
 							state.loadedMessageLimitByChat[normalizedChatId] ?? 0
 						const loadingOlder =
@@ -1418,7 +1582,7 @@ export const useChatStore = create<ChatStore>()(
 						id: messageId,
 						clientMessageId: messageId,
 						chatId,
-						senderId: 'system',
+						senderId: payload.senderId?.trim() || 'system',
 						body,
 						type: 'system',
 						createdAt,
@@ -1605,9 +1769,6 @@ export const useChatStore = create<ChatStore>()(
 				editMessage: async (chatId, messageId, content) => {
 					const { token } = withSession()
 					const numericMessageId = parseNumericId(messageId)
-					if (!numericMessageId) {
-						return
-					}
 
 					set(state => ({
 						messagesByChat: {
@@ -1624,6 +1785,10 @@ export const useChatStore = create<ChatStore>()(
 						},
 					}))
 
+					if (!numericMessageId) {
+						return
+					}
+
 					realtimeSocketClient.send('edit_message', {
 						message_id: numericMessageId,
 						content,
@@ -1635,9 +1800,6 @@ export const useChatStore = create<ChatStore>()(
 				deleteMessage: async (chatId, messageId) => {
 					const { token } = withSession()
 					const numericMessageId = parseNumericId(messageId)
-					if (!numericMessageId) {
-						return
-					}
 
 					set(state => {
 						const currentMessages = state.messagesByChat[chatId] ?? []
@@ -1661,6 +1823,10 @@ export const useChatStore = create<ChatStore>()(
 							sharedFiles: deriveSharedFiles(messagesByChat),
 						}
 					})
+
+					if (!numericMessageId) {
+						return
+					}
 
 					realtimeSocketClient.send('delete_message', {
 						message_id: numericMessageId,
@@ -1703,7 +1869,12 @@ export const useChatStore = create<ChatStore>()(
 							...get().messagesByChat,
 							[chatId]: sortMessages(
 								apiMessages
-									.map(mapApiMessageToChatMessage)
+									.map(message =>
+										withResolvedSystemCallSender(
+											chatId,
+											mapApiMessageToChatMessage(message),
+										),
+									)
 									.filter(message => !message.isDeleted),
 							),
 						}
