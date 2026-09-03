@@ -1,5 +1,6 @@
 import "react-native-reanimated";
 
+import { DarkTheme, DefaultTheme, ThemeProvider, type Theme } from "@react-navigation/native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -10,13 +11,38 @@ import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Toast from "react-native-toast-message";
 
+import { GlassBackdrop, toastConfig } from "@/components/ui";
 import { IncomingCallPrompt } from "@/features/calls/components/IncomingCallPrompt";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
 import { useAuthStore, useCallsStore, useChatStore, useSettingsStore } from "@/store";
+import { injectWebThemeStyles } from "@/theme/webStyles";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
-const WEB_SCROLLBAR_STYLE_ID = "messanger-web-scrollbar-theme";
+
+/**
+ * Navigators paint their own opaque background by default, which would cover the
+ * glass backdrop, so every navigation surface is transparent instead.
+ */
+const createNavigationTheme = (
+  isDark: boolean,
+  accent: string,
+  textPrimary: string,
+  border: string
+): Theme => {
+  const base = isDark ? DarkTheme : DefaultTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: accent,
+      background: "transparent",
+      card: "transparent",
+      text: textPrimary,
+      border
+    }
+  };
+};
 
 export default function RootLayout(): JSX.Element {
   const [queryClient] = useState(() => new QueryClient());
@@ -30,50 +56,15 @@ export default function RootLayout(): JSX.Element {
   const settingsHydrated = useSettingsStore((state) => state.hydrated);
 
   useEffect(() => {
-    SystemUI.setBackgroundColorAsync(theme.colors.background).catch(() => undefined);
+    SystemUI.setBackgroundColorAsync(theme.colors.backdropBase).catch(() => undefined);
     if (Platform.OS === "web" && typeof document !== "undefined") {
-      document.body.style.backgroundColor = theme.colors.background;
+      document.body.style.backgroundColor = theme.colors.backdropBase;
     }
-  }, [theme.colors.background]);
+  }, [theme.colors.backdropBase]);
 
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof document === "undefined") {
-      return;
-    }
-
-    let styleTag = document.getElementById(WEB_SCROLLBAR_STYLE_ID) as HTMLStyleElement | null;
-    if (!styleTag) {
-      styleTag = document.createElement("style");
-      styleTag.id = WEB_SCROLLBAR_STYLE_ID;
-      document.head.appendChild(styleTag);
-    }
-
-    styleTag.textContent = `
-      * {
-        scrollbar-width: thin;
-        scrollbar-color: ${theme.colors.textMuted} transparent;
-      }
-      *::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      *::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      *::-webkit-scrollbar-thumb {
-        background: ${theme.colors.textMuted};
-        border-radius: 999px;
-        border: 2px solid transparent;
-        background-clip: padding-box;
-        min-height: 28px;
-      }
-      *::-webkit-scrollbar-thumb:hover {
-        background: ${theme.colors.textSecondary};
-        border: 2px solid transparent;
-        background-clip: padding-box;
-      }
-    `;
-  }, [theme.colors.textMuted, theme.colors.textSecondary]);
+    injectWebThemeStyles(theme);
+  }, [theme]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -108,12 +99,20 @@ export default function RootLayout(): JSX.Element {
     initializeCalls().catch(() => undefined);
   }, [authHydrated, initializeCalls, session?.token]);
 
+  const navigationTheme = createNavigationTheme(
+    theme.mode === "dark",
+    theme.colors.accent,
+    theme.colors.textPrimary,
+    theme.colors.glassBorder
+  );
+
   const ready = authHydrated && chatHydrated && settingsHydrated;
 
   if (!ready) {
     return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.colors.background }}>
+      <GestureHandlerRootView style={styles.root}>
+        <GlassBackdrop />
+        <View style={styles.splash}>
           <ActivityIndicator size="large" color={theme.colors.accent} />
         </View>
       </GestureHandlerRootView>
@@ -121,18 +120,26 @@ export default function RootLayout(): JSX.Element {
   }
 
   return (
-    <GestureHandlerRootView style={[styles.root, { backgroundColor: theme.colors.background }]}>
+    <GestureHandlerRootView style={styles.root}>
+      <GlassBackdrop />
       <QueryClientProvider client={queryClient}>
-        <StatusBar style={theme.mode === "dark" ? "light" : "dark"} />
-        <View style={[styles.appFrame, Platform.OS === "web" && styles.webFrame]}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(auth)" />
-            <Stack.Screen name="(app)" />
-          </Stack>
-          <IncomingCallPrompt />
-          <Toast position="top" topOffset={52} />
-        </View>
+        <ThemeProvider value={navigationTheme}>
+          <StatusBar style={theme.mode === "dark" ? "light" : "dark"} />
+          <View style={styles.appFrame}>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "transparent" }
+              }}
+            >
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
+              <Stack.Screen name="(app)" />
+            </Stack>
+            <IncomingCallPrompt />
+            <Toast config={toastConfig} position="top" topOffset={52} />
+          </View>
+        </ThemeProvider>
       </QueryClientProvider>
     </GestureHandlerRootView>
   );
@@ -140,14 +147,16 @@ export default function RootLayout(): JSX.Element {
 
 const styles = StyleSheet.create({
   root: {
+    backgroundColor: "transparent",
     flex: 1
+  },
+  splash: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center"
   },
   appFrame: {
+    backgroundColor: "transparent",
     flex: 1
-  },
-  webFrame: {
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 480
   }
 });

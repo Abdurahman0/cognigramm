@@ -62,6 +62,30 @@ npm run build:android:aab
 npm run build:ios
 ```
 
+## Design system
+
+Dark and light glass UI shared by mobile and web.
+
+- `theme/colors.ts`: palette including backdrop blooms and translucent panel fills (`glass`, `glassStrong`, `glassSoft`, `glassBorder`)
+- `theme/tokens.ts`: spacing, radii, type scale, blur strengths, layout widths
+- `theme/webStyles.ts`: injects the CSS `backdrop-filter` rules that back `dataSet={{ glass: ... }}`
+- `components/ui/`: `GlassView`, `GlassBackdrop`, `IconButton`, `Badge`, `Chip`, `PresenceDot`, themed toasts
+- `components/layout/`: `AppShell` (desktop rail + glass window), `WorkspaceSidebar`, `NavRail`, `WorkspacePane`, `DetailScreenShell`, `GlassTabBar`
+
+Real backdrop blur is CSS-only, so native platforms fall back to layered translucency over the
+same animated backdrop.
+
+## Responsive layout
+
+`hooks/useResponsive.ts` drives every layout decision:
+
+- `< 768px`: single pane with the floating glass tab bar
+- `768–1079px`: single pane, wider gutters
+- `>= 1080px`: desktop shell - nav rail, workspace sidebar, list pane, detail pane
+
+The web build uses the full viewport (no mobile-width frame); the same components render the
+desktop shell on wide screens and the phone layout on narrow ones.
+
 ## Architecture
 
 - `app/`: Expo Router navigation and screens

@@ -209,17 +209,17 @@ export function ChatComposer({
 	}
 
 	return (
-		<View
-			style={[
-				styles.root,
-				{
-					borderTopColor: theme.colors.border,
-					backgroundColor: theme.colors.surface,
-				},
-			]}
-		>
+		<View style={styles.root}>
 			{editingLabel ? (
-				<View style={[styles.editingBanner, { borderColor: theme.colors.border }]}>
+				<View
+					style={[
+						styles.editingBanner,
+						{
+							borderColor: theme.colors.glassBorder,
+							backgroundColor: theme.colors.glassSoft,
+						},
+					]}
+				>
 					<View style={styles.editingCopy}>
 						<Feather name='edit-3' size={12} color={theme.colors.accent} />
 						<Text style={[styles.editingText, { color: theme.colors.textSecondary }]}>
@@ -233,11 +233,12 @@ export function ChatComposer({
 			) : null}
 			{emojiPickerOpen ? (
 				<View
+					{...(Platform.OS === 'web' ? { dataSet: { glass: 'soft' } } : null)}
 					style={[
 						styles.emojiPanel,
 						{
-							backgroundColor: theme.colors.surfaceMuted,
-							borderColor: theme.colors.border,
+							backgroundColor: theme.colors.glassSoft,
+							borderColor: theme.colors.glassBorder,
 						},
 					]}
 				>
@@ -249,7 +250,7 @@ export function ChatComposer({
 								styles.emojiButton,
 								{
 									backgroundColor: pressed
-										? theme.colors.surface
+										? theme.colors.glassHover
 										: 'transparent',
 								},
 							]}
@@ -262,14 +263,14 @@ export function ChatComposer({
 			{mediaActionsSlot ? <View style={styles.mediaActionsWrap}>{mediaActionsSlot}</View> : null}
 
 			<View
+				{...(Platform.OS === 'web' ? { dataSet: { glass: 'soft' } } : null)}
 				style={[
 					styles.composerShell,
 					keyboardVisible && styles.composerShellKeyboardOpen,
 					Platform.OS === 'web' && styles.composerShellWeb,
 					{
-						borderColor: theme.colors.border,
-						backgroundColor: theme.colors.surfaceMuted,
-						borderWidth: Platform.OS === 'web' ? 0 : 1,
+						borderColor: theme.colors.glassBorder,
+						backgroundColor: theme.colors.glassSoft,
 					},
 				]}
 			>
@@ -347,13 +348,21 @@ export function ChatComposer({
 							backgroundColor:
 								!sendingLocked && text.trim().length > 0
 									? theme.colors.accent
-									: theme.colors.textMuted,
+									: theme.colors.glassHover,
 						},
 						sendingLocked && styles.buttonDisabled,
 					]}
 					hitSlop={8}
 				>
-					<Feather name='send' size={17} color='#FFFFFF' />
+					<Feather
+						name='send'
+						size={17}
+						color={
+							!sendingLocked && text.trim().length > 0
+								? theme.colors.onAccent
+								: theme.colors.textMuted
+						}
+					/>
 				</Pressable>
 			</View>
 		</View>
@@ -362,18 +371,18 @@ export function ChatComposer({
 
 const styles = StyleSheet.create({
 	root: {
-		borderTopWidth: 1,
-		gap: 6,
+		backgroundColor: 'transparent',
+		gap: 8,
+		paddingBottom: 6,
 		paddingHorizontal: 12,
-		paddingTop: 6,
-		paddingBottom: 4,
+		paddingTop: 8,
 	},
 	composerShell: {
 		alignItems: 'flex-end',
-		borderRadius: 24,
+		borderRadius: 26,
 		borderWidth: 1,
 		flexDirection: 'row',
-		minHeight: 50,
+		minHeight: 52,
 		paddingLeft: 8,
 		paddingRight: 6,
 		paddingVertical: 6,
@@ -431,11 +440,11 @@ const styles = StyleSheet.create({
 	},
 	sendButton: {
 		alignItems: 'center',
-		borderRadius: 17,
-		height: 34,
+		borderRadius: 19,
+		height: 38,
 		justifyContent: 'center',
 		marginLeft: 6,
-		width: 34,
+		width: 38,
 	},
 	sendButtonKeyboardOpen: {
 		alignSelf: 'center',
@@ -444,7 +453,7 @@ const styles = StyleSheet.create({
 		opacity: 0.6,
 	},
 	emojiPanel: {
-		borderRadius: 12,
+		borderRadius: 18,
 		borderWidth: 1,
 		flexDirection: 'row',
 		flexWrap: 'wrap',
@@ -456,7 +465,7 @@ const styles = StyleSheet.create({
 	},
 	editingBanner: {
 		alignItems: 'center',
-		borderRadius: 10,
+		borderRadius: 14,
 		borderWidth: 1,
 		flexDirection: 'row',
 		justifyContent: 'space-between',

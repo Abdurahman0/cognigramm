@@ -5,13 +5,16 @@ import {
   type NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   type TextInputKeyPressEventData,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppButton, AppInput, ScreenContainer } from "@/components/common";
+import { AppButton, AppInput } from "@/components/common";
+import { GlassView } from "@/components/ui";
 import { RegisterFormValues, registerSchema } from "@/features/auth/schemas";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -63,122 +66,145 @@ export default function RegisterScreen(): JSX.Element {
   };
 
   return (
-    <ScreenContainer scroll padded>
-      <View style={styles.root}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Create Account</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-          Register your company profile for messaging and coordination.
-        </Text>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <GlassView tone="panel" radius={theme.radius.panel} highlight elevation="floating" style={styles.card}>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Create account</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Register your company profile for messaging and coordination.
+          </Text>
 
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="fullName"
-            render={({ field }) => (
-              <AppInput
-                placeholder="Full name"
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.fullName?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="email"
-            render={({ field }) => (
-              <AppInput
-                placeholder="Work email"
-                value={field.value}
-                onChangeText={field.onChange}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.email?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="department"
-            render={({ field }) => (
-              <AppInput
-                placeholder="Department"
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.department?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field }) => (
-              <AppInput
-                placeholder="Password"
-                secureTextEntry
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.password?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field }) => (
-              <AppInput
-                placeholder="Confirm password"
-                secureTextEntry
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.confirmPassword?.message}
-              />
-            )}
-          />
-          <AppButton label="Create account" onPress={submit} loading={status === "loading"} />
-        </View>
+          <View style={styles.form}>
+            <Controller
+              control={control}
+              name="fullName"
+              render={({ field }) => (
+                <AppInput
+                  label="Full name"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.fullName?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="email"
+              render={({ field }) => (
+                <AppInput
+                  label="Work email"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.email?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="department"
+              render={({ field }) => (
+                <AppInput
+                  label="Department"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.department?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="password"
+              render={({ field }) => (
+                <AppInput
+                  label="Password"
+                  secureTextEntry
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.password?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <AppInput
+                  label="Confirm password"
+                  secureTextEntry
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.confirmPassword?.message}
+                />
+              )}
+            />
+            <AppButton label="Create account" onPress={submit} loading={status === "loading"} />
+          </View>
 
-        <Pressable style={styles.signInWrap} onPress={() => router.replace("/(auth)/login")}>
-          <Text style={[styles.link, { color: theme.colors.accent }]}>Already have an account? Sign in</Text>
-        </Pressable>
-      </View>
-    </ScreenContainer>
+          <Pressable
+            accessibilityRole="link"
+            style={styles.linkWrap}
+            onPress={() => router.replace("/(auth)/login")}
+          >
+            <Text style={[styles.link, { color: theme.colors.accent }]}>Already have an account? Sign in</Text>
+          </Pressable>
+        </GlassView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1,
-    paddingVertical: 24
+    backgroundColor: "transparent",
+    flex: 1
+  },
+  scroll: {
+    alignItems: "center",
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: 20
+  },
+  card: {
+    gap: 6,
+    maxWidth: 460,
+    padding: 26,
+    width: "100%"
   },
   title: {
-    fontSize: 30,
-    fontWeight: "800"
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5
   },
   subtitle: {
     fontSize: 14,
-    marginTop: 8
+    lineHeight: 20
   },
   form: {
     gap: 12,
-    marginTop: 22
+    marginTop: 20
   },
-  signInWrap: {
+  linkWrap: {
     marginTop: 16
   },
   link: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     textAlign: "center"
   }
 });

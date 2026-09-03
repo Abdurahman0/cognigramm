@@ -11,7 +11,9 @@ import {
   View
 } from "react-native";
 
-import { EmptyState, ScreenContainer, SectionHeader } from "@/components/common";
+import { EmptyState, SectionHeader } from "@/components/common";
+import { DetailScreenShell } from "@/components/layout";
+import { Chip, IconButton } from "@/components/ui";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
@@ -129,59 +131,43 @@ export default function MediaScreen(): JSX.Element {
 
   if (!chatId || !chat) {
     return (
-      <ScreenContainer scroll padded={false}>
+      <DetailScreenShell>
         <View style={styles.page}>
           <SectionHeader
-            title="Shared Content"
+            title="Shared content"
             subtitle="Conversation"
             rightSlot={
-              <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-                <Feather name="x" size={20} color={theme.colors.textPrimary} />
-              </Pressable>
+              <IconButton icon="x" accessibilityLabel="Close" tone="plain" onPress={() => router.back()} />
             }
           />
           <EmptyState title="Conversation not found" description="Select a valid chat." icon="alert-circle" />
         </View>
-      </ScreenContainer>
+      </DetailScreenShell>
     );
   }
 
   return (
-    <ScreenContainer padded={false}>
-      <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+    <DetailScreenShell>
+      <View style={styles.header}>
         <SectionHeader
-          title="Shared Content"
+          title="Shared content"
           subtitle={chat.title}
           rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={theme.colors.textPrimary} />
-            </Pressable>
+            <IconButton icon="x" accessibilityLabel="Close" tone="plain" onPress={() => router.back()} />
           }
         />
       </View>
 
       <View style={styles.content}>
         <View style={styles.filters}>
-          {filterOptions.map((option) => {
-            const active = filter === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => setFilter(option.key)}
-                style={[
-                  styles.filterBtn,
-                  {
-                    borderColor: active ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: active ? theme.colors.accentMuted : theme.colors.surface
-                  }
-                ]}
-              >
-                <Text style={[styles.filterLabel, { color: active ? theme.colors.accent : theme.colors.textSecondary }]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {filterOptions.map((option) => (
+            <Chip
+              key={option.key}
+              label={option.label}
+              active={filter === option.key}
+              onPress={() => setFilter(option.key)}
+            />
+          ))}
         </View>
 
         <FlatList
@@ -202,10 +188,18 @@ export default function MediaScreen(): JSX.Element {
               item.kind === "media" ? "image" : item.kind === "link" ? "link" : Platform.OS === "web" ? "file-text" : "file";
             return (
               <Pressable
+                accessibilityRole="button"
                 onPress={() => openResource(item)}
-                style={[styles.row, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
+                style={({ pressed, hovered }) => [
+                  styles.row,
+                  {
+                    borderRadius: theme.radius.lg,
+                    backgroundColor: hovered ? theme.colors.glassHover : theme.colors.glassSoft,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
               >
-                <View style={[styles.rowIcon, { backgroundColor: theme.colors.surfaceMuted }]}>
+                <View style={[styles.rowIcon, { backgroundColor: theme.colors.glassHover }]}>
                   <Feather name={icon} size={16} color={theme.colors.textSecondary} />
                 </View>
                 <View style={styles.rowCopy}>
@@ -225,27 +219,20 @@ export default function MediaScreen(): JSX.Element {
           }}
         />
       </View>
-    </ScreenContainer>
+    </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
     gap: 14,
+    paddingBottom: 24,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 24
+    paddingTop: 14
   },
   header: {
-    borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12
-  },
-  closeBtn: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    width: 34
+    paddingTop: 14
   },
   content: {
     flex: 1,
@@ -258,35 +245,22 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8
   },
-  filterBtn: {
-    borderRadius: 999,
-    borderWidth: 1,
-    minHeight: 34,
-    paddingHorizontal: 10,
-    justifyContent: "center"
-  },
-  filterLabel: {
-    fontSize: 12,
-    fontWeight: "700"
-  },
   listContent: {
     flexGrow: 1,
     paddingBottom: 20
   },
   row: {
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: "row",
-    minHeight: 72,
-    paddingHorizontal: 12
+    minHeight: 74,
+    paddingHorizontal: 14
   },
   rowIcon: {
     alignItems: "center",
-    borderRadius: 10,
-    height: 34,
+    borderRadius: 12,
+    height: 38,
     justifyContent: "center",
-    width: 34
+    width: 38
   },
   rowCopy: {
     flex: 1,

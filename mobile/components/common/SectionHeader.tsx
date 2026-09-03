@@ -7,15 +7,23 @@ interface SectionHeaderProps {
   title: string;
   subtitle?: string;
   rightSlot?: ReactNode;
+  leftSlot?: ReactNode;
 }
 
-export function SectionHeader({ title, subtitle, rightSlot }: SectionHeaderProps): JSX.Element {
+export function SectionHeader({ title, subtitle, rightSlot, leftSlot }: SectionHeaderProps): JSX.Element {
   const { theme } = useAppTheme();
   return (
     <View style={styles.row}>
+      {leftSlot}
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
-        {subtitle ? <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{subtitle}</Text> : null}
+        <Text numberOfLines={1} style={[styles.title, { color: theme.colors.textPrimary }]}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text numberOfLines={1} style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
       {rightSlot}
     </View>
@@ -26,6 +34,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 10,
     justifyContent: "space-between"
   },
   content: {
@@ -33,8 +42,9 @@ const styles = StyleSheet.create({
     gap: 2
   },
   title: {
-    fontSize: 20,
-    fontWeight: "700"
+    fontSize: 21,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
   subtitle: {
     fontSize: 13

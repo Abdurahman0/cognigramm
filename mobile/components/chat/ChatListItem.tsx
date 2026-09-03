@@ -1,10 +1,13 @@
+import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { Badge } from "@/components/ui/Badge";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useChatStore } from "@/store/chatStore";
-import type { ChatMessage, ChatSummary, User } from "@/types";
+import { useSettingsStore } from "@/store/settingsStore";
+import type { ChatMessage, ChatSummary, DeliveryState, User } from "@/types";
 import { formatChatTimestamp } from "@/utils/date";
 import { resolveMessagePreview } from "@/utils/message";
 
@@ -14,6 +17,13 @@ interface ChatListItemProps {
   active?: boolean;
   onPress: () => void;
 }
+
+const STATUS_ICON: Record<DeliveryState, keyof typeof Feather.glyphMap> = {
+  sending: "clock",
+  sent: "check",
+  delivered: "check-circle",
+  seen: "eye"
+};
 
 const getDirectPeer = (chat: ChatSummary, users: User[], currentUserId: string): User | undefined => {
   if (chat.kind !== "direct") {
@@ -32,54 +42,81 @@ export function ChatListItem({
   const { theme } = useAppTheme();
   const currentUser = useCurrentUser();
   const users = useChatStore((state) => state.users);
+  const compactMode = useSettingsStore((state) => state.compactMode);
   const peer = getDirectPeer(chat, users, currentUser.id);
-  const preview = chat.typingUserIds.length > 0 ? "Typing..." : resolveMessagePreview(lastMessage);
+  const typing = chat.typingUserIds.length > 0;
+  const preview = typing ? "Typing…" : resolveMessagePreview(lastMessage);
   const timeLabel = lastMessage ? formatChatTimestamp(lastMessage.createdAt) : "";
+  const isOwnLastMessage = Boolean(lastMessage && lastMessage.senderId === currentUser.id);
+  const unread = chat.unreadCount > 0;
 
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
       onPress={onPress}
       style={({ pressed, hovered }) => [
         styles.root,
         {
-          borderColor: active ? theme.colors.accent : theme.colors.border,
-          backgroundColor: active ? theme.colors.accentMuted : hovered ? theme.colors.surfaceMuted : theme.colors.surface,
-          opacity: pressed ? 0.92 : 1
+          borderRadius: theme.radius.lg,
+          minHeight: compactMode ? 62 : 72,
+          paddingVertical: compactMode ? 8 : 11,
+          backgroundColor: active
+            ? theme.colors.accentMuted
+            : hovered
+            ? theme.colors.glassHover
+            : "transparent",
+          opacity: pressed ? 0.9 : 1
         }
       ]}
     >
       <Avatar
         uri={peer?.avatar ?? chat.avatar}
         name={peer?.fullName ?? chat.title}
+        size={compactMode ? 40 : 48}
+        shape={chat.kind === "group" ? "squircle" : "circle"}
         showOnlineDot={chat.kind === "direct"}
         isOnline={peer?.isOnline}
       />
       <View style={styles.body}>
         <View style={styles.topLine}>
-          <Text numberOfLines={1} style={[styles.title, { color: theme.colors.textPrimary }]}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.title,
+              { color: theme.colors.textPrimary, fontWeight: unread ? "700" : "600" }
+            ]}
+          >
             {chat.title}
           </Text>
-          <Text style={[styles.time, { color: theme.colors.textMuted }]}>{timeLabel}</Text>
+          <Text style={[styles.time, { color: unread ? theme.colors.accent : theme.colors.textMuted }]}>
+            {timeLabel}
+          </Text>
         </View>
         <View style={styles.bottomLine}>
+          {isOwnLastMessage && !typing && lastMessage ? (
+            <Feather
+              name={STATUS_ICON[lastMessage.status]}
+              size={13}
+              color={lastMessage.status === "seen" ? theme.colors.accent : theme.colors.textMuted}
+            />
+          ) : null}
           <Text
             numberOfLines={1}
             style={[
               styles.preview,
               {
-                color: chat.typingUserIds.length > 0 ? theme.colors.accent : theme.colors.textSecondary
+                color: typing
+                  ? theme.colors.online
+                  : unread
+                  ? theme.colors.textSecondary
+                  : theme.colors.textMuted
               }
             ]}
           >
             {preview}
           </Text>
-          <View style={styles.flags}>
-            {chat.unreadCount > 0 ? (
-              <View style={[styles.badge, { backgroundColor: theme.colors.accent }]}>
-                <Text style={styles.badgeText}>{chat.unreadCount > 9 ? "9+" : chat.unreadCount}</Text>
-              </View>
-            ) : null}
-          </View>
+          {unread ? <Badge count={chat.unreadCount} /> : null}
         </View>
       </View>
     </Pressable>
@@ -89,58 +126,36 @@ export function ChatListItem({
 const styles = StyleSheet.create({
   root: {
     alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
     flexDirection: "row",
-    gap: 10,
-    minHeight: 78,
-    paddingHorizontal: 12,
-    paddingVertical: 10
+    gap: 12,
+    paddingHorizontal: 12
   },
   body: {
     flex: 1,
-    gap: 5
+    gap: 4
   },
   topLine: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 8,
     justifyContent: "space-between"
   },
   title: {
     flex: 1,
     fontSize: 15,
-    fontWeight: "700",
-    marginRight: 8
+    letterSpacing: -0.1
   },
   time: {
-    fontSize: 12
+    fontSize: 11,
+    fontWeight: "600"
   },
   bottomLine: {
     alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between"
+    gap: 6
   },
   preview: {
     flex: 1,
-    fontSize: 13,
-    marginRight: 8
-  },
-  flags: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8
-  },
-  badge: {
-    alignItems: "center",
-    borderRadius: 999,
-    justifyContent: "center",
-    minWidth: 22,
-    paddingHorizontal: 6,
-    height: 22
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700"
+    fontSize: 13
   }
 });

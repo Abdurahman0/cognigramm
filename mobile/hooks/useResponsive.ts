@@ -1,16 +1,37 @@
 import { Platform, useWindowDimensions } from "react-native";
 
-export const useResponsive = () => {
+export const BREAKPOINTS = {
+  tablet: 768,
+  desktop: 1080,
+  wide: 1440
+} as const;
+
+export interface ResponsiveState {
+  width: number;
+  height: number;
+  isWeb: boolean;
+  /** Phone-sized viewport: single pane, floating tab bar. */
+  isCompact: boolean;
+  /** Tablet-sized viewport: single pane with wider gutters. */
+  isTablet: boolean;
+  /** Multi-pane layout: nav rail + sidebar + list + detail. */
+  isDesktop: boolean;
+  isWide: boolean;
+  isLandscape: boolean;
+}
+
+export const useResponsive = (): ResponsiveState => {
   const { width, height } = useWindowDimensions();
-  const isWeb = Platform.OS === "web";
-  const isTablet = !isWeb && width >= 768;
-  const isDesktop = !isWeb && width >= 1024;
-  const isWideDesktop = !isWeb && width >= 1280;
+  const isDesktop = width >= BREAKPOINTS.desktop;
+
   return {
     width,
     height,
-    isTablet,
+    isWeb: Platform.OS === "web",
+    isCompact: width < BREAKPOINTS.tablet,
+    isTablet: width >= BREAKPOINTS.tablet && !isDesktop,
     isDesktop,
-    isWideDesktop
+    isWide: width >= BREAKPOINTS.wide,
+    isLandscape: width > height
   };
 };

@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { Avatar } from "@/components/common/Avatar";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { User } from "@/types";
-import { Avatar } from "@/components/common/Avatar";
 
 interface UserCardProps {
   user: User;
@@ -14,28 +14,45 @@ interface UserCardProps {
 
 export function UserCard({ user, onPress, trailingLabel }: UserCardProps): JSX.Element {
   const { theme } = useAppTheme();
+
   return (
     <Pressable
-      style={({ pressed }) => [
+      accessibilityRole="button"
+      style={({ pressed, hovered }) => [
         styles.root,
         {
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radius.lg,
+          backgroundColor: hovered ? theme.colors.glassHover : theme.colors.glassSoft,
           opacity: pressed ? 0.9 : 1
         }
       ]}
       onPress={onPress}
     >
-      <Avatar uri={user.avatar} name={user.fullName} isOnline={user.isOnline} showOnlineDot size={42} />
+      <Avatar
+        uri={user.avatar}
+        name={user.fullName}
+        isOnline={user.isOnline}
+        showOnlineDot
+        size={44}
+      />
       <View style={styles.main}>
         <Text numberOfLines={1} style={[styles.name, { color: theme.colors.textPrimary }]}>
           {user.fullName}
         </Text>
         <Text numberOfLines={1} style={[styles.meta, { color: theme.colors.textMuted }]}>
-          {ROLE_LABELS[user.role]} - {user.department}
+          {ROLE_LABELS[user.role]} · {user.department}
         </Text>
       </View>
-      {trailingLabel ? <Text style={[styles.trailing, { color: theme.colors.accent }]}>{trailingLabel}</Text> : null}
+      {trailingLabel ? (
+        <Text
+          style={[
+            styles.trailing,
+            { color: user.isOnline ? theme.colors.online : theme.colors.textMuted }
+          ]}
+        >
+          {trailingLabel}
+        </Text>
+      ) : null}
       <Feather name="chevron-right" size={18} color={theme.colors.textMuted} />
     </Pressable>
   );
@@ -44,12 +61,10 @@ export function UserCard({ user, onPress, trailingLabel }: UserCardProps): JSX.E
 const styles = StyleSheet.create({
   root: {
     alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
     flexDirection: "row",
+    gap: 12,
     minHeight: 70,
-    paddingHorizontal: 12,
-    gap: 10
+    paddingHorizontal: 14
   },
   main: {
     flex: 1,

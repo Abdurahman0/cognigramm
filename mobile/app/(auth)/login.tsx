@@ -5,13 +5,16 @@ import {
   type NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   type TextInputKeyPressEventData,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppButton, AppInput, ScreenContainer } from "@/components/common";
+import { AppButton, AppInput } from "@/components/common";
+import { GlassView } from "@/components/ui";
 import { LoginFormValues, loginSchema } from "@/features/auth/schemas";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -55,83 +58,131 @@ export default function LoginScreen(): JSX.Element {
   };
 
   return (
-    <ScreenContainer scroll padded>
-      <View style={styles.root}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Sign In</Text>
-        <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-          Access your internal messaging workspace.
-        </Text>
+    <SafeAreaView edges={["top", "bottom"]} style={styles.root}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <GlassView tone="panel" radius={theme.radius.panel} highlight elevation="floating" style={styles.card}>
+          <View style={styles.brandRow}>
+            <View style={[styles.brandMark, { backgroundColor: theme.colors.accentMuted }]}>
+              <Text style={[styles.brandGlyph, { color: theme.colors.accent }]}>QQ</Text>
+            </View>
+            <Text style={[styles.brandName, { color: theme.colors.textMuted }]}>Qora Qarg&apos;a</Text>
+          </View>
 
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="email"
-            render={({ field }) => (
-              <AppInput
-                label="Work email"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.email?.message}
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field }) => (
-              <AppInput
-                label="Password"
-                secureTextEntry
-                value={field.value}
-                onChangeText={field.onChange}
-                onSubmitEditing={submit}
-                onKeyPress={handleWebEnterSubmit}
-                error={errors.password?.message}
-              />
-            )}
-          />
-          <AppButton label="Continue" onPress={submit} loading={status === "loading"} />
-        </View>
+          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Sign in</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+            Access your internal messaging workspace.
+          </Text>
 
-        <View style={styles.links}>
-          <Pressable onPress={() => router.push("/(auth)/register")}>
+          <View style={styles.form}>
+            <Controller
+              control={control}
+              name="email"
+              render={({ field }) => (
+                <AppInput
+                  label="Work email"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.email?.message}
+                />
+              )}
+            />
+            <Controller
+              control={control}
+              name="password"
+              render={({ field }) => (
+                <AppInput
+                  label="Password"
+                  secureTextEntry
+                  value={field.value}
+                  onChangeText={field.onChange}
+                  onSubmitEditing={submit}
+                  onKeyPress={handleWebEnterSubmit}
+                  error={errors.password?.message}
+                />
+              )}
+            />
+            <AppButton label="Continue" onPress={submit} loading={status === "loading"} />
+          </View>
+
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push("/(auth)/register")}
+            style={styles.linkWrap}
+          >
             <Text style={[styles.link, { color: theme.colors.accent }]}>Create account</Text>
           </Pressable>
-        </View>
-      </View>
-    </ScreenContainer>
+        </GlassView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    flex: 1,
+    backgroundColor: "transparent",
+    flex: 1
+  },
+  scroll: {
+    alignItems: "center",
+    flexGrow: 1,
     justifyContent: "center",
-    paddingVertical: 28
+    padding: 20
+  },
+  card: {
+    gap: 6,
+    maxWidth: 420,
+    padding: 26,
+    width: "100%"
+  },
+  brandRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 14
+  },
+  brandMark: {
+    alignItems: "center",
+    borderRadius: 14,
+    height: 40,
+    justifyContent: "center",
+    width: 40
+  },
+  brandGlyph: {
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  brandName: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.3
   },
   title: {
-    fontSize: 30,
-    fontWeight: "800"
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5
   },
   subtitle: {
     fontSize: 14,
-    marginTop: 8
+    lineHeight: 20
   },
   form: {
     gap: 14,
-    marginTop: 24
+    marginTop: 22
   },
-  links: {
-    gap: 10,
+  linkWrap: {
     marginTop: 18
   },
   link: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     textAlign: "center"
   }
 });

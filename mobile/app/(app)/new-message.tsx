@@ -1,16 +1,24 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppButton, Avatar, ScreenContainer, SearchBar, SectionHeader } from "@/components/common";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useAppToast } from "@/hooks/useAppToast";
+import { AppButton, AppInput, Avatar, EmptyState, SearchBar, SectionHeader } from "@/components/common";
+import { DetailScreenShell } from "@/components/layout";
+import { Chip, IconButton } from "@/components/ui";
+import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppToast } from "@/hooks/useAppToast";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useChatStore } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 
 type ComposeMode = "direct" | "group";
+
+const MODES: { key: ComposeMode; label: string }[] = [
+  { key: "direct", label: "Direct" },
+  { key: "group", label: "Group" }
+];
 
 export default function NewMessageScreen(): JSX.Element {
   const router = useRouter();
@@ -18,11 +26,13 @@ export default function NewMessageScreen(): JSX.Element {
   const toast = useAppToast();
   const currentUser = useCurrentUser();
 
-  const { users, startDirectConversation, createGroupConversation } = useChatStore(useShallow((state) => ({
-    users: state.users,
-    startDirectConversation: state.startDirectConversation,
-    createGroupConversation: state.createGroupConversation
-  })));
+  const { users, startDirectConversation, createGroupConversation } = useChatStore(
+    useShallow((state) => ({
+      users: state.users,
+      startDirectConversation: state.startDirectConversation,
+      createGroupConversation: state.createGroupConversation
+    }))
+  );
 
   const [mode, setMode] = useState<ComposeMode>("direct");
   const [query, setQuery] = useState("");
@@ -34,7 +44,9 @@ export default function NewMessageScreen(): JSX.Element {
     return users
       .filter((user) => user.id !== currentUser.id)
       .filter((user) => {
-        if (!normalized) return true;
+        if (!normalized) {
+          return true;
+        }
         return (
           user.fullName.toLowerCase().includes(normalized) ||
           user.department.toLowerCase().includes(normalized) ||
@@ -48,7 +60,9 @@ export default function NewMessageScreen(): JSX.Element {
       setSelectedIds([userId]);
       return;
     }
-    setSelectedIds((state) => (state.includes(userId) ? state.filter((id) => id !== userId) : [...state, userId]));
+    setSelectedIds((state) =>
+      state.includes(userId) ? state.filter((id) => id !== userId) : [...state, userId]
+    );
   };
 
   const handleCreate = async () => {
@@ -80,163 +94,146 @@ export default function NewMessageScreen(): JSX.Element {
   };
 
   return (
-    <ScreenContainer padded={false}>
-      <View style={[styles.header, { borderBottomColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-        <SectionHeader
-          title="New Conversation"
-          subtitle="Start direct chats or groups"
-          rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={theme.colors.textPrimary} />
-            </Pressable>
-          }
-        />
-      </View>
+    <DetailScreenShell maxWidth={720}>
+      <View style={styles.root}>
+        <View style={styles.header}>
+          <SectionHeader
+            title="New conversation"
+            subtitle={mode === "direct" ? "Message a colleague" : "Create a group space"}
+            rightSlot={
+              <IconButton icon="x" accessibilityLabel="Close" tone="plain" onPress={() => router.back()} />
+            }
+          />
+        </View>
 
-      <View style={styles.content}>
-        <View style={styles.modeTabs}>
-          {([
-            { key: "direct", label: "Direct" },
-            { key: "group", label: "Group" }
-          ] as const).map((item) => {
-            const active = mode === item.key;
-            return (
-              <Pressable
+        <View style={styles.controls}>
+          <View style={styles.modeRow}>
+            {MODES.map((item) => (
+              <Chip
                 key={item.key}
+                label={item.label}
+                active={mode === item.key}
                 onPress={() => {
                   setMode(item.key);
                   setSelectedIds([]);
                 }}
-                style={[
-                  styles.tabBtn,
-                  {
-                    backgroundColor: active ? theme.colors.accent : theme.colors.surface,
-                    borderColor: active ? theme.colors.accent : theme.colors.border
-                  }
-                ]}
-              >
-                <Text style={{ color: active ? "#FFFFFF" : theme.colors.textSecondary, fontWeight: "600", fontSize: 13 }}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              />
+            ))}
+          </View>
 
-        {mode !== "direct" ? (
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Group name"
-            placeholderTextColor={theme.colors.textMuted}
-            style={[
-              styles.titleInput,
-              Platform.OS === "web" ? styles.titleInputWeb : null,
-              {
-                color: theme.colors.textPrimary,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface
-              }
-            ]}
+          {mode === "group" ? (
+            <AppInput
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Group name"
+              accessibilityLabel="Group name"
+            />
+          ) : null}
+
+          <SearchBar
+            value={query}
+            onChangeText={setQuery}
+            onClear={() => setQuery("")}
+            placeholder="Search colleagues"
           />
-        ) : null}
-
-        <SearchBar value={query} onChangeText={setQuery} onClear={() => setQuery("")} placeholder="Search employees" />
+        </View>
 
         <FlatList
           data={candidates}
           keyExtractor={(item) => item.id}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <EmptyState title="No colleagues found" description="Try a different search term." icon="users" />
+          }
           renderItem={({ item }) => {
             const selected = selectedIds.includes(item.id);
             return (
               <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
                 onPress={() => toggleSelection(item.id)}
-                style={[
+                style={({ pressed, hovered }) => [
                   styles.row,
                   {
-                    borderColor: selected ? theme.colors.accent : theme.colors.border,
-                    backgroundColor: selected ? theme.colors.accentMuted : theme.colors.surface
+                    borderRadius: theme.radius.lg,
+                    backgroundColor: selected
+                      ? theme.colors.accentMuted
+                      : hovered
+                      ? theme.colors.glassHover
+                      : theme.colors.glassSoft,
+                    opacity: pressed ? 0.9 : 1
                   }
                 ]}
               >
-                <Avatar uri={item.avatar} name={item.fullName} size={42} showOnlineDot isOnline={item.isOnline} />
+                <Avatar uri={item.avatar} name={item.fullName} size={44} showOnlineDot isOnline={item.isOnline} />
                 <View style={styles.rowCopy}>
-                  <Text style={[styles.name, { color: theme.colors.textPrimary }]}>{item.fullName}</Text>
-                  <Text style={[styles.meta, { color: theme.colors.textMuted }]}>
-                    {item.role.toUpperCase()} - {item.department}
+                  <Text numberOfLines={1} style={[styles.name, { color: theme.colors.textPrimary }]}>
+                    {item.fullName}
+                  </Text>
+                  <Text numberOfLines={1} style={[styles.meta, { color: theme.colors.textMuted }]}>
+                    {ROLE_LABELS[item.role]} · {item.department}
                   </Text>
                 </View>
-                {selected ? <Feather name="check-circle" size={18} color={theme.colors.accent} /> : null}
+                {selected ? <Feather name="check-circle" size={19} color={theme.colors.accent} /> : null}
               </Pressable>
             );
           }}
-          contentContainerStyle={{ paddingBottom: 20 }}
         />
 
-        <AppButton
-          label={
-            mode === "direct" ? "Start chat" : `Create group (${selectedIds.length})`
-          }
-          onPress={handleCreate}
-        />
+        <View style={styles.footer}>
+          <AppButton
+            label={mode === "direct" ? "Start chat" : `Create group (${selectedIds.length})`}
+            onPress={() => {
+              handleCreate().catch(() => undefined);
+            }}
+          />
+        </View>
       </View>
-    </ScreenContainer>
+    </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1
+  },
   header: {
-    borderBottomWidth: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12
+    paddingTop: 14
   },
-  closeBtn: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    width: 34
-  },
-  content: {
-    flex: 1,
-    gap: 12,
+  controls: {
+    gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12
   },
-  modeTabs: {
+  modeRow: {
     flexDirection: "row",
     gap: 8
   },
-  tabBtn: {
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+  list: {
+    flex: 1,
+    marginTop: 10
   },
-  titleInput: {
-    borderRadius: 12,
-    borderWidth: 1,
-    fontSize: 15,
-    minHeight: 46,
+  listContent: {
+    paddingBottom: 12,
     paddingHorizontal: 12
   },
-  titleInputWeb: {
-    outlineStyle: "solid",
-    outlineWidth: 0,
-    outlineColor: "transparent"
+  separator: {
+    height: 8
   },
   row: {
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: "row",
-    minHeight: 68,
+    gap: 12,
+    minHeight: 70,
     paddingHorizontal: 12
   },
   rowCopy: {
     flex: 1,
-    gap: 4,
-    marginLeft: 10
+    gap: 3
   },
   name: {
     fontSize: 15,
@@ -244,5 +241,10 @@ const styles = StyleSheet.create({
   },
   meta: {
     fontSize: 12
+  },
+  footer: {
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8
   }
 });

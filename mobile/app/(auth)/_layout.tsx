@@ -14,6 +14,7 @@ export default function AuthLayout(): JSX.Element {
     <Stack
       screenOptions={{
         headerShown: false,
+        contentStyle: { backgroundColor: "transparent" },
         animation: Platform.OS === "ios" ? "default" : "ios_from_right",
         animationDuration: 200,
         gestureEnabled: true

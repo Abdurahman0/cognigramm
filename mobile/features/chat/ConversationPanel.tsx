@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
+import { IconButton } from '@/components/ui'
 import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
@@ -728,9 +729,7 @@ export function ConversationPanel({
 
 	if (!chat) {
 		return (
-			<View
-				style={[styles.emptyWrap, { backgroundColor: theme.colors.background }]}
-			>
+			<View style={styles.emptyWrap}>
 				<EmptyState
 					title='Conversation not found'
 					description='Select another chat from the list.'
@@ -1065,24 +1064,30 @@ export function ConversationPanel({
 
 	return (
 		<KeyboardAvoidingView
-			style={[styles.root, { backgroundColor: theme.colors.background }]}
+			style={styles.root}
 			enabled={Platform.OS === 'ios'}
 			behavior='padding'
 			keyboardVerticalOffset={0}
 			{...(shouldEnableSwipeBack ? swipeBackResponder.panHandlers : {})}
 		>
 			<View
+				{...(Platform.OS === 'web' ? { dataSet: { glass: 'strong' } } : null)}
 				style={[
 					styles.header,
 					{
-						backgroundColor: theme.colors.surface,
-						borderBottomColor: theme.colors.border,
+						backgroundColor: theme.colors.glassStrong,
+						borderBottomColor: theme.colors.glassBorder,
 					},
 				]}
 			>
 				<View style={styles.headerLeft}>
 					{compact ? (
-						<Pressable
+						<IconButton
+							icon='chevron-left'
+							accessibilityLabel='Back to conversations'
+							tone='plain'
+							size='md'
+							style={styles.backBtn}
 							onPress={() => {
 								if (Platform.OS === 'web') {
 									router.replace('/(app)/(tabs)/chats')
@@ -1090,15 +1095,7 @@ export function ConversationPanel({
 								}
 								router.back()
 							}}
-							style={styles.backBtn}
-							hitSlop={8}
-						>
-							<Feather
-								name='chevron-left'
-								size={20}
-								color={theme.colors.textPrimary}
-							/>
-						</Pressable>
+						/>
 					) : null}
 
 					<Pressable
@@ -1109,7 +1106,7 @@ export function ConversationPanel({
 							styles.headerTapTarget,
 							{
 								backgroundColor: pressed
-									? theme.colors.surfaceMuted
+									? theme.colors.glassHover
 									: 'transparent',
 							},
 						]}
@@ -1157,65 +1154,29 @@ export function ConversationPanel({
 					</Pressable>
 				</View>
 				<View style={styles.headerActions}>
-					<Pressable
-						onPress={refreshChatMessages}
-						disabled={loadingOlder}
-						accessibilityRole='button'
-						accessibilityLabel='Refresh chat messages'
-						style={({ pressed }) => [
-							styles.actionButton,
-							{
-								opacity: loadingOlder ? 0.55 : 1,
-								backgroundColor: pressed
-									? theme.colors.accentMuted
-									: theme.colors.surfaceMuted,
-							},
-						]}
-					>
-						<Feather
-							name={loadingOlder ? 'loader' : 'refresh-cw'}
-							size={16}
-							color={theme.colors.textSecondary}
+					{compact ? null : (
+						<IconButton
+							icon={loadingOlder ? 'loader' : 'refresh-cw'}
+							accessibilityLabel='Refresh chat messages'
+							disabled={loadingOlder}
+							onPress={refreshChatMessages}
 						/>
-					</Pressable>
-					<Pressable
-						onPress={() => beginCall('audio')}
-						accessibilityRole='button'
+					)}
+					<IconButton
+						icon='phone'
 						accessibilityLabel='Start audio call'
-						style={({ pressed }) => [
-							styles.actionButton,
-							{
-								backgroundColor: pressed
-									? theme.colors.accentMuted
-									: theme.colors.surfaceMuted,
-							},
-						]}
-					>
-						<Feather
-							name='phone'
-							size={16}
-							color={theme.colors.textSecondary}
-						/>
-					</Pressable>
-					<Pressable
-						onPress={() => beginCall('video')}
-						accessibilityRole='button'
+						onPress={() => beginCall('audio')}
+					/>
+					<IconButton
+						icon='video'
 						accessibilityLabel='Start video call'
-						style={({ pressed }) => [
-							styles.actionButton,
-							{
-								backgroundColor: pressed
-									? theme.colors.accentMuted
-									: theme.colors.surfaceMuted,
-							},
-						]}
-					>
-						<Feather
-							name='video'
-							size={16}
-							color={theme.colors.textSecondary}
-						/>
-					</Pressable>
+						onPress={() => beginCall('video')}
+					/>
+					<IconButton
+						icon='info'
+						accessibilityLabel='Open conversation details'
+						onPress={openChatInfo}
+					/>
 				</View>
 			</View>
 
@@ -1223,7 +1184,7 @@ export function ConversationPanel({
 				ref={listRef}
 				data={messages}
 				keyExtractor={item => item.id}
-				style={{ flex: 1, backgroundColor: theme.colors.background }}
+				style={styles.messagesList}
 				scrollEventThrottle={16}
 				keyboardShouldPersistTaps='handled'
 				keyboardDismissMode={
@@ -1249,13 +1210,7 @@ export function ConversationPanel({
 						setNewIncomingCount(0)
 					}
 				}}
-				contentContainerStyle={[
-					styles.messagesContainer,
-					{
-						backgroundColor: theme.colors.background,
-						paddingBottom: 8,
-					},
-				]}
+				contentContainerStyle={styles.messagesContainer}
 				ListFooterComponent={
 					<View
 						style={{
@@ -1285,6 +1240,9 @@ export function ConversationPanel({
 				}}
 				renderItem={({ item, index }) => {
 					const sender = users.find(user => user.id === item.senderId)
+					const previous = index > 0 ? messages[index - 1] : undefined
+					const showSender =
+						chat.kind === 'group' && previous?.senderId !== item.senderId
 					return (
 						<View>
 							{index === unreadMarkerIndex && entryUnreadCount > 0 ? (
@@ -1292,7 +1250,7 @@ export function ConversationPanel({
 									<View
 										style={[
 											styles.newMessagesLine,
-											{ backgroundColor: theme.colors.border },
+											{ backgroundColor: theme.colors.glassBorder },
 										]}
 									/>
 									<Text
@@ -1306,7 +1264,7 @@ export function ConversationPanel({
 									<View
 										style={[
 											styles.newMessagesLine,
-											{ backgroundColor: theme.colors.border },
+											{ backgroundColor: theme.colors.glassBorder },
 										]}
 									/>
 								</View>
@@ -1319,6 +1277,7 @@ export function ConversationPanel({
 										: (sender?.fullName ?? 'Unknown')
 								}
 								isMine={item.senderId === currentUser.id}
+								showSender={showSender}
 								onLongPress={
 									Platform.OS === 'web' || !canDeleteMessage(item)
 										? undefined
@@ -1358,10 +1317,12 @@ export function ConversationPanel({
 			<Animated.View
 				ref={composerRef}
 				onLayout={handleComposerLayout}
+				{...(Platform.OS === 'web' ? { dataSet: { glass: 'strong' } } : null)}
 				style={[
 					styles.composerDock,
 					{
-						backgroundColor: theme.colors.surface,
+						backgroundColor: theme.colors.glassStrong,
+						borderTopColor: theme.colors.glassBorder,
 						paddingBottom: composerBottomInset,
 						transform: [{ translateY: composerTranslateY }],
 					},
@@ -1504,14 +1465,16 @@ export function ConversationPanel({
 
 const styles = StyleSheet.create({
 	root: {
+		backgroundColor: 'transparent',
 		flex: 1,
 	},
 	header: {
 		alignItems: 'center',
-		borderBottomWidth: 1,
+		borderBottomWidth: StyleSheet.hairlineWidth * 2,
 		flexDirection: 'row',
+		gap: 8,
 		justifyContent: 'space-between',
-		minHeight: 66,
+		minHeight: 68,
 		paddingHorizontal: 12,
 	},
 	headerLeft: {
@@ -1521,12 +1484,12 @@ const styles = StyleSheet.create({
 	},
 	headerTapTarget: {
 		alignItems: 'center',
-		borderRadius: 12,
+		borderRadius: 16,
 		flex: 1,
 		flexDirection: 'row',
 		gap: 10,
-		minHeight: 46,
-		paddingHorizontal: 4,
+		minHeight: 48,
+		paddingHorizontal: 6,
 	},
 	headerCopy: {
 		flex: 1,
@@ -1534,6 +1497,7 @@ const styles = StyleSheet.create({
 	headerTitle: {
 		fontSize: 16,
 		fontWeight: '700',
+		letterSpacing: -0.1,
 	},
 	headerSubtitle: {
 		fontSize: 12,
@@ -1551,18 +1515,17 @@ const styles = StyleSheet.create({
 	headerActions: {
 		alignItems: 'center',
 		flexDirection: 'row',
-		gap: 8,
+		gap: 6,
 	},
-	actionButton: {
-		alignItems: 'center',
-		height: 32,
-		justifyContent: 'center',
-		width: 32,
+	messagesList: {
+		backgroundColor: 'transparent',
+		flex: 1,
 	},
 	messagesContainer: {
 		flexGrow: 1,
-		paddingHorizontal: 12,
-		paddingTop: 10,
+		paddingBottom: 8,
+		paddingHorizontal: 14,
+		paddingTop: 12,
 	},
 	newMessagesDivider: {
 		alignItems: 'center',
@@ -1581,6 +1544,7 @@ const styles = StyleSheet.create({
 		textTransform: 'uppercase',
 	},
 	composerDock: {
+		borderTopWidth: StyleSheet.hairlineWidth * 2,
 		bottom: 0,
 		left: 0,
 		position: 'absolute',
@@ -1594,7 +1558,7 @@ const styles = StyleSheet.create({
 	},
 	newMessagesFab: {
 		alignItems: 'center',
-		borderRadius: 18,
+		borderRadius: 999,
 		flexDirection: 'row',
 		gap: 4,
 		paddingHorizontal: 10,
@@ -1619,9 +1583,6 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 16,
 	},
 	backBtn: {
-		alignItems: 'center',
-		height: 34,
-		justifyContent: 'center',
-		width: 24,
+		marginRight: 2,
 	},
 })

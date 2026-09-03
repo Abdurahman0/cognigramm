@@ -92,8 +92,8 @@ export function MediaMessageComposerActions({
           style={[
             styles.previewRow,
             {
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surfaceMuted,
+              borderColor: theme.colors.glassBorder,
+              backgroundColor: theme.colors.glassSoft,
             },
           ]}
         >
@@ -102,8 +102,8 @@ export function MediaMessageComposerActions({
               style={[
                 styles.previewIcon,
                 {
-                  backgroundColor: theme.colors.surface,
-                  borderColor: theme.colors.border,
+                  backgroundColor: theme.colors.glassHover,
+                  borderColor: theme.colors.glassBorder,
                 },
               ]}
             >
@@ -128,7 +128,7 @@ export function MediaMessageComposerActions({
               onPress={isSending ? undefined : onDiscardDraft}
               style={[
                 styles.previewActionButton,
-                { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                { backgroundColor: theme.colors.glassHover, borderColor: theme.colors.glassBorder },
               ]}
             >
               <Feather name="x" size={16} color={theme.colors.textSecondary} />
@@ -151,8 +151,8 @@ export function MediaMessageComposerActions({
             style={[
               styles.recorderButton,
               {
-                borderColor: voiceRecording ? theme.colors.accent : theme.colors.border,
-                backgroundColor: voiceRecording ? theme.colors.accentMuted : theme.colors.surfaceMuted,
+                borderColor: voiceRecording ? theme.colors.accent : theme.colors.glassBorder,
+                backgroundColor: voiceRecording ? theme.colors.accentMuted : theme.colors.glassSoft,
               },
             ]}
           >
@@ -172,8 +172,8 @@ export function MediaMessageComposerActions({
             style={[
               styles.recorderButton,
               {
-                borderColor: videoRecording ? theme.colors.accent : theme.colors.border,
-                backgroundColor: videoRecording ? theme.colors.accentMuted : theme.colors.surfaceMuted,
+                borderColor: videoRecording ? theme.colors.accent : theme.colors.glassBorder,
+                backgroundColor: videoRecording ? theme.colors.accentMuted : theme.colors.glassSoft,
               },
             ]}
           >
@@ -191,7 +191,7 @@ export function MediaMessageComposerActions({
               onPress={voiceRecording ? onCancelVoiceRecording : onCancelVideoRecording}
               style={[
                 styles.cancelRecordingButton,
-                { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceMuted },
+                { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glassSoft },
               ]}
             >
               <Feather name="x" size={14} color={theme.colors.textSecondary} />

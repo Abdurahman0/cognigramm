@@ -6,8 +6,11 @@ import { useAuthStore } from "@/store/authStore";
 
 const isIOS = Platform.OS === "ios";
 
+const transparentContent = { backgroundColor: "transparent" } as const;
+
 const pushScreenOptions: NativeStackNavigationOptions = {
   presentation: "card",
+  contentStyle: transparentContent,
   animation: isIOS ? "default" : "ios_from_right",
   animationDuration: 220,
   gestureEnabled: true,
@@ -17,6 +20,7 @@ const pushScreenOptions: NativeStackNavigationOptions = {
 
 const modalScreenOptions: NativeStackNavigationOptions = {
   presentation: "modal",
+  contentStyle: transparentContent,
   animation: isIOS ? "default" : "fade_from_bottom",
   gestureEnabled: true
 };
@@ -29,7 +33,13 @@ export default function AppLayout(): JSX.Element {
   }
 
   return (
-    <Stack screenOptions={{ ...pushScreenOptions, headerShown: false }}>
+    <Stack
+      screenOptions={{
+        ...pushScreenOptions,
+        headerShown: false,
+        contentStyle: transparentContent
+      }}
+    >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="chat/[chatId]" options={pushScreenOptions} />
       <Stack.Screen name="chat-info/[chatId]" options={pushScreenOptions} />

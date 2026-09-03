@@ -1,16 +1,17 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
   Avatar,
   EmptyState,
-  ScreenContainer,
   SearchBar,
   SectionHeader,
   UserCard
 } from "@/components/common";
+import { DetailScreenShell } from "@/components/layout";
+import { GlassView, IconButton } from "@/components/ui";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppToast } from "@/hooks/useAppToast";
@@ -59,11 +60,15 @@ function QuickAction({ icon, label, active = false, onPress }: QuickActionProps)
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.quickAction,
         {
-          borderColor: active ? theme.colors.accent : theme.colors.border,
-          backgroundColor: active ? theme.colors.accentMuted : theme.colors.surface,
+          borderRadius: theme.radius.lg,
+          backgroundColor: active
+            ? theme.colors.accentMuted
+            : hovered
+            ? theme.colors.glassHover
+            : theme.colors.glassSoft,
           opacity: pressed ? 0.88 : 1
         }
       ]}
@@ -97,17 +102,27 @@ function InfoRow({ icon, label, value, onPress }: InfoRowProps): JSX.Element {
   );
 
   if (!onPress) {
-    return <View style={[styles.infoRow, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>{row}</View>;
+    return (
+      <View
+        style={[
+          styles.infoRow,
+          { borderRadius: theme.radius.lg, backgroundColor: theme.colors.glassSoft }
+        ]}
+      >
+        {row}
+      </View>
+    );
   }
 
   return (
     <Pressable
+      accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
+      style={({ pressed, hovered }) => [
         styles.infoRow,
         {
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
+          borderRadius: theme.radius.lg,
+          backgroundColor: hovered ? theme.colors.glassHover : theme.colors.glassSoft,
           opacity: pressed ? 0.9 : 1
         }
       ]}
@@ -203,20 +218,22 @@ export default function ChatInfoScreen(): JSX.Element {
       router.back();
     };
     return (
-      <ScreenContainer scroll padded={false}>
-        <View style={[styles.screen, isDesktop && styles.screenDesktop]}>
+      <DetailScreenShell>
+        <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
           <SectionHeader
-            title="Chat Info"
+            title="Chat info"
             subtitle="Details"
             rightSlot={
-              <Pressable onPress={handleClose} style={styles.headerIconBtn}>
-                <Feather name="x" size={20} color={theme.colors.textPrimary} />
-              </Pressable>
+              <IconButton icon="x" accessibilityLabel="Close details" tone="plain" onPress={handleClose} />
             }
           />
-          <EmptyState title="Conversation not found" description="Open a valid chat from your conversation list." icon="alert-circle" />
-        </View>
-      </ScreenContainer>
+          <EmptyState
+            title="Conversation not found"
+            description="Open a valid chat from your conversation list."
+            icon="alert-circle"
+          />
+        </ScrollView>
+      </DetailScreenShell>
     );
   }
 
@@ -277,20 +294,25 @@ export default function ChatInfoScreen(): JSX.Element {
     chat.kind === "direct" ? ["message", "files"] : ["message", "members", "files"];
 
   return (
-    <ScreenContainer scroll padded={false}>
-      <View style={[styles.screen, isDesktop && styles.screenDesktop]}>
+    <DetailScreenShell>
+      <ScrollView contentContainerStyle={styles.screen} showsVerticalScrollIndicator={false}>
         <SectionHeader
           title={kindTitleMap[chat.kind]}
           subtitle={heroTitle}
           rightSlot={
-            <Pressable onPress={handleClose} style={styles.headerIconBtn}>
-              <Feather name="x" size={20} color={theme.colors.textPrimary} />
-            </Pressable>
+            <IconButton icon="x" accessibilityLabel="Close details" tone="plain" onPress={handleClose} />
           }
         />
 
-        <View style={[styles.heroCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-          <Avatar uri={heroAvatar} name={heroTitle} size={90} showOnlineDot={chat.kind === "direct"} isOnline={directPeer?.isOnline} />
+        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.heroCard}>
+          <Avatar
+            uri={heroAvatar}
+            name={heroTitle}
+            size={92}
+            shape={chat.kind === "group" ? "squircle" : "circle"}
+            showOnlineDot={chat.kind === "direct"}
+            isOnline={directPeer?.isOnline}
+          />
           <View style={styles.heroContent}>
             <Text style={[styles.heroTitle, { color: theme.colors.textPrimary }]}>{heroTitle}</Text>
             <View style={styles.heroBadges}>
@@ -298,7 +320,7 @@ export default function ChatInfoScreen(): JSX.Element {
                 <Text style={[styles.badgeLabel, { color: theme.colors.accent }]}>{kindLabelMap[chat.kind]}</Text>
               </View>
               {chat.kind === "direct" ? (
-                <View style={[styles.badge, { backgroundColor: theme.colors.surfaceMuted }]}>
+                <View style={[styles.badge, { backgroundColor: theme.colors.glassSoft }]}>
                   <Text style={[styles.badgeLabel, { color: theme.colors.textSecondary }]}>
                     {PRESENCE_LABELS[directPeer?.presence ?? currentUser.presence]}
                   </Text>
@@ -311,7 +333,7 @@ export default function ChatInfoScreen(): JSX.Element {
             ) : null}
             <Text style={[styles.heroDescription, { color: theme.colors.textMuted }]}>{heroDescription}</Text>
           </View>
-        </View>
+        </GlassView>
 
         <View style={styles.quickActionsRow}>
           {quickActionOrder.map((actionId) => {
@@ -323,18 +345,22 @@ export default function ChatInfoScreen(): JSX.Element {
         </View>
 
         <View style={styles.metricsRow}>
-          <View style={[styles.metricCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{chat.memberIds.length}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>Members</Text>
-          </View>
-          <View style={[styles.metricCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{mediaCount}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>Media</Text>
-          </View>
-          <View style={[styles.metricCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{files.length + linksCount}</Text>
-            <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>Resources</Text>
-          </View>
+          {[
+            { label: "Members", value: chat.memberIds.length },
+            { label: "Media", value: mediaCount },
+            { label: "Resources", value: files.length + linksCount }
+          ].map((metric) => (
+            <GlassView
+              key={metric.label}
+              tone="soft"
+              radius={theme.radius.lg}
+              bordered={false}
+              style={styles.metricCard}
+            >
+              <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{metric.value}</Text>
+              <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>{metric.label}</Text>
+            </GlassView>
+          ))}
         </View>
 
         <View style={styles.section}>
@@ -406,35 +432,22 @@ export default function ChatInfoScreen(): JSX.Element {
             onPress={openMediaScreen}
           />
         </View>
-      </View>
-    </ScreenContainer>
+      </ScrollView>
+    </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     gap: 14,
+    paddingBottom: 28,
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 26
-  },
-  screenDesktop: {
-    alignSelf: "center",
-    width: "100%",
-    maxWidth: 860
-  },
-  headerIconBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    width: 34,
-    height: 34
+    paddingTop: 14
   },
   heroCard: {
-    borderRadius: 18,
-    borderWidth: 1,
     flexDirection: "row",
-    gap: 14,
-    padding: 14
+    gap: 16,
+    padding: 18
   },
   heroContent: {
     flex: 1,
@@ -477,9 +490,7 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    minHeight: 68,
+    minHeight: 72,
     minWidth: 72,
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -497,9 +508,7 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 82,
+    minHeight: 86,
     alignItems: "center",
     justifyContent: "center",
     gap: 3
@@ -532,12 +541,10 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     alignItems: "center",
-    borderRadius: 14,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 60,
-    paddingHorizontal: 12
+    minHeight: 62,
+    paddingHorizontal: 14
   },
   rowIcon: {
     alignItems: "center",

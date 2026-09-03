@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/common";
+import { GlassView } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { CallRuntimeState, CallType } from "@/features/calls/types";
 
@@ -63,13 +64,16 @@ interface CallMediaViewportProps {
   peerName: string;
   peerAvatar?: string;
   runtime: CallRuntimeState;
+  /** Status or duration line shown under the peer name while there is no remote video. */
+  caption?: string;
 }
 
 export function CallMediaViewport({
   callType,
   peerName,
   peerAvatar,
-  runtime
+  runtime,
+  caption
 }: CallMediaViewportProps): JSX.Element {
   const { theme } = useAppTheme();
   const showVideoLayout = callType === "video";
@@ -130,103 +134,111 @@ export function CallMediaViewport({
     objectFit: "cover"
   };
 
+  const placeholderCaption = showVideoLayout
+    ? isWeb
+      ? canRenderWebVideo
+        ? "Waiting for remote video…"
+        : "This browser cannot render live video."
+      : canRenderNativeRtcVideo
+      ? "Waiting for remote video…"
+      : "Video renderer unavailable in this build."
+    : "Audio call";
+
+  const hero = (
+    <View style={styles.centeredContent}>
+      <Avatar uri={peerAvatar} name={peerName} size={132} shape="squircle" />
+      <Text style={[styles.peerName, { color: theme.colors.textPrimary }]}>{peerName}</Text>
+      <Text style={[styles.peerMeta, { color: theme.colors.textMuted }]}>
+        {caption ?? placeholderCaption}
+      </Text>
+    </View>
+  );
+
   return (
     <View style={styles.root}>
       {shouldRenderWebAudio ? <audio autoPlay playsInline ref={remoteAudioRef} /> : null}
-      <View style={[styles.remotePane, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+      <GlassView
+        tone="soft"
+        radius={theme.radius.xxl}
+        bordered={false}
+        style={styles.remotePane}
+      >
         {showVideoLayout ? (
           isWeb && remoteHasVideo && remoteWebStream && canRenderWebVideo ? (
             <video autoPlay playsInline ref={remoteVideoRef} style={webVideoStyle} />
           ) : !isWeb && remoteHasVideo && remoteStreamUrl && canRenderNativeRtcVideo && RtcView ? (
             <RtcView streamURL={remoteStreamUrl} objectFit="cover" style={styles.rtcView} />
           ) : (
-            <View style={styles.centeredContent}>
-              <Avatar uri={peerAvatar} name={peerName} size={74} />
-              <Text style={[styles.peerName, { color: theme.colors.textPrimary }]}>{peerName}</Text>
-              <Text style={[styles.peerMeta, { color: theme.colors.textMuted }]}>
-                {isWeb
-                  ? canRenderWebVideo
-                    ? "Waiting for remote video..."
-                    : "This browser cannot render live video."
-                  : canRenderNativeRtcVideo
-                  ? "Waiting for remote video..."
-                  : "Video renderer unavailable in this build."}
-              </Text>
-            </View>
+            hero
           )
         ) : (
-          <View style={styles.centeredContent}>
-            <Avatar uri={peerAvatar} name={peerName} size={74} />
-            <Text style={[styles.peerName, { color: theme.colors.textPrimary }]}>{peerName}</Text>
-            <Text style={[styles.peerMeta, { color: theme.colors.textMuted }]}>
-              Audio call
-            </Text>
-          </View>
+          hero
         )}
-      </View>
 
-      {showVideoLayout ? (
-        <View style={[styles.localPreview, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          {isWeb && localPreviewEnabled && localWebStream && canRenderWebVideo ? (
-            <video autoPlay muted playsInline ref={localVideoRef} style={webVideoStyle} />
-          ) : !isWeb && localPreviewEnabled && localStreamUrl && canRenderNativeRtcVideo && RtcView ? (
-            <RtcView streamURL={localStreamUrl} mirror objectFit="cover" style={styles.rtcView} />
-          ) : (
-            <View style={styles.localPreviewPlaceholder}>
-              <Feather
-                name={isWeb ? (canRenderWebVideo ? "video-off" : "alert-triangle") : canRenderNativeRtcVideo ? "video-off" : "alert-triangle"}
-                size={16}
-                color={theme.colors.textMuted}
-              />
-              <Text style={[styles.localPreviewText, { color: theme.colors.textMuted }]}>
-                {isWeb
-                  ? canRenderWebVideo
-                    ? "Camera off"
-                    : "Renderer unavailable"
-                  : canRenderNativeRtcVideo
-                  ? "Camera off"
-                  : "Renderer unavailable"}
-              </Text>
-            </View>
-          )}
-        </View>
-      ) : null}
+        {showVideoLayout ? (
+          <GlassView
+            tone="strong"
+            radius={theme.radius.lg}
+            elevation="soft"
+            style={styles.localPreview}
+          >
+            {isWeb && localPreviewEnabled && localWebStream && canRenderWebVideo ? (
+              <video autoPlay muted playsInline ref={localVideoRef} style={webVideoStyle} />
+            ) : !isWeb && localPreviewEnabled && localStreamUrl && canRenderNativeRtcVideo && RtcView ? (
+              <RtcView streamURL={localStreamUrl} mirror objectFit="cover" style={styles.rtcView} />
+            ) : (
+              <View style={styles.localPreviewPlaceholder}>
+                <Feather
+                  name={canRenderWebVideo || canRenderNativeRtcVideo ? "video-off" : "alert-triangle"}
+                  size={16}
+                  color={theme.colors.textMuted}
+                />
+                <Text style={[styles.localPreviewText, { color: theme.colors.textMuted }]}>
+                  {canRenderWebVideo || canRenderNativeRtcVideo ? "Camera off" : "Renderer unavailable"}
+                </Text>
+              </View>
+            )}
+          </GlassView>
+        ) : null}
+      </GlassView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
-    gap: 10
+    flex: 1,
+    minHeight: 280
   },
   remotePane: {
-    borderRadius: 14,
-    borderWidth: 1,
-    minHeight: 260,
+    flex: 1,
+    justifyContent: "center",
     overflow: "hidden"
   },
   centeredContent: {
     alignItems: "center",
+    flex: 1,
     justifyContent: "center",
-    minHeight: 260,
-    paddingHorizontal: 16
+    paddingHorizontal: 20,
+    paddingVertical: 28
   },
   peerName: {
-    fontSize: 17,
+    fontSize: 22,
     fontWeight: "800",
-    marginTop: 12
+    letterSpacing: -0.3,
+    marginTop: 18
   },
   peerMeta: {
-    fontSize: 12,
-    marginTop: 4
+    fontSize: 13,
+    marginTop: 6
   },
   localPreview: {
-    alignSelf: "flex-end",
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 112,
-    width: 150,
-    overflow: "hidden"
+    bottom: 14,
+    height: 116,
+    overflow: "hidden",
+    position: "absolute",
+    right: 14,
+    width: 158
   },
   rtcView: {
     height: "100%",
@@ -234,8 +246,8 @@ const styles = StyleSheet.create({
   },
   localPreviewPlaceholder: {
     alignItems: "center",
-    justifyContent: "center",
     height: "100%",
+    justifyContent: "center",
     width: "100%"
   },
   localPreviewText: {

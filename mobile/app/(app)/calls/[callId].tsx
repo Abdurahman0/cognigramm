@@ -1,15 +1,11 @@
-import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View
-} from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { EmptyState, ScreenContainer, SectionHeader } from "@/components/common";
+import { EmptyState } from "@/components/common";
+import { AppShell, WorkspacePane } from "@/components/layout";
+import { GlassView, IconButton } from "@/components/ui";
 import {
   CallControls,
   CallMediaViewport,
@@ -17,12 +13,13 @@ import {
   getCallDurationMs,
   useCallController
 } from "@/features/calls";
+import { ChatListPane } from "@/features/chat/ChatListPane";
 import { CALL_STATUS_LABELS, CALL_TYPE_LABELS } from "@/constants/calls";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppToast } from "@/hooks/useAppToast";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useChatStore } from "@/store/chatStore";
-import { formatMessageDate } from "@/utils/date";
 
 const isTerminalStatus = new Set(["ended", "failed", "declined", "missed"]);
 
@@ -30,6 +27,7 @@ export default function CallDetailsScreen(): JSX.Element {
   const router = useRouter();
   const toast = useAppToast();
   const { theme } = useAppTheme();
+  const { isDesktop } = useResponsive();
   const currentUser = useCurrentUser();
   const { callId, autoAccept } = useLocalSearchParams<{
     callId: string;
@@ -39,6 +37,7 @@ export default function CallDetailsScreen(): JSX.Element {
   const endedRedirectedRef = useRef("");
   const chats = useChatStore((state) => state.chats);
   const users = useChatStore((state) => state.users);
+  const setDesktopChat = useChatStore((state) => state.setActiveDesktopChatId);
   const [durationTickMs, setDurationTickMs] = useState(() => Date.now());
 
   const {
@@ -123,11 +122,16 @@ export default function CallDetailsScreen(): JSX.Element {
     }
 
     endedRedirectedRef.current = session.id;
+    if (isDesktop) {
+      setDesktopChat(session.conversationId);
+      router.replace("/(app)/(tabs)/chats");
+      return;
+    }
     router.replace({
       pathname: "/(app)/chat/[chatId]" as never,
       params: { chatId: session.conversationId } as never
     });
-  }, [router, session]);
+  }, [isDesktop, router, session, setDesktopChat]);
 
   useEffect(() => {
     if (!session || session.status !== "connected" || session.endedAt) {
@@ -141,101 +145,128 @@ export default function CallDetailsScreen(): JSX.Element {
     };
   }, [session, session?.endedAt, session?.id, session?.status]);
 
-  if (!callId) {
+  const closeStage = () => {
+    if (isDesktop) {
+      router.replace("/(app)/(tabs)/chats");
+      return;
+    }
+    router.back();
+  };
+
+  const openChatFromList = (chatId: string) => {
+    setDesktopChat(chatId);
+    router.replace("/(app)/(tabs)/chats");
+  };
+
+  const withShell = (content: JSX.Element): JSX.Element => {
+    if (!isDesktop) {
+      return (
+        <SafeAreaView edges={["top", "bottom"]} style={styles.mobileRoot}>
+          {content}
+        </SafeAreaView>
+      );
+    }
+
     return (
-      <ScreenContainer scroll padded={false}>
-        <View style={styles.page}>
-          <EmptyState title="Call not found" description="Select a valid call session." icon="phone-missed" />
+      <AppShell>
+        <View style={styles.desktopRoot}>
+          <WorkspacePane width={theme.layout.listPaneWidth}>
+            <ChatListPane onSelectChat={openChatFromList} />
+          </WorkspacePane>
+          <WorkspacePane>{content}</WorkspacePane>
         </View>
-      </ScreenContainer>
+      </AppShell>
+    );
+  };
+
+  if (!callId) {
+    return withShell(
+      <View style={styles.centered}>
+        <EmptyState title="Call not found" description="Select a valid call session." icon="phone-missed" />
+      </View>
     );
   }
 
   if (!session) {
-    return (
-      <ScreenContainer scroll padded={false}>
-        <View style={styles.page}>
-          <SectionHeader
-            title="Call"
-            subtitle={callId}
-            rightSlot={
-              <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-                <Feather name="x" size={20} color={theme.colors.textPrimary} />
-              </Pressable>
-            }
-          />
-          <EmptyState title="Loading call" description="Fetching the latest call session..." icon="loader" />
-        </View>
-      </ScreenContainer>
+    return withShell(
+      <View style={styles.centered}>
+        <EmptyState title="Loading call" description="Fetching the latest call session…" icon="loader" />
+      </View>
     );
   }
 
-  const title = conversationTitle || peer?.fullName || "Call Session";
+  const title = peer?.fullName || conversationTitle || "Call session";
   const statusLabel = CALL_STATUS_LABELS[runtime.status];
   const isIncoming = session.direction === "incoming" || incomingFromUserId.length > 0;
-  const showConnecting = runtime.status === "connecting";
-  const terminal = isTerminalStatus.has(runtime.status);
-  const callUpdatedAt = formatMessageDate(session.updatedAt);
   const durationMs = getCallDurationMs(session, durationTickMs);
   const durationLabel = durationMs > 0 ? formatCallDuration(durationMs) : "";
+  const caption = durationLabel || statusLabel;
 
-  return (
-    <ScreenContainer scroll padded={false}>
-      <View style={styles.page}>
-        <SectionHeader
-          title="Call Session"
-          subtitle={title}
-          rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={theme.colors.textPrimary} />
-            </Pressable>
+  return withShell(
+    <View style={styles.stage}>
+      <View style={styles.stageHeader}>
+        <IconButton
+          icon="chevron-left"
+          accessibilityLabel="Leave call view"
+          tone="plain"
+          onPress={closeStage}
+        />
+        <View style={styles.stageHeaderCopy}>
+          <Text numberOfLines={1} style={[styles.stageTitle, { color: theme.colors.textPrimary }]}>
+            {title}
+          </Text>
+          <Text numberOfLines={1} style={[styles.stageMeta, { color: theme.colors.textMuted }]}>
+            {CALL_TYPE_LABELS[session.callType]} call · {statusLabel}
+            {durationLabel ? ` · ${durationLabel}` : ""}
+          </Text>
+        </View>
+        <IconButton
+          icon="user-plus"
+          accessibilityLabel="Open conversation details"
+          onPress={() =>
+            router.push({
+              pathname: "/(app)/chat-info/[chatId]" as never,
+              params: { chatId: session.conversationId } as never
+            })
           }
         />
+      </View>
 
-        <View style={[styles.summaryCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-          <View style={[styles.summaryIcon, { backgroundColor: theme.colors.accentMuted }]}>
-            <Feather name={session.callType === "video" ? "video" : "phone"} size={20} color={theme.colors.accent} />
-          </View>
-          <View style={styles.summaryCopy}>
-            <Text style={[styles.summaryTitle, { color: theme.colors.textPrimary }]}>
-              {CALL_TYPE_LABELS[session.callType]} call
-            </Text>
-            <Text style={[styles.summaryMeta, { color: theme.colors.textSecondary }]}>
-              {statusLabel} - updated {callUpdatedAt}
-            </Text>
-            {durationLabel ? (
-              <Text style={[styles.summaryMeta, { color: theme.colors.textSecondary }]}>
-                Duration: {durationLabel}
-              </Text>
-            ) : null}
-            <Text style={[styles.summaryMeta, { color: theme.colors.textMuted }]}>Call ID: {session.id}</Text>
-          </View>
-        </View>
+      {runtime.status === "connecting" ? (
+        <GlassView tone="soft" radius={theme.radius.lg} bordered={false} style={styles.notice}>
+          <ActivityIndicator size="small" color={theme.colors.accent} />
+          <Text style={[styles.noticeText, { color: theme.colors.textSecondary }]}>
+            Establishing a secure connection…
+          </Text>
+        </GlassView>
+      ) : null}
 
-        {showConnecting ? (
-          <View style={[styles.connectingCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-            <ActivityIndicator size="small" color={theme.colors.accent} />
-            <Text style={[styles.connectingText, { color: theme.colors.textSecondary }]}>Establishing connection...</Text>
-          </View>
-        ) : null}
+      {runtime.errorMessage ? (
+        <Pressable
+          onPress={clearError}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss call error"
+          style={[
+            styles.notice,
+            {
+              borderRadius: theme.radius.lg,
+              backgroundColor: theme.colors.dangerMuted
+            }
+          ]}
+        >
+          <Text style={[styles.noticeText, { color: theme.colors.danger }]}>{runtime.errorMessage}</Text>
+        </Pressable>
+      ) : null}
 
-        {runtime.errorMessage ? (
-          <Pressable
-            onPress={clearError}
-            style={[styles.errorCard, { borderColor: theme.colors.danger, backgroundColor: theme.colors.danger + "14" }]}
-          >
-            <Feather name="alert-triangle" size={14} color={theme.colors.danger} />
-            <Text style={[styles.errorText, { color: theme.colors.danger }]}>{runtime.errorMessage}</Text>
-          </Pressable>
-        ) : null}
+      <CallMediaViewport
+        callType={session.callType}
+        peerName={peer?.fullName ?? title}
+        peerAvatar={peer?.avatar}
+        runtime={runtime}
+        caption={caption}
+      />
 
-        <CallMediaViewport
-          callType={session.callType}
-          peerName={peer?.fullName ?? "Participant"}
-          peerAvatar={peer?.avatar}
-          runtime={runtime}
-        />
-
+      <GlassView tone="strong" radius={theme.radius.panel} highlight style={styles.controlDock}>
         <CallControls
           callId={session.id}
           status={runtime.status}
@@ -282,94 +313,65 @@ export default function CallDetailsScreen(): JSX.Element {
             });
           }}
         />
-
-        {terminal ? (
-          <Pressable
-            onPress={() => router.back()}
-            style={[styles.closeSessionButton, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}
-          >
-            <Text style={[styles.closeSessionText, { color: theme.colors.textSecondary }]}>Close</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </ScreenContainer>
+      </GlassView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  page: {
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 22
+  mobileRoot: {
+    backgroundColor: "transparent",
+    flex: 1
   },
-  closeBtn: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    width: 34
-  },
-  summaryCard: {
-    borderRadius: 14,
-    borderWidth: 1,
+  desktopRoot: {
+    backgroundColor: "transparent",
+    flex: 1,
     flexDirection: "row",
     gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12
+    minWidth: 0
   },
-  summaryIcon: {
-    alignItems: "center",
-    borderRadius: 12,
-    height: 44,
+  centered: {
+    flex: 1,
     justifyContent: "center",
-    width: 44
+    paddingHorizontal: 24
   },
-  summaryCopy: {
+  stage: {
+    flex: 1,
+    gap: 12,
+    padding: 14
+  },
+  stageHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10
+  },
+  stageHeaderCopy: {
     flex: 1,
     gap: 2
   },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: "800"
+  stageTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: -0.2
   },
-  summaryMeta: {
+  stageMeta: {
     fontSize: 12
   },
-  connectingCard: {
+  notice: {
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 8,
-    minHeight: 44,
-    paddingHorizontal: 12
+    minHeight: 42,
+    paddingHorizontal: 14
   },
-  connectingText: {
+  noticeText: {
+    flex: 1,
     fontSize: 12,
     fontWeight: "600"
   },
-  errorCard: {
+  controlDock: {
     alignItems: "center",
-    borderRadius: 12,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 12
-  },
-  closeSessionButton: {
-    alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    minHeight: 42,
-    justifyContent: "center"
-  },
-  closeSessionText: {
-    fontSize: 13,
-    fontWeight: "700"
+    paddingHorizontal: 16,
+    paddingVertical: 16
   }
 });

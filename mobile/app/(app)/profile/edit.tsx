@@ -1,13 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { z } from "zod";
-import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { AppButton, AppInput, Avatar, ScreenContainer, SectionHeader } from "@/components/common";
-import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useAppToast } from "@/hooks/useAppToast";
+import { AppButton, AppInput, Avatar, SectionHeader } from "@/components/common";
+import { DetailScreenShell } from "@/components/layout";
+import { GlassView, IconButton } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAppToast } from "@/hooks/useAppToast";
+import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useChatStore } from "@/store/chatStore";
 
 const schema = z.object({
@@ -29,6 +31,7 @@ export default function EditProfileScreen(): JSX.Element {
   const {
     control,
     handleSubmit,
+    watch,
     formState: { errors }
   } = useForm<EditValues>({
     resolver: zodResolver(schema),
@@ -39,6 +42,9 @@ export default function EditProfileScreen(): JSX.Element {
       avatar: user.avatar
     }
   });
+
+  const previewAvatar = watch("avatar");
+  const previewName = watch("fullName");
 
   const save = handleSubmit(async (values) => {
     try {
@@ -51,83 +57,101 @@ export default function EditProfileScreen(): JSX.Element {
   });
 
   return (
-    <ScreenContainer scroll padded>
-      <View style={styles.root}>
+    <DetailScreenShell maxWidth={640}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <SectionHeader
-          title="Edit Profile"
+          title="Edit profile"
           subtitle="Update personal details and avatar"
-          rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-              <Text style={{ color: theme.colors.accent, fontSize: 14, fontWeight: "700" }}>Close</Text>
-            </Pressable>
-          }
+          rightSlot={<IconButton icon="x" accessibilityLabel="Close" tone="plain" onPress={() => router.back()} />}
         />
 
-        <View style={styles.preview}>
-          <Avatar uri={user.avatar} name={user.fullName} size={70} showOnlineDot isOnline={user.isOnline} />
+        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.preview}>
+          <Avatar
+            uri={previewAvatar || user.avatar}
+            name={previewName || user.fullName}
+            size={88}
+            shape="squircle"
+            showOnlineDot
+            isOnline={user.isOnline}
+          />
+        </GlassView>
+
+        <View style={styles.form}>
+          <Controller
+            control={control}
+            name="fullName"
+            render={({ field }) => (
+              <AppInput
+                label="Full name"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.fullName?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="title"
+            render={({ field }) => (
+              <AppInput
+                label="Job title"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.title?.message}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="about"
+            render={({ field }) => (
+              <AppInput
+                label="About"
+                value={field.value}
+                onChangeText={field.onChange}
+                error={errors.about?.message}
+                multiline
+                style={styles.multiline}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="avatar"
+            render={({ field }) => (
+              <AppInput
+                label="Avatar URL"
+                value={field.value}
+                onChangeText={field.onChange}
+                autoCapitalize="none"
+                error={errors.avatar?.message}
+              />
+            )}
+          />
+
+          <AppButton label="Save changes" onPress={save} />
         </View>
-
-        <Controller
-          control={control}
-          name="fullName"
-          render={({ field }) => (
-            <AppInput label="Full name" value={field.value} onChangeText={field.onChange} error={errors.fullName?.message} />
-          )}
-        />
-        <Controller
-          control={control}
-          name="title"
-          render={({ field }) => (
-            <AppInput label="Job title" value={field.value} onChangeText={field.onChange} error={errors.title?.message} />
-          )}
-        />
-        <Controller
-          control={control}
-          name="about"
-          render={({ field }) => (
-            <AppInput
-              label="About"
-              value={field.value}
-              onChangeText={field.onChange}
-              error={errors.about?.message}
-              multiline
-              style={{ minHeight: 90, textAlignVertical: "top" }}
-            />
-          )}
-        />
-        <Controller
-          control={control}
-          name="avatar"
-          render={({ field }) => (
-            <AppInput
-              label="Avatar URL"
-              value={field.value}
-              onChangeText={field.onChange}
-              autoCapitalize="none"
-              error={errors.avatar?.message}
-            />
-          )}
-        />
-
-        <AppButton label="Save changes" onPress={save} />
-      </View>
-    </ScreenContainer>
+      </ScrollView>
+    </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    gap: 12
-  },
-  closeBtn: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    paddingHorizontal: 8
+  content: {
+    gap: 14,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+    paddingTop: 14
   },
   preview: {
     alignItems: "center",
-    marginBottom: 8,
-    marginTop: 4
+    paddingVertical: 20
+  },
+  form: {
+    gap: 12
+  },
+  multiline: {
+    minHeight: 96,
+    textAlignVertical: "top"
   }
 });

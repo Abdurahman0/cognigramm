@@ -1,6 +1,6 @@
-import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
+import { IconButton, type IconName } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { CallStatus, CallType } from "@/features/calls/types";
 
@@ -23,66 +23,37 @@ interface CallControlsProps {
   onToggleSpeaker: () => void;
 }
 
-interface ControlButtonProps {
+interface ControlProps {
   label: string;
-  icon: React.ComponentProps<typeof Feather>["name"];
-  disabled?: boolean;
-  danger?: boolean;
-  active?: boolean;
+  icon: IconName;
   onPress: () => void;
+  disabled?: boolean;
+  tone?: "neutral" | "danger" | "success";
+  active?: boolean;
 }
 
-function ControlButton({
-  label,
-  icon,
-  disabled = false,
-  danger = false,
-  active = false,
-  onPress
-}: ControlButtonProps): JSX.Element {
+function Control({ label, icon, onPress, disabled = false, tone = "neutral", active = false }: ControlProps): JSX.Element {
   const { theme } = useAppTheme();
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled, selected: active }}
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [
-        styles.controlButton,
-        {
-          opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
-          borderColor: danger
-            ? theme.colors.danger
-            : active
-            ? theme.colors.accent
-            : theme.colors.border,
-          backgroundColor: danger
-            ? theme.colors.danger + "1E"
-            : active
-            ? theme.colors.accentMuted
-            : theme.colors.surface
-        }
-      ]}
-    >
-      <Feather
-        name={icon}
-        size={15}
-        color={danger ? theme.colors.danger : active ? theme.colors.accent : theme.colors.textSecondary}
+    <View style={styles.control}>
+      <IconButton
+        icon={icon}
+        accessibilityLabel={label}
+        onPress={onPress}
+        disabled={disabled}
+        tone={tone}
+        active={active}
+        size="xl"
       />
-      <Text
-        style={[
-          styles.controlLabel,
-          {
-            color: danger ? theme.colors.danger : active ? theme.colors.accent : theme.colors.textSecondary
-          }
-        ]}
-      >
+      <Text numberOfLines={1} style={[styles.controlLabel, { color: theme.colors.textMuted }]}>
         {label}
       </Text>
-    </Pressable>
+    </View>
   );
 }
 
+/** Circular in-call controls, laid out as a single floating row. */
 export function CallControls({
   callId,
   status,
@@ -108,70 +79,67 @@ export function CallControls({
   return (
     <View style={styles.root}>
       {isIncomingRinging ? (
-        <View style={styles.row}>
-          <ControlButton
-            label="Accept"
-            icon="phone-call"
-            onPress={() => onAccept(callId)}
-            disabled={controlsDisabled}
-            active
-          />
-          <ControlButton
-            label="Decline"
-            icon="phone-off"
-            onPress={() => onDecline(callId)}
-            disabled={controlsDisabled}
-            danger
-          />
-        </View>
+        <Control
+          label="Accept"
+          icon="phone-call"
+          tone="success"
+          disabled={controlsDisabled}
+          onPress={() => onAccept(callId)}
+        />
       ) : null}
 
       {inCallControlsVisible ? (
-        <View style={styles.row}>
-          <ControlButton
+        <>
+          {callType === "video" ? (
+            <Control
+              label={isCameraEnabled ? "Camera" : "Camera off"}
+              icon={isCameraEnabled ? "video" : "video-off"}
+              active={!isCameraEnabled}
+              disabled={controlsDisabled}
+              onPress={onToggleCamera}
+            />
+          ) : null}
+          <Control
             label={isMuted ? "Unmute" : "Mute"}
             icon={isMuted ? "mic-off" : "mic"}
-            onPress={onToggleMute}
-            disabled={controlsDisabled}
             active={isMuted}
+            disabled={controlsDisabled}
+            onPress={onToggleMute}
           />
-          <ControlButton
+          {callType === "video" ? (
+            <Control
+              label="Flip"
+              icon="refresh-cw"
+              disabled={controlsDisabled || !canSwitchCamera}
+              onPress={onSwitchCamera}
+            />
+          ) : null}
+          <Control
             label={speakerEnabled ? "Speaker" : "Earpiece"}
             icon={speakerEnabled ? "volume-2" : "volume-x"}
-            onPress={onToggleSpeaker}
-            disabled={controlsDisabled}
             active={speakerEnabled}
+            disabled={controlsDisabled}
+            onPress={onToggleSpeaker}
           />
-          {callType === "video" ? (
-            <ControlButton
-              label={isCameraEnabled ? "Camera On" : "Camera Off"}
-              icon={isCameraEnabled ? "video" : "video-off"}
-              onPress={onToggleCamera}
-              disabled={controlsDisabled}
-              active={!isCameraEnabled}
-            />
-          ) : null}
-          {callType === "video" ? (
-            <ControlButton
-              label="Switch Cam"
-              icon="refresh-cw"
-              onPress={onSwitchCamera}
-              disabled={controlsDisabled || !canSwitchCamera}
-            />
-          ) : null}
-        </View>
+        </>
       ) : null}
 
-      {canEnd ? (
-        <View style={styles.row}>
-          <ControlButton
-            label="End Call"
-            icon="phone-off"
-            onPress={() => onEnd(callId)}
-            disabled={controlsDisabled}
-            danger
-          />
-        </View>
+      {isIncomingRinging ? (
+        <Control
+          label="Decline"
+          icon="phone-off"
+          tone="danger"
+          disabled={controlsDisabled}
+          onPress={() => onDecline(callId)}
+        />
+      ) : canEnd ? (
+        <Control
+          label="End"
+          icon="phone-off"
+          tone="danger"
+          disabled={controlsDisabled}
+          onPress={() => onEnd(callId)}
+        />
       ) : null}
     </View>
   );
@@ -179,26 +147,19 @@ export function CallControls({
 
 const styles = StyleSheet.create({
   root: {
-    gap: 8
-  },
-  row: {
+    alignItems: "flex-start",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 14,
+    justifyContent: "center"
   },
-  controlButton: {
+  control: {
     alignItems: "center",
-    borderRadius: 11,
-    borderWidth: 1,
-    flexDirection: "row",
     gap: 6,
-    minHeight: 40,
-    minWidth: 110,
-    justifyContent: "center",
-    paddingHorizontal: 10
+    minWidth: 62
   },
   controlLabel: {
-    fontSize: 12,
-    fontWeight: "700"
+    fontSize: 11,
+    fontWeight: "600"
   }
 });

@@ -1,13 +1,28 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { ScreenContainer, SectionHeader, ToggleItem } from "@/components/common";
+import { AppButton, SectionHeader, ToggleItem } from "@/components/common";
+import { DetailScreenShell } from "@/components/layout";
+import { Chip, GlassView, IconButton } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useAuthStore } from "@/store/authStore";
+import { useChatStore } from "@/store/chatStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import type { ThemeMode } from "@/types";
 
-const themeModes: ThemeMode[] = ["light", "dark", "system"];
+const THEME_MODES: { key: ThemeMode; label: string }[] = [
+  { key: "light", label: "Light" },
+  { key: "dark", label: "Dark" },
+  { key: "system", label: "System" }
+];
+
+const CONNECTION_LABELS: Record<string, string> = {
+  idle: "Idle",
+  connecting: "Connecting…",
+  connected: "Live",
+  disconnected: "Offline"
+};
 
 export default function SettingsScreen(): JSX.Element {
   const router = useRouter();
@@ -16,75 +31,122 @@ export default function SettingsScreen(): JSX.Element {
   const setThemeMode = useSettingsStore((state) => state.setThemeMode);
   const compactMode = useSettingsStore((state) => state.compactMode);
   const setCompactMode = useSettingsStore((state) => state.setCompactMode);
+  const websocketStatus = useChatStore((state) => state.websocketStatus);
+  const logout = useAuthStore((state) => state.logout);
+
+  const connectionLive = websocketStatus === "connected";
 
   return (
-    <ScreenContainer scroll padded>
-      <View style={styles.root}>
+    <DetailScreenShell maxWidth={720}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <SectionHeader
           title="Settings"
           subtitle="Workspace preferences"
           rightSlot={
-            <Pressable onPress={() => router.back()} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={theme.colors.textPrimary} />
-            </Pressable>
+            <IconButton icon="x" accessibilityLabel="Close settings" tone="plain" onPress={() => router.back()} />
           }
         />
 
-        <View style={styles.themeTabs}>
-          {themeModes.map((mode) => {
-            const active = themeMode === mode;
-            return (
-              <Pressable
-                key={mode}
-                onPress={() => setThemeMode(mode)}
-                style={[
-                  styles.themeBtn,
-                  {
-                    backgroundColor: active ? theme.colors.accent : theme.colors.surface,
-                    borderColor: active ? theme.colors.accent : theme.colors.border
-                  }
-                ]}
-              >
-                <Text style={{ color: active ? "#FFFFFF" : theme.colors.textSecondary, fontWeight: "600" }}>
-                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
+          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Appearance</Text>
+          <Text style={[styles.cardHint, { color: theme.colors.textMuted }]}>
+            Glass surfaces adapt to the selected mode across mobile and web.
+          </Text>
+          <View style={styles.chipRow}>
+            {THEME_MODES.map((mode) => (
+              <Chip
+                key={mode.key}
+                label={mode.label}
+                active={themeMode === mode.key}
+                onPress={() => setThemeMode(mode.key)}
+              />
+            ))}
+          </View>
+        </GlassView>
+
+        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
+          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Layout</Text>
+          <ToggleItem
+            title="Compact density"
+            description="Tighter conversation rows for power users on tablet and web."
+            value={compactMode}
+            onValueChange={setCompactMode}
+          />
+        </GlassView>
+
+        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
+          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Realtime</Text>
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: connectionLive ? theme.colors.online : theme.colors.warning }
+              ]}
+            />
+            <Text style={[styles.statusLabel, { color: theme.colors.textSecondary }]}>
+              Message socket · {CONNECTION_LABELS[websocketStatus] ?? websocketStatus}
+            </Text>
+          </View>
+        </GlassView>
+
+        <View style={styles.signOutRow}>
+          <AppButton
+            variant="danger"
+            label="Sign out"
+            fullWidth={false}
+            icon={<Feather name="log-out" size={15} color={theme.colors.onAccent} />}
+            onPress={() => {
+              logout();
+              router.replace("/(auth)/login");
+            }}
+          />
         </View>
-
-        <ToggleItem
-          title="Compact Mode"
-          description="Denser UI for power users on tablet and web."
-          value={compactMode}
-          onValueChange={setCompactMode}
-        />
-
-      </View>
-    </ScreenContainer>
+      </ScrollView>
+    </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    gap: 14
+  signOutRow: {
+    alignItems: "flex-start",
+    paddingTop: 2
   },
-  closeBtn: {
-    alignItems: "center",
-    height: 34,
-    justifyContent: "center",
-    width: 34
+  content: {
+    gap: 12,
+    paddingBottom: 28,
+    paddingHorizontal: 16,
+    paddingTop: 14
   },
-  themeTabs: {
+  card: {
+    gap: 10,
+    padding: 18
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: "700"
+  },
+  cardHint: {
+    fontSize: 12,
+    lineHeight: 17
+  },
+  chipRow: {
     flexDirection: "row",
-    gap: 10
+    flexWrap: "wrap",
+    gap: 8
   },
-  themeBtn: {
-    borderRadius: 12,
-    borderWidth: 1,
-    flex: 1,
-    minHeight: 46,
+  statusRow: {
     alignItems: "center",
-    justifyContent: "center"
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 34
+  },
+  statusDot: {
+    borderRadius: 999,
+    height: 9,
+    width: 9
+  },
+  statusLabel: {
+    fontSize: 13,
+    fontWeight: "600"
   }
 });

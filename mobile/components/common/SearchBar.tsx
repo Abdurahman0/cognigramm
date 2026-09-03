@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { GlassView } from "@/components/ui/GlassView";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface SearchBarProps {
@@ -8,26 +9,20 @@ interface SearchBarProps {
   value: string;
   onChangeText: (value: string) => void;
   onClear?: () => void;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function SearchBar({
   placeholder = "Search",
   value,
   onChangeText,
-  onClear
+  onClear,
+  style
 }: SearchBarProps): JSX.Element {
   const { theme } = useAppTheme();
+
   return (
-    <View
-      style={[
-        styles.root,
-        {
-          borderColor: theme.colors.border,
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.radius.md
-        }
-      ]}
-    >
+    <GlassView tone="soft" radius={theme.radius.pill} bordered={false} style={[styles.root, style]}>
       <Feather name="search" size={17} color={theme.colors.textMuted} />
       <TextInput
         style={[styles.input, Platform.OS === "web" ? styles.inputWeb : null, { color: theme.colors.textPrimary }]}
@@ -35,28 +30,28 @@ export function SearchBar({
         placeholderTextColor={theme.colors.textMuted}
         value={value}
         onChangeText={onChangeText}
+        returnKeyType="search"
       />
       {value.length > 0 ? (
-        <Pressable onPress={onClear} hitSlop={10}>
-          <Feather name="x" size={18} color={theme.colors.textMuted} />
+        <Pressable onPress={onClear} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
+          <Feather name="x" size={17} color={theme.colors.textMuted} />
         </Pressable>
       ) : null}
-    </View>
+    </GlassView>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     alignItems: "center",
-    borderWidth: 1,
     flexDirection: "row",
     minHeight: 44,
-    paddingHorizontal: 12
+    paddingHorizontal: 14
   },
   input: {
     flex: 1,
     fontSize: 15,
-    marginLeft: 8,
+    marginLeft: 9,
     paddingVertical: 10
   },
   inputWeb: {

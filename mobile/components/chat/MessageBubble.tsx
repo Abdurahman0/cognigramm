@@ -22,6 +22,8 @@ interface MessageBubbleProps {
   message: ChatMessage;
   senderName: string;
   isMine: boolean;
+  /** Group chats label the first message of each run; direct chats never do. */
+  showSender?: boolean;
   onLongPress?: () => void;
   onOpenActions?: (event: GestureResponderEvent) => void;
   onEdit?: () => void;
@@ -160,6 +162,7 @@ export function MessageBubble({
   message,
   senderName,
   isMine,
+  showSender = true,
   onLongPress,
   onOpenActions,
   onEdit,
@@ -170,15 +173,18 @@ export function MessageBubble({
   canDelete = false
 }: MessageBubbleProps): JSX.Element {
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const { theme } = useAppTheme();
   const bubbleColor = isMine ? theme.colors.messageMine : theme.colors.messageOther;
-  const textColor = isMine ? "#FFFFFF" : theme.colors.textPrimary;
-  const metaColor = isMine ? "#DCE7FF" : theme.colors.textMuted;
+  const textColor = isMine ? theme.colors.onAccent : theme.colors.textPrimary;
+  const metaColor = isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted;
   const attachmentUrl = message.attachment?.publicUrl ?? null;
   const mimeType = (message.attachment?.mimeType ?? "").toLowerCase();
   const isImageAttachment = mimeType.startsWith("image/") || message.type === "image";
   const callSummary = message.type === "system" ? getCallSummaryPresentation(message.body) : null;
-  const showWebActionsButton = Platform.OS === "web" && Boolean(onOpenActions);
+  const canOpenActions = Platform.OS === "web" && Boolean(onOpenActions);
+  const showWebActionsButton = canOpenActions && (hovered || showActionsTooltip);
+  const senderLabel = !isMine && showSender ? senderName : "";
 
   const openAttachment = (): void => {
     if (!attachmentUrl) {
@@ -202,22 +208,39 @@ export function MessageBubble({
 
   return (
     <>
-      <View style={[styles.row, { justifyContent: isMine ? "flex-end" : "flex-start" }]}>
+      <View
+        style={[
+          styles.row,
+          {
+            alignSelf: isMine ? "flex-end" : "flex-start",
+            justifyContent: isMine ? "flex-end" : "flex-start"
+          }
+        ]}
+      >
         <Pressable
           onLongPress={onLongPress}
           onPress={showActionsTooltip ? onDismissActions : undefined}
+          onHoverIn={() => setHovered(true)}
+          onHoverOut={() => setHovered(false)}
           style={[
             styles.bubble,
             {
+              alignItems: "flex-start",
               backgroundColor: bubbleColor,
-              borderColor: isMine ? theme.colors.messageMine : theme.colors.border,
-              alignItems: "flex-start"
-            }
+              borderColor: isMine ? "transparent" : theme.colors.glassBorder,
+              borderBottomRightRadius: isMine ? 8 : 20,
+              borderBottomLeftRadius: isMine ? 20 : 8
+            },
+            isMine ? theme.elevation.soft : null
           ]}
         >
-          {!isMine || showWebActionsButton ? (
+          {senderLabel || showWebActionsButton ? (
             <View style={styles.topRow}>
-              {!isMine ? <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderName}</Text> : <View />}
+              {senderLabel ? (
+                <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderLabel}</Text>
+              ) : (
+                <View />
+              )}
               {showWebActionsButton ? (
                 <Pressable
                   onPress={onOpenActions}
@@ -232,13 +255,20 @@ export function MessageBubble({
             </View>
           ) : null}
           {showWebActionsButton && showActionsTooltip && (canEdit || canDelete) ? (
-            <View style={[styles.tooltip, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+            <View
+              {...(Platform.OS === "web" ? { dataSet: { glass: "strong" } } : null)}
+              style={[
+                styles.tooltip,
+                { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glassStrong },
+                theme.elevation.panel
+              ]}
+            >
               {canEdit ? (
                 <Pressable
                   onPress={onEdit}
                   style={({ pressed }) => [
                     styles.tooltipAction,
-                    pressed && { backgroundColor: theme.colors.surfaceMuted }
+                    pressed && { backgroundColor: theme.colors.glassHover }
                   ]}
                 >
                   <Text style={[styles.tooltipActionText, { color: theme.colors.textPrimary }]}>Edit</Text>
@@ -266,7 +296,7 @@ export function MessageBubble({
               style={[
                 styles.callCard,
                 {
-                  backgroundColor: isMine ? "rgba(255,255,255,0.12)" : theme.colors.surfaceMuted,
+                  backgroundColor: isMine ? "rgba(255,255,255,0.14)" : theme.colors.glassSoft,
                   borderColor:
                     callSummary.tone === "danger"
                       ? isMine
@@ -274,7 +304,7 @@ export function MessageBubble({
                         : `${theme.colors.danger}38`
                       : isMine
                         ? "rgba(255,255,255,0.24)"
-                        : theme.colors.border
+                        : theme.colors.glassBorder
                 }
               ]}
             >
@@ -288,8 +318,8 @@ export function MessageBubble({
                           ? "rgba(255,130,130,0.25)"
                           : `${theme.colors.danger}1A`
                         : isMine
-                          ? "rgba(255,255,255,0.16)"
-                          : theme.colors.surface
+                          ? "rgba(255,255,255,0.18)"
+                          : theme.colors.glassHover
                   }
                 ]}
               >
@@ -314,14 +344,14 @@ export function MessageBubble({
             <VoiceMessageBubble
               message={message}
               textColor={textColor}
-              mutedTextColor={isMine ? "#DCE7FF" : theme.colors.textMuted}
+              mutedTextColor={isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted}
               accentColor={theme.colors.accent}
             />
           ) : message.type === "video_note" ? (
             <VideoNoteBubble
               message={message}
               textColor={textColor}
-              mutedTextColor={isMine ? "#DCE7FF" : theme.colors.textMuted}
+              mutedTextColor={isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted}
             />
           ) : isImageAttachment ? (
             attachmentUrl ? (
@@ -380,7 +410,9 @@ export function MessageBubble({
             {message.editedAt ? (
               <Text style={[styles.metaText, { color: metaColor }]}>edited</Text>
             ) : null}
-            {isMine ? <Feather name={statusIcon[message.status]} size={12} color="#DCE7FF" /> : null}
+            {isMine ? (
+              <Feather name={statusIcon[message.status]} size={12} color="rgba(255, 255, 255, 0.82)" />
+            ) : null}
           </View>
         </Pressable>
       </View>
@@ -409,15 +441,17 @@ export function MessageBubble({
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    marginVertical: 4
+    marginVertical: 4,
+    maxWidth: 760,
+    width: "100%"
   },
   bubble: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     gap: 6,
     maxWidth: "84%",
     minWidth: 128,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 10
   },
   sender: {

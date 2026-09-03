@@ -9,4 +9,32 @@ declare global {
   }
 }
 
+/**
+ * react-native-web renders `dataSet` entries as `data-*` attributes, which is how
+ * glass surfaces opt into the injected CSS backdrop filters.
+ */
+declare module "react-native" {
+  type WebDataSet = Record<string, string | number | boolean | undefined>;
+
+  interface ViewProps {
+    dataSet?: WebDataSet;
+  }
+
+  interface TextProps {
+    dataSet?: WebDataSet;
+  }
+
+  interface PressableProps {
+    dataSet?: WebDataSet;
+  }
+
+  interface ScrollViewProps {
+    dataSet?: WebDataSet;
+  }
+
+  interface TextInputProps {
+    dataSet?: WebDataSet;
+  }
+}
+
 export {};

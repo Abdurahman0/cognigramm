@@ -23,14 +23,15 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
       <TextInput
         ref={ref}
         placeholderTextColor={theme.colors.textMuted}
+        {...(Platform.OS === "web" ? { dataSet: { glass: "soft" } } : null)}
         style={[
           styles.input,
           Platform.OS === "web" ? styles.inputWeb : null,
           {
-            borderColor: hasError ? theme.colors.danger : theme.colors.border,
-            backgroundColor: theme.colors.surface,
+            borderColor: hasError ? theme.colors.danger : theme.colors.glassBorder,
+            backgroundColor: theme.colors.glassSoft,
             color: theme.colors.textPrimary,
-            borderRadius: theme.radius.md
+            borderRadius: theme.radius.lg
           },
           style
         ]}
@@ -56,9 +57,9 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     fontSize: 15,
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 10
+    minHeight: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 12
   },
   inputWeb: {
     outlineStyle: "solid",

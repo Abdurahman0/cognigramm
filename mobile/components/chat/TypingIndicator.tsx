@@ -76,8 +76,8 @@ export function TypingIndicator({ label = 'Typing' }: TypingIndicatorProps) {
 				style={[
 					styles.bubble,
 					{
-						backgroundColor: theme.colors.messageOther,
-						borderColor: theme.colors.border,
+						backgroundColor: theme.colors.glassStrong,
+						borderColor: theme.colors.glassBorder,
 					},
 				]}
 			>
