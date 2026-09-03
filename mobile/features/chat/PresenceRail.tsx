@@ -1,7 +1,8 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
+import { AppText } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -81,9 +82,9 @@ export function PresenceRail({ onOpenConversation, limit = 14 }: PresenceRailPro
               showOnlineDot
               isOnline={person.isOnline}
             />
-            <Text numberOfLines={1} style={[styles.name, { color: theme.colors.textSecondary }]}>
+            <AppText variant="caption2" tone="secondary" numberOfLines={1} style={styles.name}>
               {firstName}
-            </Text>
+            </AppText>
           </Pressable>
         );
       })}
@@ -109,8 +110,6 @@ const styles = StyleSheet.create({
     width: 66
   },
   name: {
-    fontSize: 11,
-    fontWeight: "600",
     maxWidth: 58,
     textAlign: "center"
   },

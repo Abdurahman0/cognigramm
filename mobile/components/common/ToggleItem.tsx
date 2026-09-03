@@ -1,5 +1,6 @@
-import { StyleSheet, Switch, Text, View } from "react-native";
+import { StyleSheet, Switch, View } from "react-native";
 
+import { AppText } from "@/components/ui/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface ToggleItemProps {
@@ -7,28 +8,42 @@ interface ToggleItemProps {
   description?: string;
   value: boolean;
   onValueChange: (value: boolean) => void;
+  /** Rows inside a ListSection skip their own background. */
+  standalone?: boolean;
 }
 
-export function ToggleItem({ title, description, value, onValueChange }: ToggleItemProps): JSX.Element {
+export function ToggleItem({
+  title,
+  description,
+  value,
+  onValueChange,
+  standalone = false
+}: ToggleItemProps): JSX.Element {
   const { theme } = useAppTheme();
   return (
     <View
       style={[
         styles.root,
-        { backgroundColor: theme.colors.glassSoft, borderRadius: theme.radius.lg }
+        standalone && {
+          backgroundColor: theme.colors.materialUltraThin,
+          borderRadius: theme.radius.xl
+        }
       ]}
     >
       <View style={styles.copy}>
-        <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
+        <AppText variant="body">{title}</AppText>
         {description ? (
-          <Text style={[styles.description, { color: theme.colors.textMuted }]}>{description}</Text>
+          <AppText variant="footnote" tone="secondary">
+            {description}
+          </AppText>
         ) : null}
       </View>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: theme.colors.glassHover, true: theme.colors.accentMuted }}
-        thumbColor={value ? theme.colors.accent : theme.colors.textMuted}
+        trackColor={{ false: theme.colors.fillSecondary, true: theme.colors.success }}
+        thumbColor="#FFFFFF"
+        ios_backgroundColor={theme.colors.fillSecondary}
       />
     </View>
   );
@@ -38,21 +53,14 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     flexDirection: "row",
+    gap: 12,
     justifyContent: "space-between",
+    minHeight: 50,
     paddingHorizontal: 16,
-    paddingVertical: 14
+    paddingVertical: 10
   },
   copy: {
     flex: 1,
-    gap: 4,
-    marginRight: 10
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: "600"
-  },
-  description: {
-    fontSize: 12,
-    lineHeight: 17
+    gap: 1
   }
 });

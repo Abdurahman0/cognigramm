@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { Badge } from "@/components/ui/Badge";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 export type IconName = React.ComponentProps<typeof Feather>["name"];
@@ -23,10 +24,11 @@ interface IconButtonProps {
 const SIZES: Record<IconButtonSize, { box: number; icon: number }> = {
   sm: { box: 30, icon: 15 },
   md: { box: 38, icon: 18 },
-  lg: { box: 46, icon: 20 },
-  xl: { box: 58, icon: 24 }
+  lg: { box: 46, icon: 21 },
+  xl: { box: 60, icon: 25 }
 };
 
+/** Circular glass control: capsule shape, specular rim, springy press. */
 export function IconButton({
   icon,
   onPress,
@@ -54,55 +56,66 @@ export function IconButton({
     ? theme.colors.onAccent
     : active
     ? theme.colors.accent
-    : theme.colors.textSecondary;
+    : theme.colors.textPrimary;
+
+  const background = solidTone
+    ? solidTone
+    : active
+    ? theme.colors.accentMuted
+    : tone === "plain"
+    ? "transparent"
+    : theme.colors.materialUltraThin;
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled, selected: active }}
       onPress={disabled ? undefined : onPress}
       disabled={disabled}
-      style={({ pressed, hovered }) => [
-        styles.root,
-        {
-          width: dimensions.box,
-          height: dimensions.box,
-          borderRadius: dimensions.box / 2,
-          backgroundColor: solidTone
-            ? solidTone
-            : active
-            ? theme.colors.accentMuted
-            : tone === "plain"
-            ? hovered
-              ? theme.colors.glassHover
-              : "transparent"
-            : hovered
-            ? theme.colors.glassHover
-            : theme.colors.glassSoft,
-          opacity: disabled ? 0.45 : pressed ? 0.82 : 1
-        },
-        style
-      ]}
+      style={[styles.pressable, { opacity: disabled ? 0.4 : 1 }, style]}
     >
-      <Feather name={icon} size={dimensions.icon} color={iconColor} />
+      <View
+        {...(Platform.OS === "web" && !solidTone && tone !== "plain"
+          ? { dataSet: { glass: "thin" } }
+          : null)}
+        style={[
+          styles.circle,
+          {
+            width: dimensions.box,
+            height: dimensions.box,
+            borderRadius: dimensions.box / 2,
+            backgroundColor: background,
+            borderColor: solidTone ? "transparent" : theme.colors.glassBorder,
+            borderWidth: tone === "plain" ? 0 : StyleSheet.hairlineWidth * 2
+          },
+          solidTone ? theme.elevation.soft : null
+        ]}
+      >
+        <Feather name={icon} size={dimensions.icon} color={iconColor} />
+      </View>
       {badgeCount > 0 ? (
-        <View style={styles.badge}>
+        <View style={styles.badge} pointerEvents="none">
           <Badge count={badgeCount} />
         </View>
       ) : null}
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  pressable: {
     alignItems: "center",
     justifyContent: "center"
   },
+  circle: {
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden"
+  },
   badge: {
     position: "absolute",
-    right: -4,
+    right: -6,
     top: -4
   }
 });

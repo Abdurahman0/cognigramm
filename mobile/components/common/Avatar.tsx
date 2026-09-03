@@ -37,7 +37,7 @@ export function Avatar({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
-  const cornerRadius = shape === "squircle" ? Math.round(size * 0.32) : size / 2;
+  const cornerRadius = shape === "squircle" ? Math.round(size * 0.26) : size / 2;
   const dotSize = Math.max(10, Math.round(size * 0.28));
 
   return (

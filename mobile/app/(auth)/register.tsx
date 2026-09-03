@@ -7,14 +7,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   type TextInputKeyPressEventData,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, AppInput } from "@/components/common";
-import { GlassView } from "@/components/ui";
+import { AppText, GlassView } from "@/components/ui";
 import { RegisterFormValues, registerSchema } from "@/features/auth/schemas";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -72,11 +71,11 @@ export default function RegisterScreen(): JSX.Element {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassView tone="panel" radius={theme.radius.panel} highlight elevation="floating" style={styles.card}>
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Create account</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+        <GlassView material="regular" radius={theme.radius.sheet} highlight elevation="floating" style={styles.card}>
+          <AppText variant="largeTitle">Create account</AppText>
+          <AppText variant="subhead" tone="secondary">
             Register your company profile for messaging and coordination.
-          </Text>
+          </AppText>
 
           <View style={styles.form}>
             <Controller
@@ -161,7 +160,9 @@ export default function RegisterScreen(): JSX.Element {
             style={styles.linkWrap}
             onPress={() => router.replace("/(auth)/login")}
           >
-            <Text style={[styles.link, { color: theme.colors.accent }]}>Already have an account? Sign in</Text>
+            <AppText variant="bodyEmphasized" tone="accent" style={styles.link}>
+              Already have an account? Sign in
+            </AppText>
           </Pressable>
         </GlassView>
       </ScrollView>
@@ -186,15 +187,7 @@ const styles = StyleSheet.create({
     padding: 26,
     width: "100%"
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20
-  },
+
   form: {
     gap: 12,
     marginTop: 20
@@ -203,8 +196,6 @@ const styles = StyleSheet.create({
     marginTop: 16
   },
   link: {
-    fontSize: 14,
-    fontWeight: "700",
     textAlign: "center"
   }
 });

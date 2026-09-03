@@ -1,14 +1,14 @@
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WORKSPACE_NAV_ITEMS } from "@/components/layout/navItems";
-import { Badge, GlassView } from "@/components/ui";
+import { AppText, Badge, GlassView, PressableScale } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
 
-/** Floating translucent tab bar for phone and tablet viewports. */
+/** Floating capsule tab bar: thick glass, tinted pill under the selected tab. */
 export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Element {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -18,10 +18,10 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
   return (
     <View
       pointerEvents="box-none"
-      style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 10) }]}
+      style={[styles.dock, { paddingBottom: Math.max(insets.bottom, 12) }]}
     >
       <GlassView
-        tone="strong"
+        material="thick"
         radius={theme.radius.pill}
         highlight
         elevation="floating"
@@ -31,11 +31,12 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
           const navItem = WORKSPACE_NAV_ITEMS.find((item) => item.key === route.name);
           const focused = state.index === index;
           const badgeCount = route.name === "chats" ? unreadTotal : 0;
-          const color = focused ? theme.colors.accent : theme.colors.textMuted;
+          const color = focused ? theme.colors.accent : theme.colors.textSecondary;
 
           return (
-            <Pressable
+            <PressableScale
               key={route.key}
+              scaleTo={0.92}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               accessibilityLabel={navItem?.label ?? route.name}
@@ -49,27 +50,30 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
                   navigation.navigate(route.name);
                 }
               }}
-              style={({ pressed }) => [
-                styles.item,
-                {
-                  borderRadius: theme.radius.pill,
-                  backgroundColor: focused ? theme.colors.accentMuted : "transparent",
-                  opacity: pressed ? 0.85 : 1
-                }
-              ]}
+              style={styles.itemPressable}
             >
-              <View>
-                <Feather name={navItem?.icon ?? "circle"} size={19} color={color} />
-                {badgeCount > 0 ? (
-                  <View style={styles.badge}>
-                    <Badge count={badgeCount} />
-                  </View>
-                ) : null}
+              <View
+                style={[
+                  styles.item,
+                  {
+                    borderRadius: theme.radius.pill,
+                    backgroundColor: focused ? theme.colors.accentMuted : "transparent"
+                  }
+                ]}
+              >
+                <View>
+                  <Feather name={navItem?.icon ?? "circle"} size={22} color={color} />
+                  {badgeCount > 0 ? (
+                    <View style={styles.badge}>
+                      <Badge count={badgeCount} tone="danger" />
+                    </View>
+                  ) : null}
+                </View>
+                <AppText variant="caption2" color={color} numberOfLines={1}>
+                  {navItem?.label ?? route.name}
+                </AppText>
               </View>
-              <Text numberOfLines={1} style={[styles.label, { color }]}>
-                {navItem?.label ?? route.name}
-              </Text>
-            </Pressable>
+            </PressableScale>
           );
         })}
       </GlassView>
@@ -80,32 +84,31 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
 const styles = StyleSheet.create({
   dock: {
     backgroundColor: "transparent",
-    paddingHorizontal: 14,
-    paddingTop: 6
+    paddingHorizontal: 16,
+    paddingTop: 8
   },
   bar: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 4,
+    gap: 2,
     justifyContent: "space-between",
-    paddingHorizontal: 8,
-    paddingVertical: 8
+    paddingHorizontal: 6,
+    paddingVertical: 6
+  },
+  itemPressable: {
+    flex: 1
   },
   item: {
     alignItems: "center",
-    flex: 1,
     gap: 3,
     justifyContent: "center",
     minHeight: 48,
-    paddingHorizontal: 6
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: "700"
+    paddingHorizontal: 6,
+    paddingVertical: 6
   },
   badge: {
     position: "absolute",
-    right: -10,
+    right: -12,
     top: -6
   }
 });

@@ -14,7 +14,6 @@ import {
 	Platform,
 	Pressable,
 	StyleSheet,
-	Text,
 	View,
 	type KeyboardEvent,
 	type LayoutChangeEvent,
@@ -25,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
-import { IconButton } from '@/components/ui'
+import { AppText, IconButton } from '@/components/ui'
 import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
@@ -1113,15 +1112,9 @@ export function ConversationPanel({
 					>
 						<Avatar uri={header.avatar} name={header.title} size={40} />
 						<View style={styles.headerCopy}>
-							<Text
-								numberOfLines={1}
-								style={[
-									styles.headerTitle,
-									{ color: theme.colors.textPrimary },
-								]}
-							>
+							<AppText variant='headline' numberOfLines={1}>
 								{header.title}
-							</Text>
+							</AppText>
 							<View style={styles.headerSubtitleRow}>
 								{chat.kind === 'direct' ? (
 									<View
@@ -1135,22 +1128,18 @@ export function ConversationPanel({
 										]}
 									/>
 								) : null}
-								<Text
-									numberOfLines={1}
-									style={[
-										styles.headerSubtitle,
-										{ color: theme.colors.textMuted },
-									]}
-								>
+								<AppText variant='footnote' tone='secondary' numberOfLines={1}>
 									{headerSubtitle}
-								</Text>
+								</AppText>
 							</View>
 						</View>
-						<Feather
-							name='chevron-right'
-							size={16}
-							color={theme.colors.textMuted}
-						/>
+						{compact ? null : (
+							<Feather
+								name='chevron-right'
+								size={16}
+								color={theme.colors.textFaint}
+							/>
+						)}
 					</Pressable>
 				</View>
 				<View style={styles.headerActions}>
@@ -1172,11 +1161,13 @@ export function ConversationPanel({
 						accessibilityLabel='Start video call'
 						onPress={() => beginCall('video')}
 					/>
-					<IconButton
-						icon='info'
-						accessibilityLabel='Open conversation details'
-						onPress={openChatInfo}
-					/>
+					{compact ? null : (
+						<IconButton
+							icon='info'
+							accessibilityLabel='Open conversation details'
+							onPress={openChatInfo}
+						/>
+					)}
 				</View>
 			</View>
 
@@ -1253,14 +1244,9 @@ export function ConversationPanel({
 											{ backgroundColor: theme.colors.glassBorder },
 										]}
 									/>
-									<Text
-										style={[
-											styles.newMessagesText,
-											{ color: theme.colors.accent },
-										]}
-									>
-										New messages
-									</Text>
+									<AppText variant='caption2' tone='accent' style={styles.newMessagesText}>
+										NEW MESSAGES
+									</AppText>
 									<View
 										style={[
 											styles.newMessagesLine,
@@ -1439,10 +1425,10 @@ export function ConversationPanel({
 						},
 					]}
 				>
-					<Feather name='chevron-down' size={14} color='#FFFFFF' />
-					<Text style={styles.newMessagesFabText}>
+					<Feather name='chevron-down' size={14} color={theme.colors.onAccent} />
+					<AppText variant='caption2' color={theme.colors.onAccent}>
 						{newIncomingCount} new
-					</Text>
+					</AppText>
 				</Pressable>
 			) : null}
 			{typingMembers.length > 0 ? (
@@ -1494,14 +1480,7 @@ const styles = StyleSheet.create({
 	headerCopy: {
 		flex: 1,
 	},
-	headerTitle: {
-		fontSize: 16,
-		fontWeight: '700',
-		letterSpacing: -0.1,
-	},
-	headerSubtitle: {
-		fontSize: 12,
-	},
+
 	headerSubtitleRow: {
 		alignItems: 'center',
 		flexDirection: 'row',
@@ -1539,9 +1518,7 @@ const styles = StyleSheet.create({
 		height: 1,
 	},
 	newMessagesText: {
-		fontSize: 11,
-		fontWeight: '700',
-		textTransform: 'uppercase',
+		letterSpacing: 0.5,
 	},
 	composerDock: {
 		borderTopWidth: StyleSheet.hairlineWidth * 2,
@@ -1567,11 +1544,7 @@ const styles = StyleSheet.create({
 		right: 14,
 		zIndex: 20,
 	},
-	newMessagesFabText: {
-		color: '#FFFFFF',
-		fontSize: 12,
-		fontWeight: '700',
-	},
+
 	emptyStateWrap: {
 		flex: 1,
 		justifyContent: 'center',

@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { usePathname, useRouter } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
-import { Badge, GlassView, IconButton } from "@/components/ui";
+import { AppText, Badge, GlassView, IconButton, PressableScale } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
 
@@ -17,46 +17,39 @@ interface RailItemProps {
 
 function RailItem({ item, active, badgeCount = 0, onPress }: RailItemProps): JSX.Element {
   const { theme } = useAppTheme();
+  const color = active ? theme.colors.accent : theme.colors.textSecondary;
 
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={0.93}
       accessibilityRole="tab"
       accessibilityLabel={item.label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={({ pressed, hovered }) => [
-        styles.item,
-        {
-          borderRadius: theme.radius.lg,
-          backgroundColor: active
-            ? theme.colors.accentMuted
-            : hovered
-            ? theme.colors.glassHover
-            : "transparent",
-          opacity: pressed ? 0.85 : 1
-        }
-      ]}
+      style={styles.itemPressable}
     >
-      <Feather
-        name={item.icon}
-        size={20}
-        color={active ? theme.colors.accent : theme.colors.textSecondary}
-      />
-      <Text
-        numberOfLines={1}
+      <View
         style={[
-          styles.itemLabel,
-          { color: active ? theme.colors.accent : theme.colors.textMuted }
+          styles.item,
+          {
+            borderRadius: theme.radius.lg,
+            backgroundColor: active ? theme.colors.accentMuted : "transparent"
+          }
         ]}
       >
-        {item.label}
-      </Text>
-      {badgeCount > 0 ? (
-        <View style={styles.itemBadge}>
-          <Badge count={badgeCount} />
+        <View>
+          <Feather name={item.icon} size={22} color={color} />
+          {badgeCount > 0 ? (
+            <View style={styles.itemBadge}>
+              <Badge count={badgeCount} tone="danger" />
+            </View>
+          ) : null}
         </View>
-      ) : null}
-    </Pressable>
+        <AppText variant="caption2" color={color} numberOfLines={1}>
+          {item.label}
+        </AppText>
+      </View>
+    </PressableScale>
   );
 }
 
@@ -71,7 +64,7 @@ export function NavRail(): JSX.Element {
 
   return (
     <GlassView
-      tone="strong"
+      material="thick"
       radius={theme.radius.panel}
       highlight
       elevation="panel"
@@ -105,7 +98,7 @@ export function NavRail(): JSX.Element {
           icon="settings"
           accessibilityLabel="Open settings"
           size="md"
-          onPress={() => router.push("/(app)/settings")}
+          onPress={() => router.push("/(app)/settings" as never)}
         />
       </View>
     </GlassView>
@@ -116,45 +109,44 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     gap: 10,
-    paddingBottom: 12,
-    paddingTop: 14
+    paddingBottom: 14,
+    paddingTop: 16
   },
   brand: {
     alignItems: "center",
-    height: 40,
+    height: 38,
     justifyContent: "center",
-    width: 40
+    width: 38
   },
   logo: {
-    height: 30,
-    width: 30
+    height: 28,
+    width: 28
   },
   items: {
     alignItems: "center",
     flex: 1,
     gap: 6,
-    paddingTop: 6,
+    paddingTop: 8,
     width: "100%"
+  },
+  itemPressable: {
+    width: "86%"
   },
   item: {
     alignItems: "center",
     gap: 3,
     justifyContent: "center",
-    minHeight: 56,
-    width: "84%"
-  },
-  itemLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    letterSpacing: 0.1
+    minHeight: 58,
+    paddingVertical: 6,
+    width: "100%"
   },
   itemBadge: {
     position: "absolute",
-    right: 6,
-    top: 6
+    right: -14,
+    top: -6
   },
   footer: {
     alignItems: "center",
-    gap: 8
+    gap: 10
   }
 });

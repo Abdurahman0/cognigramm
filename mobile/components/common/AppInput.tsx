@@ -1,7 +1,8 @@
 import { forwardRef } from "react";
 import type { TextInputProps } from "react-native";
-import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, TextInput, View } from "react-native";
 
+import { AppText } from "@/components/ui/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface AppInputProps extends TextInputProps {
@@ -19,28 +20,39 @@ export const AppInput = forwardRef<TextInput, AppInputProps>(function AppInput(
 
   return (
     <View style={styles.wrapper}>
-      {label ? <Text style={[styles.label, { color: theme.colors.textSecondary }]}>{label}</Text> : null}
+      {label ? (
+        <AppText variant="footnote" tone="secondary" style={styles.label}>
+          {label}
+        </AppText>
+      ) : null}
       <TextInput
         ref={ref}
         placeholderTextColor={theme.colors.textMuted}
-        {...(Platform.OS === "web" ? { dataSet: { glass: "soft" } } : null)}
+        selectionColor={theme.colors.accent}
+        {...(Platform.OS === "web" ? { dataSet: { glass: "thin" } } : null)}
         style={[
           styles.input,
+          theme.typeScale.body,
           Platform.OS === "web" ? styles.inputWeb : null,
           {
+            fontFamily: theme.fontFamily,
             borderColor: hasError ? theme.colors.danger : theme.colors.glassBorder,
-            backgroundColor: theme.colors.glassSoft,
+            backgroundColor: theme.colors.materialUltraThin,
             color: theme.colors.textPrimary,
-            borderRadius: theme.radius.lg
+            borderRadius: theme.radius.md
           },
           style
         ]}
         {...props}
       />
       {error ? (
-        <Text style={[styles.error, { color: theme.colors.danger }]}>{error}</Text>
+        <AppText variant="caption1" tone="danger">
+          {error}
+        </AppText>
       ) : hint ? (
-        <Text style={[styles.hint, { color: theme.colors.textMuted }]}>{hint}</Text>
+        <AppText variant="caption1" tone="tertiary">
+          {hint}
+        </AppText>
       ) : null}
     </View>
   );
@@ -51,26 +63,17 @@ const styles = StyleSheet.create({
     gap: 6
   },
   label: {
-    fontSize: 13,
-    fontWeight: "600"
+    paddingHorizontal: 4
   },
   input: {
-    borderWidth: 1,
-    fontSize: 15,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     minHeight: 50,
     paddingHorizontal: 16,
-    paddingVertical: 12
+    paddingVertical: 13
   },
   inputWeb: {
     outlineStyle: "solid",
     outlineWidth: 0,
     outlineColor: "transparent"
-  },
-  error: {
-    fontSize: 12,
-    fontWeight: "500"
-  },
-  hint: {
-    fontSize: 12
   }
 });

@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   recorderLabel: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
   },
   cancelRecordingButton: {
@@ -262,11 +262,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   previewTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
   },
   previewSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
   },
   previewActions: {
     flexDirection: "row",
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     width: 2,
   },
   errorText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "600",
     paddingHorizontal: 2,
   },

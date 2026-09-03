@@ -227,7 +227,7 @@ export function MessageBubble({
             {
               alignItems: "flex-start",
               backgroundColor: bubbleColor,
-              borderColor: isMine ? "transparent" : theme.colors.glassBorder,
+              borderColor: "transparent",
               borderBottomRightRadius: isMine ? 8 : 20,
               borderBottomLeftRadius: isMine ? 20 : 8
             },
@@ -441,22 +441,23 @@ export function MessageBubble({
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
-    marginVertical: 4,
-    maxWidth: 760,
+    marginVertical: 2,
+    maxWidth: 680,
     width: "100%"
   },
   bubble: {
     borderRadius: 20,
-    borderWidth: 1,
-    gap: 6,
-    maxWidth: "84%",
-    minWidth: 128,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    gap: 4,
+    maxWidth: "78%",
+    minWidth: 120,
     paddingHorizontal: 14,
-    paddingVertical: 10
+    paddingVertical: 9
   },
   sender: {
-    fontSize: 12,
-    fontWeight: "600"
+    fontSize: 13,
+    fontWeight: "600",
+    letterSpacing: -0.08
   },
   topRow: {
     alignItems: "center",
@@ -491,13 +492,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12
   },
   tooltipActionText: {
-    fontSize: 13,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "500",
+    letterSpacing: -0.24
   },
   body: {
     flexShrink: 1,
-    fontSize: 14,
-    lineHeight: 19
+    fontSize: 17,
+    letterSpacing: -0.41,
+    lineHeight: 22
   },
   linkText: {
     textDecorationLine: "underline"
@@ -506,8 +509,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   deletedText: {
-    fontSize: 13,
-    fontStyle: "italic"
+    fontSize: 16,
+    fontStyle: "italic",
+    letterSpacing: -0.32
   },
   callCard: {
     alignItems: "center",
@@ -530,27 +534,28 @@ const styles = StyleSheet.create({
     gap: 1
   },
   callTitle: {
-    fontSize: 13,
-    fontWeight: "700"
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.24
   },
   callSubtitle: {
-    fontSize: 11,
-    fontWeight: "500"
+    fontSize: 13,
+    letterSpacing: -0.08
   },
   imageWrap: {
     borderRadius: 10,
     overflow: "hidden"
   },
   imagePreview: {
-    borderRadius: 10,
-    height: 180,
-    width: 180
+    borderRadius: 14,
+    height: 190,
+    width: 190
   },
   fileWrap: {
     gap: 4
   },
   fileLink: {
-    fontSize: 12,
+    fontSize: 13,
     textDecorationLine: "underline"
   },
   metaRow: {
@@ -560,7 +565,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end"
   },
   metaText: {
-    fontSize: 10
+    fontSize: 11,
+    letterSpacing: 0.06
   },
   voiceRow: {
     alignItems: "center",

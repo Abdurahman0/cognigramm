@@ -1,10 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 
 import { AppButton, SectionHeader, ToggleItem } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
-import { Chip, GlassView, IconButton } from "@/components/ui";
+import { AppText, Chip, IconButton, ListRow, ListSection, PresenceDot } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
@@ -37,7 +37,7 @@ export default function SettingsScreen(): JSX.Element {
   const connectionLive = websocketStatus === "connected";
 
   return (
-    <DetailScreenShell maxWidth={720}>
+    <DetailScreenShell maxWidth={680}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <SectionHeader
           title="Settings"
@@ -47,11 +47,7 @@ export default function SettingsScreen(): JSX.Element {
           }
         />
 
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Appearance</Text>
-          <Text style={[styles.cardHint, { color: theme.colors.textMuted }]}>
-            Glass surfaces adapt to the selected mode across mobile and web.
-          </Text>
+        <ListSection header="Appearance" footer="Liquid Glass surfaces pick up the wallpaper behind them in both appearances.">
           <View style={styles.chipRow}>
             {THEME_MODES.map((mode) => (
               <Chip
@@ -62,91 +58,71 @@ export default function SettingsScreen(): JSX.Element {
               />
             ))}
           </View>
-        </GlassView>
-
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Layout</Text>
           <ToggleItem
             title="Compact density"
-            description="Tighter conversation rows for power users on tablet and web."
+            description="Tighter conversation rows for tablet and web."
             value={compactMode}
             onValueChange={setCompactMode}
           />
-        </GlassView>
+        </ListSection>
 
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Realtime</Text>
-          <View style={styles.statusRow}>
-            <View
-              style={[
-                styles.statusDot,
-                { backgroundColor: connectionLive ? theme.colors.online : theme.colors.warning }
-              ]}
-            />
-            <Text style={[styles.statusLabel, { color: theme.colors.textSecondary }]}>
-              Message socket · {CONNECTION_LABELS[websocketStatus] ?? websocketStatus}
-            </Text>
-          </View>
-        </GlassView>
+        <ListSection header="Realtime">
+          <ListRow
+            title="Message socket"
+            value={CONNECTION_LABELS[websocketStatus] ?? websocketStatus}
+            showChevron={false}
+            leading={
+              <View style={styles.statusDot}>
+                <PresenceDot online={connectionLive} size={10} ringColor="transparent" />
+              </View>
+            }
+          />
+        </ListSection>
 
         <View style={styles.signOutRow}>
           <AppButton
             variant="danger"
             label="Sign out"
             fullWidth={false}
-            icon={<Feather name="log-out" size={15} color={theme.colors.onAccent} />}
+            icon={<Feather name="log-out" size={16} color={theme.colors.onAccent} />}
             onPress={() => {
               logout();
               router.replace("/(auth)/login");
             }}
           />
         </View>
+
+        <AppText variant="caption1" tone="tertiary" style={styles.version}>
+          Qora Qarg&apos;a · Workspace messenger
+        </AppText>
       </ScrollView>
     </DetailScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  signOutRow: {
-    alignItems: "flex-start",
-    paddingTop: 2
-  },
   content: {
-    gap: 12,
-    paddingBottom: 28,
+    gap: 18,
+    paddingBottom: 32,
     paddingHorizontal: 16,
-    paddingTop: 14
-  },
-  card: {
-    gap: 10,
-    padding: 18
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  cardHint: {
-    fontSize: 12,
-    lineHeight: 17
+    paddingTop: 16
   },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
-  },
-  statusRow: {
-    alignItems: "center",
-    flexDirection: "row",
     gap: 8,
-    minHeight: 34
+    paddingHorizontal: 16,
+    paddingVertical: 13
   },
   statusDot: {
-    borderRadius: 999,
-    height: 9,
-    width: 9
+    alignItems: "center",
+    justifyContent: "center",
+    width: 22
   },
-  statusLabel: {
-    fontSize: 13,
-    fontWeight: "600"
+  signOutRow: {
+    alignItems: "flex-start"
+  },
+  version: {
+    textAlign: "center"
   }
 });

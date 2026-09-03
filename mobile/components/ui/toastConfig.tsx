@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { ToastConfig, ToastConfigParams } from "react-native-toast-message";
 
+import { AppText } from "@/components/ui/AppText";
 import { GlassView } from "@/components/ui/GlassView";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { IconName } from "@/components/ui/IconButton";
@@ -26,20 +27,20 @@ function ToastCard({ tone, title, message }: ToastCardProps): JSX.Element {
     tone === "success" ? theme.colors.success : tone === "error" ? theme.colors.danger : theme.colors.accent;
 
   return (
-    <GlassView tone="strong" radius={theme.radius.lg} highlight elevation="panel" style={styles.card}>
+    <GlassView material="thick" radius={theme.radius.xl} highlight elevation="panel" style={styles.card}>
       <View style={[styles.iconWrap, { backgroundColor: `${accent}22` }]}>
         <Feather name={TONE_ICON[tone]} size={16} color={accent} />
       </View>
       <View style={styles.copy}>
         {title ? (
-          <Text numberOfLines={1} style={[styles.title, { color: theme.colors.textPrimary }]}>
+          <AppText variant="subheadEmphasized" numberOfLines={1}>
             {title}
-          </Text>
+          </AppText>
         ) : null}
         {message ? (
-          <Text numberOfLines={2} style={[styles.message, { color: theme.colors.textSecondary }]}>
+          <AppText variant="footnote" tone="secondary" numberOfLines={2}>
             {message}
-          </Text>
+          </AppText>
         ) : null}
       </View>
     </GlassView>
@@ -81,12 +82,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2
   },
-  title: {
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  message: {
-    fontSize: 12,
-    lineHeight: 17
+  copySpacing: {
+    gap: 2
   }
 });

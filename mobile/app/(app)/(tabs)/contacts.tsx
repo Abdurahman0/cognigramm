@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
+import { FlatList, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, Avatar, EmptyState, SearchBar, SectionHeader, UserCard } from "@/components/common";
 import { WorkspacePane } from "@/components/layout";
-import { Chip, GlassView, IconButton } from "@/components/ui";
+import { AppText, Chip, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -123,7 +123,9 @@ export default function ContactsScreen(): JSX.Element {
         keyExtractor={(item) => item.id}
         style={styles.list}
         contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
+        )}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState title="No colleagues found" description="Try a different name, role, or team." icon="users" />
@@ -159,64 +161,82 @@ export default function ContactsScreen(): JSX.Element {
       <WorkspacePane>
         {selectedUser ? (
           <ScrollView contentContainerStyle={styles.profileContent} showsVerticalScrollIndicator={false}>
-            <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.profileHero}>
+            <GlassView
+              material="ultraThin"
+              radius={theme.radius.panel}
+              bordered={false}
+              highlight
+              style={styles.profileHero}
+            >
               <Avatar
                 uri={selectedUser.avatar}
                 name={selectedUser.fullName}
-                size={96}
+                size={104}
                 shape="squircle"
                 showOnlineDot
                 isOnline={selectedUser.isOnline}
               />
-              <View style={styles.profileCopy}>
-                <Text style={[styles.profileName, { color: theme.colors.textPrimary }]}>
-                  {selectedUser.fullName}
-                </Text>
-                <Text style={[styles.profileRole, { color: theme.colors.textSecondary }]}>
-                  {ROLE_LABELS[selectedUser.role]} · {selectedUser.title}
-                </Text>
-                <Text style={[styles.profileMeta, { color: theme.colors.textMuted }]}>
-                  {selectedUser.department} · {PRESENCE_LABELS[selectedUser.presence]}
-                </Text>
-                <View style={styles.profileActions}>
-                  <AppButton
-                    label="Message"
-                    fullWidth={false}
-                    icon={<Feather name="message-square" size={15} color={theme.colors.onAccent} />}
-                    onPress={() => {
-                      openConversation(selectedUser).catch(() => undefined);
-                    }}
-                  />
-                </View>
+              <AppText variant="title1" style={styles.profileName}>
+                {selectedUser.fullName}
+              </AppText>
+              <AppText variant="subhead" tone="secondary">
+                {ROLE_LABELS[selectedUser.role]} · {selectedUser.title}
+              </AppText>
+              <AppText variant="footnote" tone="tertiary">
+                {selectedUser.department} · {PRESENCE_LABELS[selectedUser.presence]}
+              </AppText>
+              <View style={styles.profileActions}>
+                <AppButton
+                  label="Message"
+                  fullWidth={false}
+                  icon={<Feather name="message-circle" size={16} color={theme.colors.onAccent} />}
+                  onPress={() => {
+                    openConversation(selectedUser).catch(() => undefined);
+                  }}
+                />
               </View>
             </GlassView>
 
-            <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.profileCard}>
-              <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>About</Text>
-              <Text style={[styles.cardBody, { color: theme.colors.textSecondary }]}>
-                {selectedUser.about || "No profile summary yet."}
-              </Text>
-            </GlassView>
-
-            <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.profileCard}>
-              <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Contact</Text>
-              {[
-                { icon: "mail" as const, label: "Email", value: selectedUser.email },
-                { icon: "phone" as const, label: "Phone", value: selectedUser.phone ?? "Not available" },
-                { icon: "map-pin" as const, label: "Location", value: selectedUser.officeLocation ?? "Not available" },
-                { icon: "clock" as const, label: "Timezone", value: selectedUser.timezone }
-              ].map((row) => (
-                <View key={row.label} style={styles.contactRow}>
-                  <View style={[styles.contactIcon, { backgroundColor: theme.colors.glassSoft }]}>
-                    <Feather name={row.icon} size={14} color={theme.colors.textSecondary} />
-                  </View>
-                  <Text style={[styles.contactLabel, { color: theme.colors.textMuted }]}>{row.label}</Text>
-                  <Text numberOfLines={1} style={[styles.contactValue, { color: theme.colors.textPrimary }]}>
-                    {row.value}
-                  </Text>
+            {selectedUser.about ? (
+              <ListSection header="About">
+                <View style={styles.aboutRow}>
+                  <AppText variant="body" tone="secondary">
+                    {selectedUser.about}
+                  </AppText>
                 </View>
-              ))}
-            </GlassView>
+              </ListSection>
+            ) : null}
+
+            <ListSection header="Contact">
+              <ListRow
+                icon="mail"
+                iconColor={theme.colors.accent}
+                title="Email"
+                value={selectedUser.email}
+                showChevron={false}
+              />
+              <ListRow
+                icon="phone"
+                iconColor={theme.colors.success}
+                title="Phone"
+                value={selectedUser.phone ?? "Not available"}
+                showChevron={false}
+              />
+              <ListRow
+                icon="map-pin"
+                iconColor={theme.colors.danger}
+                title="Location"
+                value={selectedUser.officeLocation ?? "Not available"}
+                showChevron={false}
+              />
+              <ListRow
+                icon="clock"
+                iconColor={theme.colors.textSecondary}
+                title="Time zone"
+                value={selectedUser.timezone}
+                showChevron={false}
+              />
+            </ListSection>
           </ScrollView>
         ) : (
           <View style={styles.emptyPane}>
@@ -249,13 +269,13 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   header: {
-    paddingHorizontal: 14,
-    paddingTop: 12
+    paddingHorizontal: 16,
+    paddingTop: 14
   },
   controls: {
     gap: 10,
-    paddingHorizontal: 14,
-    paddingTop: 12
+    paddingHorizontal: 16,
+    paddingTop: 14
   },
   filters: {
     flexDirection: "row",
@@ -264,80 +284,36 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-    marginTop: 8
+    marginTop: 10
   },
   listContent: {
-    paddingBottom: 12,
-    paddingHorizontal: 8
+    paddingBottom: 16
   },
   separator: {
-    height: 8
+    height: StyleSheet.hairlineWidth * 2,
+    marginLeft: 72
   },
   profileContent: {
-    gap: 12,
-    padding: 16
-  },
-  profileHero: {
-    alignItems: "center",
-    flexDirection: "row",
     gap: 18,
     padding: 18
   },
-  profileCopy: {
-    flex: 1,
-    gap: 4
+  profileHero: {
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 28
   },
   profileName: {
-    fontSize: 24,
-    fontWeight: "800",
-    letterSpacing: -0.4
-  },
-  profileRole: {
-    fontSize: 14,
-    fontWeight: "600"
-  },
-  profileMeta: {
-    fontSize: 13
+    marginTop: 14
   },
   profileActions: {
     flexDirection: "row",
     gap: 10,
-    marginTop: 10
+    marginTop: 16
   },
-  profileCard: {
-    gap: 10,
-    padding: 18
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  cardBody: {
-    fontSize: 14,
-    lineHeight: 20
-  },
-  contactRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 40
-  },
-  contactIcon: {
-    alignItems: "center",
-    borderRadius: 999,
-    height: 30,
-    justifyContent: "center",
-    width: 30
-  },
-  contactLabel: {
-    fontSize: 12,
-    width: 84
-  },
-  contactValue: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "right"
+  aboutRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 13
   },
   emptyPane: {
     flex: 1,

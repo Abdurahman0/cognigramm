@@ -1,7 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Platform, Pressable, StyleSheet, TextInput, View, type StyleProp, type ViewStyle } from "react-native";
 
-import { GlassView } from "@/components/ui/GlassView";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface SearchBarProps {
@@ -12,6 +11,7 @@ interface SearchBarProps {
   style?: StyleProp<ViewStyle>;
 }
 
+/** iOS search field: capsule of thin glass, muted glyphs, 17pt text. */
 export function SearchBar({
   placeholder = "Search",
   value,
@@ -22,37 +22,56 @@ export function SearchBar({
   const { theme } = useAppTheme();
 
   return (
-    <GlassView tone="soft" radius={theme.radius.pill} bordered={false} style={[styles.root, style]}>
-      <Feather name="search" size={17} color={theme.colors.textMuted} />
+    <View
+      {...(Platform.OS === "web" ? { dataSet: { glass: "thin" } } : null)}
+      style={[
+        styles.root,
+        {
+          backgroundColor: theme.colors.materialUltraThin,
+          borderColor: theme.colors.glassBorder,
+          borderRadius: theme.radius.pill
+        },
+        style
+      ]}
+    >
+      <Feather name="search" size={16} color={theme.colors.textMuted} />
       <TextInput
-        style={[styles.input, Platform.OS === "web" ? styles.inputWeb : null, { color: theme.colors.textPrimary }]}
+        style={[
+          styles.input,
+          theme.typeScale.body,
+          Platform.OS === "web" ? styles.inputWeb : null,
+          { color: theme.colors.textPrimary, fontFamily: theme.fontFamily }
+        ]}
         placeholder={placeholder}
         placeholderTextColor={theme.colors.textMuted}
+        selectionColor={theme.colors.accent}
         value={value}
         onChangeText={onChangeText}
         returnKeyType="search"
+        clearButtonMode="never"
       />
       {value.length > 0 ? (
         <Pressable onPress={onClear} hitSlop={10} accessibilityRole="button" accessibilityLabel="Clear search">
-          <Feather name="x" size={17} color={theme.colors.textMuted} />
+          <Feather name="x-circle" size={16} color={theme.colors.textMuted} />
         </Pressable>
       ) : null}
-    </GlassView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     alignItems: "center",
+    borderWidth: StyleSheet.hairlineWidth * 2,
     flexDirection: "row",
-    minHeight: 44,
-    paddingHorizontal: 14
+    minHeight: 40,
+    overflow: "hidden",
+    paddingHorizontal: 13
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    marginLeft: 9,
-    paddingVertical: 10
+    marginLeft: 7,
+    paddingVertical: 9
   },
   inputWeb: {
     outlineStyle: "solid",

@@ -828,8 +828,16 @@ export const useChatStore = create<ChatStore>()(
 							}),
 						)
 
+						// A conversation opened while this ran already loaded its full history,
+						// so only seed the latest message where nothing is cached yet.
+						const cachedMessagesByChat = get().messagesByChat
 						const messagesByChat: Record<string, ChatMessage[]> = {}
 						latestByConversation.forEach(row => {
+							const cached = cachedMessagesByChat[row.conversationId] ?? []
+							if (cached.length > 1) {
+								messagesByChat[row.conversationId] = cached
+								return
+							}
 							if (!row.latest) {
 								messagesByChat[row.conversationId] = []
 								return

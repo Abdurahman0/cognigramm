@@ -1,12 +1,20 @@
+/**
+ * Apple-flavoured palette: system colours, label/fill opacity tiers, and the
+ * Liquid Glass material stack (ultraThin -> thick) that floats above the wallpaper.
+ */
 export interface AppColors {
-  /** Solid page background used as a fallback behind the glass backdrop. */
+  /** Solid page background used as a fallback behind the wallpaper. */
   background: string;
   surface: string;
   surfaceMuted: string;
   border: string;
+
+  /** Label tiers, mirroring UIColor.label / secondaryLabel / tertiaryLabel. */
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  textFaint: string;
+
   accent: string;
   accentMuted: string;
   accentStrong: string;
@@ -16,18 +24,31 @@ export interface AppColors {
   danger: string;
   dangerMuted: string;
   online: string;
+
   messageMine: string;
   messageOther: string;
   overlay: string;
   shadow: string;
 
-  /** Backdrop layers: base tone plus soft colour blooms behind the glass. */
+  /** Wallpaper: base tone plus the colour blooms the glass refracts. */
   backdropBase: string;
   backdropBloomWarm: string;
   backdropBloomCool: string;
   backdropVeil: string;
 
-  /** Translucent panel fills. `glass` is the default panel, `glassStrong` for headers/rails. */
+  /** Liquid Glass materials, thinnest to thickest. */
+  materialUltraThin: string;
+  materialThin: string;
+  materialRegular: string;
+  materialThick: string;
+
+  /** Non-material fills for rows, chips, and pressed states. */
+  fillPrimary: string;
+  fillSecondary: string;
+  fillTertiary: string;
+  separator: string;
+
+  /** Legacy aliases kept so older call sites stay valid. */
   glass: string;
   glassStrong: string;
   glassSoft: string;
@@ -35,80 +56,117 @@ export interface AppColors {
   glassBorder: string;
   glassHighlight: string;
 
-  /** Blur tint used by the optional native blur renderer. */
+  /** Lens edges: bright specular rim on top, dim refraction underneath. */
+  specularTop: string;
+  specularBottom: string;
+
   blurTint: "light" | "dark";
 }
 
 export const lightColors: AppColors = {
-  background: "#F3F0EB",
+  background: "#F2F2F7",
   surface: "#FFFFFF",
-  surfaceMuted: "#F1ECE6",
-  border: "rgba(28, 22, 18, 0.10)",
-  textPrimary: "#1B1613",
-  textSecondary: "#4E463F",
-  textMuted: "#8A8078",
-  accent: "#2F6BE8",
-  accentMuted: "rgba(47, 107, 232, 0.12)",
-  accentStrong: "#1F55C8",
+  surfaceMuted: "#F2F2F7",
+  border: "rgba(60, 60, 67, 0.29)",
+
+  textPrimary: "#000000",
+  textSecondary: "rgba(60, 60, 67, 0.60)",
+  textMuted: "rgba(60, 60, 67, 0.40)",
+  textFaint: "rgba(60, 60, 67, 0.22)",
+
+  accent: "#007AFF",
+  accentMuted: "rgba(0, 122, 255, 0.14)",
+  accentStrong: "#0060DF",
   onAccent: "#FFFFFF",
-  success: "#12A65C",
-  warning: "#D97706",
-  danger: "#E23D3D",
-  dangerMuted: "rgba(226, 61, 61, 0.12)",
-  online: "#12A65C",
-  messageMine: "rgba(47, 107, 232, 0.95)",
-  messageOther: "rgba(255, 255, 255, 0.82)",
-  overlay: "rgba(24, 18, 14, 0.34)",
-  shadow: "rgba(46, 34, 24, 0.18)",
+  success: "#34C759",
+  warning: "#FF9500",
+  danger: "#FF3B30",
+  dangerMuted: "rgba(255, 59, 48, 0.14)",
+  online: "#34C759",
 
-  backdropBase: "#EDE8E1",
-  backdropBloomWarm: "rgba(255, 206, 154, 0.55)",
-  backdropBloomCool: "rgba(168, 195, 235, 0.50)",
-  backdropVeil: "rgba(255, 255, 255, 0.34)",
+  messageMine: "#007AFF",
+  messageOther: "rgba(120, 120, 128, 0.20)",
+  overlay: "rgba(0, 0, 0, 0.28)",
+  shadow: "rgba(28, 24, 40, 0.16)",
 
-  glass: "rgba(255, 255, 255, 0.62)",
-  glassStrong: "rgba(255, 255, 255, 0.80)",
-  glassSoft: "rgba(28, 22, 18, 0.045)",
-  glassHover: "rgba(28, 22, 18, 0.075)",
-  glassBorder: "rgba(28, 22, 18, 0.09)",
-  glassHighlight: "rgba(255, 255, 255, 0.90)",
+  backdropBase: "#E9E6F2",
+  backdropBloomWarm: "rgba(255, 196, 168, 0.62)",
+  backdropBloomCool: "rgba(150, 182, 255, 0.60)",
+  backdropVeil: "rgba(255, 255, 255, 0.20)",
+
+  materialUltraThin: "rgba(255, 255, 255, 0.48)",
+  materialThin: "rgba(255, 255, 255, 0.62)",
+  materialRegular: "rgba(255, 255, 255, 0.74)",
+  materialThick: "rgba(255, 255, 255, 0.86)",
+
+  fillPrimary: "rgba(120, 120, 128, 0.20)",
+  fillSecondary: "rgba(120, 120, 128, 0.16)",
+  fillTertiary: "rgba(120, 120, 128, 0.12)",
+  separator: "rgba(60, 60, 67, 0.18)",
+
+  glass: "rgba(255, 255, 255, 0.74)",
+  glassStrong: "rgba(255, 255, 255, 0.86)",
+  glassSoft: "rgba(120, 120, 128, 0.12)",
+  glassHover: "rgba(120, 120, 128, 0.18)",
+  glassBorder: "rgba(255, 255, 255, 0.55)",
+  glassHighlight: "rgba(255, 255, 255, 0.95)",
+
+  specularTop: "rgba(255, 255, 255, 0.90)",
+  specularBottom: "rgba(255, 255, 255, 0.28)",
 
   blurTint: "light"
 };
 
 export const darkColors: AppColors = {
-  background: "#151210",
-  surface: "#2A2521",
-  surfaceMuted: "#332D28",
-  border: "rgba(255, 255, 255, 0.10)",
-  textPrimary: "#F5F1EC",
-  textSecondary: "#CFC7BF",
-  textMuted: "#9A918A",
-  accent: "#4C8DFF",
-  accentMuted: "rgba(76, 141, 255, 0.18)",
-  accentStrong: "#2F72F0",
+  background: "#000000",
+  surface: "#1C1C1E",
+  surfaceMuted: "#2C2C2E",
+  border: "rgba(84, 84, 88, 0.65)",
+
+  textPrimary: "#FFFFFF",
+  textSecondary: "rgba(235, 235, 245, 0.60)",
+  textMuted: "rgba(235, 235, 245, 0.40)",
+  textFaint: "rgba(235, 235, 245, 0.22)",
+
+  accent: "#0A84FF",
+  accentMuted: "rgba(10, 132, 255, 0.22)",
+  accentStrong: "#409CFF",
   onAccent: "#FFFFFF",
-  success: "#3ECF8E",
-  warning: "#F5A524",
-  danger: "#FF4D4F",
-  dangerMuted: "rgba(255, 77, 79, 0.16)",
-  online: "#38D57B",
-  messageMine: "rgba(76, 141, 255, 0.88)",
-  messageOther: "rgba(255, 255, 255, 0.085)",
-  overlay: "rgba(8, 6, 5, 0.62)",
-  shadow: "rgba(0, 0, 0, 0.45)",
+  success: "#30D158",
+  warning: "#FF9F0A",
+  danger: "#FF453A",
+  dangerMuted: "rgba(255, 69, 58, 0.20)",
+  online: "#30D158",
 
-  backdropBase: "#12100E",
-  backdropBloomWarm: "rgba(126, 96, 68, 0.42)",
-  backdropBloomCool: "rgba(56, 78, 104, 0.34)",
-  backdropVeil: "rgba(10, 8, 7, 0.34)",
+  messageMine: "#0A84FF",
+  messageOther: "rgba(120, 120, 128, 0.38)",
+  overlay: "rgba(0, 0, 0, 0.55)",
+  shadow: "rgba(0, 0, 0, 0.55)",
 
-  glass: "rgba(64, 58, 52, 0.52)",
-  glassStrong: "rgba(78, 71, 64, 0.60)",
-  glassSoft: "rgba(255, 255, 255, 0.06)",
-  glassHover: "rgba(255, 255, 255, 0.10)",
-  glassBorder: "rgba(255, 255, 255, 0.09)",
-  glassHighlight: "rgba(255, 255, 255, 0.14)",
+  backdropBase: "#07070B",
+  backdropBloomWarm: "rgba(122, 74, 168, 0.55)",
+  backdropBloomCool: "rgba(28, 88, 178, 0.55)",
+  backdropVeil: "rgba(4, 4, 8, 0.30)",
+
+  materialUltraThin: "rgba(120, 120, 128, 0.18)",
+  materialThin: "rgba(44, 44, 48, 0.52)",
+  materialRegular: "rgba(36, 36, 40, 0.66)",
+  materialThick: "rgba(24, 24, 28, 0.82)",
+
+  fillPrimary: "rgba(120, 120, 128, 0.36)",
+  fillSecondary: "rgba(120, 120, 128, 0.28)",
+  fillTertiary: "rgba(120, 120, 128, 0.20)",
+  separator: "rgba(84, 84, 88, 0.50)",
+
+  glass: "rgba(36, 36, 40, 0.66)",
+  glassStrong: "rgba(24, 24, 28, 0.82)",
+  glassSoft: "rgba(120, 120, 128, 0.20)",
+  glassHover: "rgba(120, 120, 128, 0.30)",
+  glassBorder: "rgba(255, 255, 255, 0.14)",
+  glassHighlight: "rgba(255, 255, 255, 0.35)",
+
+  specularTop: "rgba(255, 255, 255, 0.42)",
+  specularBottom: "rgba(255, 255, 255, 0.08)",
 
   blurTint: "dark"
 };

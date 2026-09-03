@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { Avatar } from "@/components/common";
-import { GlassView } from "@/components/ui";
+import { AppText, GlassView } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { CallRuntimeState, CallType } from "@/features/calls/types";
 
@@ -146,11 +146,13 @@ export function CallMediaViewport({
 
   const hero = (
     <View style={styles.centeredContent}>
-      <Avatar uri={peerAvatar} name={peerName} size={132} shape="squircle" />
-      <Text style={[styles.peerName, { color: theme.colors.textPrimary }]}>{peerName}</Text>
-      <Text style={[styles.peerMeta, { color: theme.colors.textMuted }]}>
+      <Avatar uri={peerAvatar} name={peerName} size={136} shape="squircle" />
+      <AppText variant="title1" style={styles.peerName}>
+        {peerName}
+      </AppText>
+      <AppText variant="subhead" tone="secondary" style={styles.peerMeta}>
         {caption ?? placeholderCaption}
-      </Text>
+      </AppText>
     </View>
   );
 
@@ -158,9 +160,10 @@ export function CallMediaViewport({
     <View style={styles.root}>
       {shouldRenderWebAudio ? <audio autoPlay playsInline ref={remoteAudioRef} /> : null}
       <GlassView
-        tone="soft"
-        radius={theme.radius.xxl}
+        material="ultraThin"
+        radius={theme.radius.panel}
         bordered={false}
+        highlight
         style={styles.remotePane}
       >
         {showVideoLayout ? (
@@ -177,7 +180,7 @@ export function CallMediaViewport({
 
         {showVideoLayout ? (
           <GlassView
-            tone="strong"
+            material="thick"
             radius={theme.radius.lg}
             elevation="soft"
             style={styles.localPreview}
@@ -193,9 +196,9 @@ export function CallMediaViewport({
                   size={16}
                   color={theme.colors.textMuted}
                 />
-                <Text style={[styles.localPreviewText, { color: theme.colors.textMuted }]}>
+                <AppText variant="caption2" tone="tertiary" style={styles.localPreviewText}>
                   {canRenderWebVideo || canRenderNativeRtcVideo ? "Camera off" : "Renderer unavailable"}
-                </Text>
+                </AppText>
               </View>
             )}
           </GlassView>
@@ -223,14 +226,10 @@ const styles = StyleSheet.create({
     paddingVertical: 28
   },
   peerName: {
-    fontSize: 22,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    marginTop: 18
+    marginTop: 20
   },
   peerMeta: {
-    fontSize: 13,
-    marginTop: 6
+    marginTop: 4
   },
   localPreview: {
     bottom: 14,
@@ -251,7 +250,6 @@ const styles = StyleSheet.create({
     width: "100%"
   },
   localPreviewText: {
-    fontSize: 11,
     marginTop: 4
   }
 });

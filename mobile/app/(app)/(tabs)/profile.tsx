@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, Avatar, SectionHeader, ToggleItem } from "@/components/common";
 import { WorkspacePane } from "@/components/layout";
-import { Chip, GlassView, IconButton } from "@/components/ui";
+import { AppText, Chip, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -32,12 +32,17 @@ export default function ProfileScreen(): JSX.Element {
   const compactMode = useSettingsStore((state) => state.compactMode);
   const setCompactMode = useSettingsStore((state) => state.setCompactMode);
 
-  const detailRows: { icon: React.ComponentProps<typeof Feather>["name"]; label: string; value: string }[] = [
-    { icon: "mail", label: "Work email", value: user.email },
-    { icon: "phone", label: "Phone", value: user.phone ?? "Not set" },
-    { icon: "briefcase", label: "Department", value: user.department },
-    { icon: "map-pin", label: "Location", value: user.officeLocation ?? "Not set" },
-    { icon: "clock", label: "Timezone", value: user.timezone }
+  const accountRows: {
+    icon: React.ComponentProps<typeof Feather>["name"];
+    label: string;
+    value: string;
+    tint: string;
+  }[] = [
+    { icon: "mail", label: "Work email", value: user.email, tint: theme.colors.accent },
+    { icon: "phone", label: "Phone", value: user.phone ?? "Not set", tint: theme.colors.success },
+    { icon: "briefcase", label: "Department", value: user.department, tint: theme.colors.warning },
+    { icon: "map-pin", label: "Location", value: user.officeLocation ?? "Not set", tint: theme.colors.danger },
+    { icon: "clock", label: "Time zone", value: user.timezone, tint: theme.colors.textSecondary }
   ];
 
   const content = (
@@ -64,57 +69,59 @@ export default function ProfileScreen(): JSX.Element {
         }
       />
 
-      <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.hero}>
+      <GlassView material="ultraThin" radius={theme.radius.panel} bordered={false} highlight style={styles.hero}>
         <Avatar
           uri={user.avatar}
           name={user.fullName}
-          size={92}
+          size={96}
           shape="squircle"
           showOnlineDot
           isOnline={user.isOnline}
         />
-        <View style={styles.heroCopy}>
-          <Text style={[styles.heroName, { color: theme.colors.textPrimary }]}>{user.fullName}</Text>
-          <Text style={[styles.heroRole, { color: theme.colors.textSecondary }]}>
-            {ROLE_LABELS[user.role]} · {user.title}
-          </Text>
-          <View style={styles.heroBadges}>
-            <View style={[styles.badge, { backgroundColor: theme.colors.glassSoft }]}>
-              <Text style={[styles.badgeLabel, { color: theme.colors.textSecondary }]}>{user.department}</Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: theme.colors.accentMuted }]}>
-              <Text style={[styles.badgeLabel, { color: theme.colors.accent }]}>
-                {PRESENCE_LABELS[user.presence]}
-              </Text>
-            </View>
+        <AppText variant="title1" style={styles.heroName}>
+          {user.fullName}
+        </AppText>
+        <AppText variant="subhead" tone="secondary">
+          {ROLE_LABELS[user.role]} · {user.title}
+        </AppText>
+        <View style={styles.heroBadges}>
+          <View style={[styles.badge, { backgroundColor: theme.colors.fillTertiary }]}>
+            <AppText variant="caption1" tone="secondary">
+              {user.department}
+            </AppText>
+          </View>
+          <View style={[styles.badge, { backgroundColor: theme.colors.accentMuted }]}>
+            <AppText variant="caption1" tone="accent">
+              {PRESENCE_LABELS[user.presence]}
+            </AppText>
           </View>
         </View>
       </GlassView>
 
       {user.about ? (
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-          <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>About</Text>
-          <Text style={[styles.cardBody, { color: theme.colors.textSecondary }]}>{user.about}</Text>
-        </GlassView>
+        <ListSection header="About">
+          <View style={styles.aboutRow}>
+            <AppText variant="body" tone="secondary">
+              {user.about}
+            </AppText>
+          </View>
+        </ListSection>
       ) : null}
 
-      <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-        <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Account</Text>
-        {detailRows.map((row) => (
-          <View key={row.label} style={styles.detailRow}>
-            <View style={[styles.detailIcon, { backgroundColor: theme.colors.glassSoft }]}>
-              <Feather name={row.icon} size={14} color={theme.colors.textSecondary} />
-            </View>
-            <Text style={[styles.detailLabel, { color: theme.colors.textMuted }]}>{row.label}</Text>
-            <Text numberOfLines={1} style={[styles.detailValue, { color: theme.colors.textPrimary }]}>
-              {row.value}
-            </Text>
-          </View>
+      <ListSection header="Account">
+        {accountRows.map((row) => (
+          <ListRow
+            key={row.label}
+            icon={row.icon}
+            iconColor={row.tint}
+            title={row.label}
+            value={row.value}
+            showChevron={false}
+          />
         ))}
-      </GlassView>
+      </ListSection>
 
-      <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.card}>
-        <Text style={[styles.cardTitle, { color: theme.colors.textPrimary }]}>Appearance</Text>
+      <ListSection header="Appearance" footer="Glass surfaces adapt to the selected appearance on mobile and web.">
         <View style={styles.themeRow}>
           {THEME_MODES.map((mode) => (
             <Chip
@@ -127,18 +134,18 @@ export default function ProfileScreen(): JSX.Element {
         </View>
         <ToggleItem
           title="Compact density"
-          description="Tighter rows for dense desktop workflows."
+          description="Tighter conversation rows for dense workflows."
           value={compactMode}
           onValueChange={setCompactMode}
         />
-      </GlassView>
+      </ListSection>
 
       <View style={styles.signOutRow}>
         <AppButton
           variant="danger"
           label="Sign out"
           fullWidth={false}
-          icon={<Feather name="log-out" size={15} color={theme.colors.onAccent} />}
+          icon={<Feather name="log-out" size={16} color={theme.colors.onAccent} />}
           onPress={() => {
             logout();
             router.replace("/(auth)/login");
@@ -176,22 +183,18 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   desktopPane: {
-    maxWidth: 780,
+    maxWidth: 760,
     width: "100%"
   },
-  signOutRow: {
-    alignItems: "flex-start",
-    paddingTop: 4
-  },
   content: {
-    gap: 12,
-    paddingBottom: 28,
+    gap: 18,
+    paddingBottom: 32,
     paddingHorizontal: 16,
-    paddingTop: 14
+    paddingTop: 16
   },
   contentDesktop: {
     alignSelf: "center",
-    maxWidth: 720,
+    maxWidth: 680,
     width: "100%"
   },
   headerActions: {
@@ -200,76 +203,36 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 18,
-    padding: 18
-  },
-  heroCopy: {
-    flex: 1,
-    gap: 5
+    gap: 4,
+    paddingHorizontal: 20,
+    paddingVertical: 26
   },
   heroName: {
-    fontSize: 23,
-    fontWeight: "800",
-    letterSpacing: -0.4
-  },
-  heroRole: {
-    fontSize: 14,
-    fontWeight: "600"
+    marginTop: 12
   },
   heroBadges: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginTop: 4
+    marginTop: 10
   },
   badge: {
     borderRadius: 999,
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     paddingVertical: 5
   },
-  badgeLabel: {
-    fontSize: 12,
-    fontWeight: "700"
-  },
-  card: {
-    gap: 10,
-    padding: 18
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  cardBody: {
-    fontSize: 14,
-    lineHeight: 20
-  },
-  detailRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 40
-  },
-  detailIcon: {
-    alignItems: "center",
-    borderRadius: 999,
-    height: 30,
-    justifyContent: "center",
-    width: 30
-  },
-  detailLabel: {
-    fontSize: 12,
-    width: 96
-  },
-  detailValue: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "right"
+  aboutRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 13
   },
   themeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 13
+  },
+  signOutRow: {
+    alignItems: "flex-start"
   }
 });

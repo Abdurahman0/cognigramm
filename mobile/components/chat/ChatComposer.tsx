@@ -282,7 +282,7 @@ export function ChatComposer({
 					]}
 					hitSlop={8}
 				>
-					<Feather name='smile' size={20} color={theme.colors.textSecondary} />
+					<Feather name='smile' size={22} color={theme.colors.textSecondary} />
 				</Pressable>
 
 				<View
@@ -334,7 +334,7 @@ export function ChatComposer({
 				>
 					<Feather
 						name='paperclip'
-						size={20}
+						size={21}
 						color={theme.colors.textSecondary}
 					/>
 				</Pressable>
@@ -355,8 +355,8 @@ export function ChatComposer({
 					hitSlop={8}
 				>
 					<Feather
-						name='send'
-						size={17}
+						name='arrow-up'
+						size={19}
 						color={
 							!sendingLocked && text.trim().length > 0
 								? theme.colors.onAccent
@@ -379,13 +379,13 @@ const styles = StyleSheet.create({
 	},
 	composerShell: {
 		alignItems: 'flex-end',
-		borderRadius: 26,
-		borderWidth: 1,
+		borderRadius: 22,
+		borderWidth: StyleSheet.hairlineWidth * 2,
 		flexDirection: 'row',
-		minHeight: 52,
-		paddingLeft: 8,
-		paddingRight: 6,
-		paddingVertical: 6,
+		minHeight: 44,
+		paddingLeft: 6,
+		paddingRight: 5,
+		paddingVertical: 5,
 	},
 	composerShellWeb: {
 		alignItems: 'center',
@@ -418,8 +418,9 @@ const styles = StyleSheet.create({
 	},
 	input: {
 		flex: 1,
-		fontSize: 15,
-		lineHeight: 20,
+		fontSize: 17,
+		letterSpacing: -0.41,
+		lineHeight: 22,
 		maxHeight: 94,
 		minHeight: 20,
 		paddingBottom: Platform.OS === 'ios' ? 2 : 0,
@@ -440,11 +441,11 @@ const styles = StyleSheet.create({
 	},
 	sendButton: {
 		alignItems: 'center',
-		borderRadius: 19,
-		height: 38,
+		borderRadius: 17,
+		height: 34,
 		justifyContent: 'center',
-		marginLeft: 6,
-		width: 38,
+		marginLeft: 4,
+		width: 34,
 	},
 	sendButtonKeyboardOpen: {
 		alignSelf: 'center',
@@ -478,8 +479,9 @@ const styles = StyleSheet.create({
 		gap: 6,
 	},
 	editingText: {
-		fontSize: 12,
+		fontSize: 13,
 		fontWeight: '600',
+		letterSpacing: -0.08,
 	},
 	cancelEditBtn: {
 		alignItems: 'center',

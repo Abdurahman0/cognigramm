@@ -64,16 +64,20 @@ npm run build:ios
 
 ## Design system
 
-Dark and light glass UI shared by mobile and web.
+Apple-style Liquid Glass, shared by mobile and web, in light and dark.
 
-- `theme/colors.ts`: palette including backdrop blooms and translucent panel fills (`glass`, `glassStrong`, `glassSoft`, `glassBorder`)
-- `theme/tokens.ts`: spacing, radii, type scale, blur strengths, layout widths
-- `theme/webStyles.ts`: injects the CSS `backdrop-filter` rules that back `dataSet={{ glass: ... }}`
-- `components/ui/`: `GlassView`, `GlassBackdrop`, `IconButton`, `Badge`, `Chip`, `PresenceDot`, themed toasts
-- `components/layout/`: `AppShell` (desktop rail + glass window), `WorkspaceSidebar`, `NavRail`, `WorkspacePane`, `DetailScreenShell`, `GlassTabBar`
+- `theme/colors.ts`: system colours, label/fill opacity tiers, separators, and the material
+  stack (`materialUltraThin` -> `materialThick`) plus specular rim colours
+- `theme/typography.ts`: the iOS type ramp (largeTitle -> caption2), SF on Apple platforms
+- `theme/tokens.ts`: spacing, continuous-corner radii, blur strength per material, layout widths, spring presets
+- `theme/webStyles.ts`: injects the CSS `backdrop-filter` (blur + saturation + brightness) behind `dataSet={{ glass: ... }}`
+- `components/ui/`: `GlassView`, `GlassBackdrop`, `AppText`, `ListSection`/`ListRow` (inset grouped lists),
+  `IconButton`, `Chip`, `Badge`, `PressableScale`, `PresenceDot`, themed toasts
+- `components/layout/`: `AppShell` (nav rail + glass window), `WorkspaceSidebar`, `NavRail`,
+  `WorkspacePane`, `DetailScreenShell`, `GlassTabBar` (floating capsule)
 
 Real backdrop blur is CSS-only, so native platforms fall back to layered translucency over the
-same animated backdrop.
+same wallpaper. Controls are capsules, cards use large continuous radii, and presses spring.
 
 ## Responsive layout
 

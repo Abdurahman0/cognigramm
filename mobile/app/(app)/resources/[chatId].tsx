@@ -7,13 +7,12 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View
 } from "react-native";
 
 import { EmptyState, SectionHeader } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
-import { Chip, IconButton } from "@/components/ui";
+import { AppText, Chip, IconButton } from "@/components/ui";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useChatStore } from "@/store/chatStore";
@@ -194,26 +193,26 @@ export default function MediaScreen(): JSX.Element {
                   styles.row,
                   {
                     borderRadius: theme.radius.lg,
-                    backgroundColor: hovered ? theme.colors.glassHover : theme.colors.glassSoft,
-                    opacity: pressed ? 0.9 : 1
+                    backgroundColor: pressed
+                      ? theme.colors.fillSecondary
+                      : hovered
+                      ? theme.colors.fillTertiary
+                      : theme.colors.materialUltraThin
                   }
                 ]}
               >
-                <View style={[styles.rowIcon, { backgroundColor: theme.colors.glassHover }]}>
-                  <Feather name={icon} size={16} color={theme.colors.textSecondary} />
+                <View style={[styles.rowIcon, { backgroundColor: theme.colors.accent }]}>
+                  <Feather name={icon} size={16} color={theme.colors.onAccent} />
                 </View>
                 <View style={styles.rowCopy}>
-                  <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.colors.textPrimary }]}>
+                  <AppText variant="body" numberOfLines={1}>
                     {item.title}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {item.subtitle}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                    {sender?.fullName ?? "Unknown"} - {formatMessageDate(item.createdAt)}
-                  </Text>
+                  </AppText>
+                  <AppText variant="footnote" tone="secondary" numberOfLines={1}>
+                    {item.subtitle} · {sender?.fullName ?? "Unknown"} · {formatMessageDate(item.createdAt)}
+                  </AppText>
                 </View>
-                <Feather name="external-link" size={14} color={theme.colors.textMuted} />
+                <Feather name="external-link" size={16} color={theme.colors.textFaint} />
               </Pressable>
             );
           }}
@@ -267,12 +266,8 @@ const styles = StyleSheet.create({
     gap: 1,
     marginLeft: 10
   },
-  rowTitle: {
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  rowMeta: {
-    fontSize: 12
+  rowCopyOnly: {
+    flex: 1
   }
 });
 

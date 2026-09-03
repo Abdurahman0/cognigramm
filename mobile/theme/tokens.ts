@@ -8,50 +8,57 @@ export const spacing = {
   xxxl: 36
 } as const;
 
+/**
+ * Apple leans on continuous corners: controls are capsules, cards use large radii,
+ * and nested corners stay concentric (outer radius - padding).
+ */
 export const radius = {
   sm: 10,
   md: 14,
   lg: 18,
-  xl: 24,
-  xxl: 28,
-  /** Outer window / floating panel corner. */
-  panel: 26,
+  xl: 22,
+  xxl: 26,
+  /** Grouped list container / floating panel. */
+  panel: 30,
+  /** Sheets and the outer desktop window. */
+  sheet: 34,
   pill: 999
 } as const;
 
-export const typography = {
-  h1: 28,
-  h2: 22,
-  h3: 18,
-  body: 15,
-  bodySm: 13,
-  caption: 12,
-  label: 11
-} as const;
-
-/** Blur strength per surface role, consumed by GlassView on web and native. */
+/** Backdrop blur strength per material tier. */
 export const blur = {
-  soft: 14,
-  panel: 24,
-  strong: 36
+  ultraThin: 20,
+  thin: 30,
+  regular: 40,
+  thick: 50,
+  soft: 20,
+  panel: 40,
+  strong: 50
 } as const;
 
 export const layout = {
-  /** Floating nav rail on desktop. */
-  railWidth: 68,
-  sidebarWidth: 264,
-  listPaneWidth: 372,
-  listPaneMinWidth: 312,
-  listPaneMaxWidth: 420,
-  /** Max readable width for centred detail pages. */
+  railWidth: 76,
+  sidebarWidth: 268,
+  listPaneWidth: 376,
+  listPaneMinWidth: 320,
+  listPaneMaxWidth: 430,
   detailMaxWidth: 880,
   authMaxWidth: 420,
-  /** Floating mobile tab bar. */
-  tabBarHeight: 62
+  tabBarHeight: 64,
+  /** Minimum comfortable touch target. */
+  hitTarget: 44
 } as const;
 
 export const duration = {
   fast: 140,
-  base: 220,
-  slow: 320
+  base: 240,
+  slow: 360
 } as const;
+
+/** Spring presets matching the springy, slightly overshooting iOS feel. */
+export const motion = {
+  press: { damping: 26, stiffness: 420, mass: 0.7 },
+  enter: { damping: 22, stiffness: 260, mass: 0.9 }
+} as const;
+
+export { typeScale, typography, fontFamily, type TypeVariant } from "@/theme/typography";

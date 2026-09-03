@@ -1,5 +1,6 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { AppText } from "@/components/ui/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 export type BadgeTone = "accent" | "danger" | "muted" | "success";
@@ -25,16 +26,19 @@ export function Badge({ count, label, tone = "accent", style }: BadgeProps): JSX
       : tone === "success"
       ? theme.colors.success
       : tone === "muted"
-      ? theme.colors.glassSoft
+      ? theme.colors.fillSecondary
       : theme.colors.accent;
-
-  const color = tone === "muted" ? theme.colors.textSecondary : theme.colors.onAccent;
 
   return (
     <View style={[styles.root, { backgroundColor: background }, style]}>
-      <Text style={[styles.label, { color }]} numberOfLines={1}>
+      <AppText
+        variant="caption2"
+        color={tone === "muted" ? theme.colors.textSecondary : theme.colors.onAccent}
+        numberOfLines={1}
+        style={styles.label}
+      >
         {text}
-      </Text>
+      </AppText>
     </View>
   );
 }
@@ -43,14 +47,12 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     borderRadius: 999,
-    height: 21,
+    height: 20,
     justifyContent: "center",
-    minWidth: 21,
-    paddingHorizontal: 7
+    minWidth: 20,
+    paddingHorizontal: 6
   },
   label: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.1
+    fontWeight: "600"
   }
 });

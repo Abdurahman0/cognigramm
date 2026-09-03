@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 
 import { NavRail } from "@/components/layout/NavRail";
 import { WorkspaceSidebar } from "@/components/layout/WorkspaceSidebar";
@@ -23,15 +23,23 @@ export function AppShell({ children, showSidebar = true }: AppShellProps): JSX.E
   const { isDesktop } = useResponsive();
 
   if (!isDesktop) {
-    return <View style={styles.compactRoot}>{children}</View>;
+    // A thin veil over the wallpaper keeps phone content legible without hiding the colour.
+    return (
+      <View
+        {...(Platform.OS === "web" ? { dataSet: { glass: "ultraThin" } } : null)}
+        style={[styles.compactRoot, { backgroundColor: theme.colors.materialUltraThin }]}
+      >
+        {children}
+      </View>
+    );
   }
 
   return (
     <View style={styles.desktopRoot}>
       <NavRail />
       <GlassView
-        tone="panel"
-        radius={theme.radius.panel}
+        material="regular"
+        radius={theme.radius.sheet}
         highlight
         elevation="floating"
         style={styles.window}
@@ -45,14 +53,13 @@ export function AppShell({ children, showSidebar = true }: AppShellProps): JSX.E
 
 const styles = StyleSheet.create({
   compactRoot: {
-    backgroundColor: "transparent",
     flex: 1
   },
   desktopRoot: {
     backgroundColor: "transparent",
     flex: 1,
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
     padding: 16
   },
   window: {

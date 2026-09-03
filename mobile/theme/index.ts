@@ -1,7 +1,8 @@
 import { Platform, type ViewStyle } from "react-native";
 
 import { darkColors, lightColors, type AppColors } from "@/theme/colors";
-import { blur, duration, layout, radius, spacing, typography } from "@/theme/tokens";
+import { blur, duration, layout, motion, radius, spacing } from "@/theme/tokens";
+import { fontFamily, typeScale, typography, type TypeVariant } from "@/theme/typography";
 import type { ThemeMode } from "@/types/common";
 
 export type ElevationLevel = "none" | "soft" | "panel" | "floating";
@@ -9,16 +10,16 @@ export type ElevationLevel = "none" | "soft" | "panel" | "floating";
 export type AppElevation = Record<ElevationLevel, ViewStyle>;
 
 /**
- * Shadows are expressed as CSS box-shadows on web (crisper, supports large blur radii)
- * and as native shadow/elevation props everywhere else.
+ * Liquid Glass sits slightly above the content it refracts, so shadows stay wide,
+ * soft, and low-contrast rather than dark drop shadows.
  */
 const createElevation = (colors: AppColors): AppElevation => {
   if (Platform.OS === "web") {
     return {
       none: {},
-      soft: { boxShadow: `0 6px 18px ${colors.shadow}` } as ViewStyle,
-      panel: { boxShadow: `0 18px 46px ${colors.shadow}` } as ViewStyle,
-      floating: { boxShadow: `0 28px 70px ${colors.shadow}` } as ViewStyle
+      soft: { boxShadow: `0 4px 16px ${colors.shadow}` } as ViewStyle,
+      panel: { boxShadow: `0 16px 40px ${colors.shadow}` } as ViewStyle,
+      floating: { boxShadow: `0 24px 60px ${colors.shadow}` } as ViewStyle
     };
   }
 
@@ -26,24 +27,24 @@ const createElevation = (colors: AppColors): AppElevation => {
     none: {},
     soft: {
       shadowColor: "#000000",
-      shadowOpacity: 0.16,
+      shadowOpacity: 0.12,
       shadowRadius: 10,
       shadowOffset: { width: 0, height: 4 },
-      elevation: 4
+      elevation: 3
     },
     panel: {
       shadowColor: "#000000",
-      shadowOpacity: 0.24,
-      shadowRadius: 20,
+      shadowOpacity: 0.18,
+      shadowRadius: 22,
       shadowOffset: { width: 0, height: 10 },
-      elevation: 10
+      elevation: 8
     },
     floating: {
       shadowColor: "#000000",
-      shadowOpacity: 0.32,
-      shadowRadius: 28,
-      shadowOffset: { width: 0, height: 16 },
-      elevation: 18
+      shadowOpacity: 0.26,
+      shadowRadius: 32,
+      shadowOffset: { width: 0, height: 18 },
+      elevation: 16
     }
   };
 };
@@ -54,9 +55,12 @@ export interface AppTheme {
   spacing: typeof spacing;
   radius: typeof radius;
   typography: typeof typography;
+  typeScale: typeof typeScale;
+  fontFamily: string;
   blur: typeof blur;
   layout: typeof layout;
   duration: typeof duration;
+  motion: typeof motion;
   elevation: AppElevation;
 }
 
@@ -75,14 +79,17 @@ export const getTheme = (mode: Exclude<ThemeMode, "system">): AppTheme => {
     spacing,
     radius,
     typography,
+    typeScale,
+    fontFamily,
     blur,
     layout,
     duration,
+    motion,
     elevation: createElevation(colors)
   };
   themeCache.set(mode, theme);
   return theme;
 };
 
-export { blur, duration, layout, radius, spacing, typography };
-export type { AppColors };
+export { blur, duration, fontFamily, layout, motion, radius, spacing, typeScale, typography };
+export type { AppColors, TypeVariant };

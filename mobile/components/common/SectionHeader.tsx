@@ -1,28 +1,37 @@
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { AppText } from "@/components/ui/AppText";
 
 interface SectionHeaderProps {
   title: string;
   subtitle?: string;
   rightSlot?: ReactNode;
   leftSlot?: ReactNode;
+  /** `large` is the iOS large-title header; `inline` is the compact nav-bar style. */
+  variant?: "large" | "inline";
 }
 
-export function SectionHeader({ title, subtitle, rightSlot, leftSlot }: SectionHeaderProps): JSX.Element {
-  const { theme } = useAppTheme();
+export function SectionHeader({
+  title,
+  subtitle,
+  rightSlot,
+  leftSlot,
+  variant = "large"
+}: SectionHeaderProps): JSX.Element {
+  const isLarge = variant === "large";
+
   return (
     <View style={styles.row}>
       {leftSlot}
       <View style={styles.content}>
-        <Text numberOfLines={1} style={[styles.title, { color: theme.colors.textPrimary }]}>
+        <AppText variant={isLarge ? "largeTitle" : "headline"} numberOfLines={1}>
           {title}
-        </Text>
+        </AppText>
         {subtitle ? (
-          <Text numberOfLines={1} style={[styles.subtitle, { color: theme.colors.textMuted }]}>
+          <AppText variant={isLarge ? "subhead" : "caption1"} tone="secondary" numberOfLines={1}>
             {subtitle}
-          </Text>
+          </AppText>
         ) : null}
       </View>
       {rightSlot}
@@ -34,19 +43,11 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
     justifyContent: "space-between"
   },
   content: {
     flex: 1,
     gap: 2
-  },
-  title: {
-    fontSize: 21,
-    fontWeight: "700",
-    letterSpacing: -0.2
-  },
-  subtitle: {
-    fontSize: 13
   }
 });

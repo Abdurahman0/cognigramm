@@ -128,10 +128,10 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   metaText: {
-    fontSize: 11,
+    fontSize: 12,
   },
   errorText: {
-    fontSize: 11,
+    fontSize: 12,
     opacity: 0.92,
   },
 });

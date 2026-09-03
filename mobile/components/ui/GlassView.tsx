@@ -4,25 +4,35 @@ import { Platform, StyleSheet, View, type StyleProp, type ViewProps, type ViewSt
 import { useAppTheme } from "@/hooks/useAppTheme";
 import type { ElevationLevel } from "@/theme";
 
+export type GlassMaterial = "ultraThin" | "thin" | "regular" | "thick" | "clear";
+/** Legacy tone names, mapped onto the material stack. */
 export type GlassTone = "panel" | "strong" | "soft" | "clear";
 
+const TONE_TO_MATERIAL: Record<GlassTone, GlassMaterial> = {
+  panel: "regular",
+  strong: "thick",
+  soft: "ultraThin",
+  clear: "clear"
+};
+
 interface GlassViewProps extends PropsWithChildren<Pick<ViewProps, "pointerEvents" | "onLayout">> {
+  material?: GlassMaterial;
   tone?: GlassTone;
   radius?: number;
   bordered?: boolean;
-  /** Hairline light reflection along the top edge, like a real glass sheet. */
+  /** Specular rim: bright lens edge on top, faint refraction underneath. */
   highlight?: boolean;
   elevation?: ElevationLevel;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
- * Translucent surface. On web the matching CSS `backdrop-filter` comes from the
- * injected `[data-glass]` rules; native platforms fall back to layered translucency,
- * which reads the same over the animated backdrop.
+ * A Liquid Glass surface. On web the CSS `backdrop-filter` from `[data-glass]` does the
+ * lensing; native platforms approximate it with layered translucency over the wallpaper.
  */
 export function GlassView({
   children,
+  material,
   tone = "panel",
   radius,
   bordered = true,
@@ -33,24 +43,25 @@ export function GlassView({
   onLayout
 }: GlassViewProps): JSX.Element {
   const { theme } = useAppTheme();
+  const resolved: GlassMaterial = material ?? TONE_TO_MATERIAL[tone];
   const cornerRadius = radius ?? theme.radius.xl;
 
   const fill =
-    tone === "strong"
-      ? theme.colors.glassStrong
-      : tone === "soft"
-      ? theme.colors.glassSoft
-      : tone === "clear"
+    resolved === "ultraThin"
+      ? theme.colors.materialUltraThin
+      : resolved === "thin"
+      ? theme.colors.materialThin
+      : resolved === "thick"
+      ? theme.colors.materialThick
+      : resolved === "clear"
       ? "transparent"
-      : theme.colors.glass;
-
-  const webBlurTone = tone === "strong" ? "strong" : tone === "soft" ? "soft" : tone === "clear" ? "none" : "panel";
+      : theme.colors.materialRegular;
 
   return (
     <View
       onLayout={onLayout}
       pointerEvents={pointerEvents}
-      {...(Platform.OS === "web" ? { dataSet: { glass: webBlurTone } } : null)}
+      {...(Platform.OS === "web" ? { dataSet: { glass: resolved } } : null)}
       style={[
         {
           backgroundColor: fill,
@@ -64,10 +75,16 @@ export function GlassView({
       ]}
     >
       {highlight ? (
-        <View
-          pointerEvents="none"
-          style={[styles.highlight, { backgroundColor: theme.colors.glassHighlight }]}
-        />
+        <>
+          <View
+            pointerEvents="none"
+            style={[styles.specularTop, { backgroundColor: theme.colors.specularTop }]}
+          />
+          <View
+            pointerEvents="none"
+            style={[styles.specularBottom, { backgroundColor: theme.colors.specularBottom }]}
+          />
+        </>
       ) : null}
       {children}
     </View>
@@ -78,13 +95,22 @@ const styles = StyleSheet.create({
   clip: {
     overflow: "hidden"
   },
-  highlight: {
+  specularTop: {
+    height: 1,
+    left: 0,
+    opacity: 0.85,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 1
+  },
+  specularBottom: {
+    bottom: 0,
     height: 1,
     left: 0,
     opacity: 0.6,
     position: "absolute",
     right: 0,
-    top: 0,
     zIndex: 1
   }
 });

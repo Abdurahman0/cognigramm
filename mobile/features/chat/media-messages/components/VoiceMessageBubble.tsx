@@ -195,10 +195,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   metaText: {
-    fontSize: 11,
+    fontSize: 12,
   },
   errorText: {
-    fontSize: 11,
+    fontSize: 12,
     opacity: 0.9,
   },
 });

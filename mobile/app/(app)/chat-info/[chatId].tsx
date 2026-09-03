@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import {
   Avatar,
@@ -11,13 +11,12 @@ import {
   UserCard
 } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
-import { GlassView, IconButton } from "@/components/ui";
+import { AppText, GlassView, IconButton, ListSection } from "@/components/ui";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
-import { useResponsive } from "@/hooks/useResponsive";
 import { useChatStore } from "@/store/chatStore";
 import type { ChatSummary, User } from "@/types";
 import { useShallow } from "zustand/react/shallow";
@@ -73,8 +72,10 @@ function QuickAction({ icon, label, active = false, onPress }: QuickActionProps)
         }
       ]}
     >
-      <Feather name={icon} size={18} color={active ? theme.colors.accent : theme.colors.textSecondary} />
-      <Text style={[styles.quickActionLabel, { color: active ? theme.colors.accent : theme.colors.textSecondary }]}>{label}</Text>
+      <Feather name={icon} size={20} color={theme.colors.accent} />
+      <AppText variant="caption1" tone="accent" numberOfLines={1}>
+        {label}
+      </AppText>
     </Pressable>
   );
 }
@@ -90,28 +91,23 @@ function InfoRow({ icon, label, value, onPress }: InfoRowProps): JSX.Element {
   const { theme } = useAppTheme();
   const row = (
     <>
-      <View style={[styles.rowIcon, { backgroundColor: theme.colors.accentMuted }]}>
-        <Feather name={icon} size={15} color={theme.colors.accent} />
+      <View style={[styles.rowIcon, { backgroundColor: theme.colors.accent }]}>
+        <Feather name={icon} size={15} color={theme.colors.onAccent} />
       </View>
       <View style={styles.rowCopy}>
-        <Text style={[styles.rowLabel, { color: theme.colors.textMuted }]}>{label}</Text>
-        <Text style={[styles.rowValue, { color: theme.colors.textPrimary }]}>{value}</Text>
+        <AppText variant="body" numberOfLines={1}>
+          {label}
+        </AppText>
       </View>
-      {onPress ? <Feather name="chevron-right" size={17} color={theme.colors.textMuted} /> : null}
+      <AppText variant="body" tone="secondary" numberOfLines={1} style={styles.rowValue}>
+        {value}
+      </AppText>
+      {onPress ? <Feather name="chevron-right" size={17} color={theme.colors.textFaint} /> : null}
     </>
   );
 
   if (!onPress) {
-    return (
-      <View
-        style={[
-          styles.infoRow,
-          { borderRadius: theme.radius.lg, backgroundColor: theme.colors.glassSoft }
-        ]}
-      >
-        {row}
-      </View>
-    );
+    return <View style={styles.infoRow}>{row}</View>;
   }
 
   return (
@@ -121,9 +117,11 @@ function InfoRow({ icon, label, value, onPress }: InfoRowProps): JSX.Element {
       style={({ pressed, hovered }) => [
         styles.infoRow,
         {
-          borderRadius: theme.radius.lg,
-          backgroundColor: hovered ? theme.colors.glassHover : theme.colors.glassSoft,
-          opacity: pressed ? 0.9 : 1
+          backgroundColor: pressed
+            ? theme.colors.fillSecondary
+            : hovered
+            ? theme.colors.fillTertiary
+            : "transparent"
         }
       ]}
     >
@@ -137,7 +135,6 @@ export default function ChatInfoScreen(): JSX.Element {
   const router = useRouter();
   const { theme } = useAppTheme();
   const toast = useAppToast();
-  const { isDesktop } = useResponsive();
   const currentUser = useCurrentUser();
 
   const {
@@ -304,7 +301,7 @@ export default function ChatInfoScreen(): JSX.Element {
           }
         />
 
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.heroCard}>
+        <GlassView material="ultraThin" radius={theme.radius.panel} bordered={false} highlight style={styles.heroCard}>
           <Avatar
             uri={heroAvatar}
             name={heroTitle}
@@ -314,24 +311,34 @@ export default function ChatInfoScreen(): JSX.Element {
             isOnline={directPeer?.isOnline}
           />
           <View style={styles.heroContent}>
-            <Text style={[styles.heroTitle, { color: theme.colors.textPrimary }]}>{heroTitle}</Text>
+            <AppText variant="title1" numberOfLines={2}>
+              {heroTitle}
+            </AppText>
             <View style={styles.heroBadges}>
               <View style={[styles.badge, { backgroundColor: theme.colors.accentMuted }]}>
-                <Text style={[styles.badgeLabel, { color: theme.colors.accent }]}>{kindLabelMap[chat.kind]}</Text>
+                <AppText variant="caption1" tone="accent">
+                  {kindLabelMap[chat.kind]}
+                </AppText>
               </View>
               {chat.kind === "direct" ? (
-                <View style={[styles.badge, { backgroundColor: theme.colors.glassSoft }]}>
-                  <Text style={[styles.badgeLabel, { color: theme.colors.textSecondary }]}>
+                <View style={[styles.badge, { backgroundColor: theme.colors.fillTertiary }]}>
+                  <AppText variant="caption1" tone="secondary">
                     {PRESENCE_LABELS[directPeer?.presence ?? currentUser.presence]}
-                  </Text>
+                  </AppText>
                 </View>
               ) : null}
             </View>
-            <Text style={[styles.heroSubtitle, { color: theme.colors.textSecondary }]}>{heroSubtitle}</Text>
+            <AppText variant="subhead" tone="secondary">
+              {heroSubtitle}
+            </AppText>
             {chat.kind === "direct" && peerMeta?.handle ? (
-              <Text style={[styles.heroHandle, { color: theme.colors.accent }]}>{peerMeta.handle}</Text>
+              <AppText variant="subheadEmphasized" tone="accent">
+                {peerMeta.handle}
+              </AppText>
             ) : null}
-            <Text style={[styles.heroDescription, { color: theme.colors.textMuted }]}>{heroDescription}</Text>
+            <AppText variant="footnote" tone="tertiary">
+              {heroDescription}
+            </AppText>
           </View>
         </GlassView>
 
@@ -352,19 +359,20 @@ export default function ChatInfoScreen(): JSX.Element {
           ].map((metric) => (
             <GlassView
               key={metric.label}
-              tone="soft"
-              radius={theme.radius.lg}
+              material="ultraThin"
+              radius={theme.radius.xl}
               bordered={false}
               style={styles.metricCard}
             >
-              <Text style={[styles.metricValue, { color: theme.colors.textPrimary }]}>{metric.value}</Text>
-              <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>{metric.label}</Text>
+              <AppText variant="title2">{metric.value}</AppText>
+              <AppText variant="footnote" tone="secondary">
+                {metric.label}
+              </AppText>
             </GlassView>
           ))}
         </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Details</Text>
+        <ListSection header="Details">
           {chat.kind === "direct" ? (
             <>
               <InfoRow icon="mail" label="Email" value={directPeer?.email ?? "Not available"} />
@@ -384,13 +392,15 @@ export default function ChatInfoScreen(): JSX.Element {
               <InfoRow icon="file-text" label="Description" value={heroDescription} />
             </>
           )}
-        </View>
+        </ListSection>
 
         {chat.kind !== "direct" ? (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Members</Text>
-              <Text style={[styles.sectionMeta, { color: theme.colors.textMuted }]}>{members.length} total</Text>
+              <AppText variant="title3">Members</AppText>
+              <AppText variant="footnote" tone="secondary">
+                {members.length} total
+              </AppText>
             </View>
             <SearchBar value={memberQuery} onChangeText={setMemberQuery} onClear={() => setMemberQuery("")} placeholder="Search members" />
             <View style={styles.membersList}>
@@ -408,29 +418,33 @@ export default function ChatInfoScreen(): JSX.Element {
 
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.textPrimary }]}>Shared Content</Text>
-            <Pressable onPress={openMediaScreen}>
-              <Text style={[styles.sectionLink, { color: theme.colors.accent }]}>Open all</Text>
+            <AppText variant="title3">Shared content</AppText>
+            <Pressable onPress={openMediaScreen} accessibilityRole="button">
+              <AppText variant="subheadEmphasized" tone="accent">
+                Open all
+              </AppText>
             </Pressable>
           </View>
-          <InfoRow
-            icon="image"
-            label="Shared media"
-            value={`${mediaCount} items`}
-            onPress={openMediaScreen}
-          />
-          <InfoRow
-            icon="paperclip"
-            label="Shared files"
-            value={`${files.length} files`}
-            onPress={openMediaScreen}
-          />
-          <InfoRow
-            icon="link"
-            label="Shared links"
-            value={`${linksCount} links`}
-            onPress={openMediaScreen}
-          />
+          <ListSection>
+            <InfoRow
+              icon="image"
+              label="Shared media"
+              value={`${mediaCount} items`}
+              onPress={openMediaScreen}
+            />
+            <InfoRow
+              icon="paperclip"
+              label="Shared files"
+              value={`${files.length} files`}
+              onPress={openMediaScreen}
+            />
+            <InfoRow
+              icon="link"
+              label="Shared links"
+              value={`${linksCount} links`}
+              onPress={openMediaScreen}
+            />
+          </ListSection>
         </View>
       </ScrollView>
     </DetailScreenShell>
@@ -446,8 +460,8 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     flexDirection: "row",
-    gap: 16,
-    padding: 18
+    gap: 18,
+    padding: 20
   },
   heroContent: {
     flex: 1,
@@ -490,7 +504,7 @@ const styles = StyleSheet.create({
   },
   quickAction: {
     alignItems: "center",
-    minHeight: 72,
+    minHeight: 74,
     minWidth: 72,
     justifyContent: "center",
     paddingHorizontal: 10,
@@ -542,28 +556,28 @@ const styles = StyleSheet.create({
   infoRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 10,
-    minHeight: 62,
-    paddingHorizontal: 14
+    gap: 12,
+    minHeight: 50,
+    paddingHorizontal: 16,
+    paddingVertical: 11
   },
   rowIcon: {
     alignItems: "center",
+    borderRadius: 8,
+    height: 29,
     justifyContent: "center",
-    width: 32,
-    height: 32,
-    borderRadius: 10
+    width: 29
   },
   rowCopy: {
-    flex: 1,
-    gap: 2
+    flex: 1
   },
   rowLabel: {
     fontSize: 11,
     fontWeight: "600"
   },
   rowValue: {
-    fontSize: 13,
-    fontWeight: "600"
+    flexShrink: 1,
+    textAlign: "right"
   },
   membersList: {
     gap: 10

@@ -65,7 +65,7 @@ export default function EditProfileScreen(): JSX.Element {
           rightSlot={<IconButton icon="x" accessibilityLabel="Close" tone="plain" onPress={() => router.back()} />}
         />
 
-        <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.preview}>
+        <GlassView material="ultraThin" radius={theme.radius.panel} bordered={false} highlight style={styles.preview}>
           <Avatar
             uri={previewAvatar || user.avatar}
             name={previewName || user.fullName}

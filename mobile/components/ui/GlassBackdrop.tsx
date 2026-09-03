@@ -67,6 +67,12 @@ export function GlassBackdrop(): JSX.Element {
         bottom={-bloomSize * 0.32}
         right={-bloomSize * 0.24}
       />
+      <Bloom
+        color={theme.colors.accentMuted}
+        size={bloomSize * 0.7}
+        top={height * 0.32}
+        right={-bloomSize * 0.18}
+      />
       <View style={[styles.veil, { backgroundColor: theme.colors.backdropVeil }]} />
     </View>
   );

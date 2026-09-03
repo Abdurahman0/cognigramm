@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, EmptyState, SectionHeader } from "@/components/common";
 import { WorkspacePane } from "@/components/layout";
-import { GlassView, IconButton } from "@/components/ui";
+import { AppText, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
 import { CALL_ROUTE_CONFIG } from "@/features/calls/config/callConfig";
 import { formatCallDuration, getCallDurationMs } from "@/features/calls/utils/formatCallDuration";
 import { CALL_STATUS_LABELS, CALL_TYPE_LABELS } from "@/constants/calls";
@@ -19,22 +19,6 @@ import { formatMessageDate, formatRelative } from "@/utils/date";
 import { useShallow } from "zustand/react/shallow";
 
 const LIVE_STATUSES = new Set<CallSession["status"]>(["calling", "ringing", "connecting", "connected"]);
-
-const getStateTone = (
-  status: CallSession["status"],
-  theme: ReturnType<typeof useAppTheme>["theme"]
-): { backgroundColor: string; textColor: string } => {
-  if (status === "connected") {
-    return { backgroundColor: `${theme.colors.success}22`, textColor: theme.colors.success };
-  }
-  if (status === "missed" || status === "failed") {
-    return { backgroundColor: theme.colors.dangerMuted, textColor: theme.colors.danger };
-  }
-  if (status === "ringing" || status === "calling" || status === "connecting") {
-    return { backgroundColor: `${theme.colors.warning}22`, textColor: theme.colors.warning };
-  }
-  return { backgroundColor: theme.colors.glassSoft, textColor: theme.colors.textSecondary };
-};
 
 export default function CallsScreen(): JSX.Element {
   const router = useRouter();
@@ -122,7 +106,7 @@ export default function CallsScreen(): JSX.Element {
       <View style={styles.header}>
         <SectionHeader
           title="Calls"
-          subtitle={`${calls.length} sessions in history`}
+          subtitle={`${calls.length} in history`}
           rightSlot={
             currentCall && LIVE_STATUSES.has(currentCall.status) ? (
               <IconButton
@@ -158,19 +142,21 @@ export default function CallsScreen(): JSX.Element {
             colors={[theme.colors.accent]}
           />
         }
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ItemSeparatorComponent={() => (
+          <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
+        )}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState
-            title="No call history yet"
+            title="No call history"
             description="Start a call from any conversation and it will appear here."
             icon="phone-call"
           />
         }
         renderItem={({ item }) => {
-          const tone = getStateTone(item.status, theme);
           const live = currentCall?.id === item.id && LIVE_STATUSES.has(item.status);
           const active = selectedCallId === item.id;
+          const missed = item.status === "missed" || item.status === "failed";
           const durationMs = getCallDurationMs(item);
           const durationLabel = durationMs > 0 ? formatCallDuration(durationMs) : "";
 
@@ -188,44 +174,34 @@ export default function CallsScreen(): JSX.Element {
               style={({ pressed, hovered }) => [
                 styles.row,
                 {
-                  borderRadius: theme.radius.lg,
                   backgroundColor: active || live
                     ? theme.colors.accentMuted
+                    : pressed
+                    ? theme.colors.fillSecondary
                     : hovered
-                    ? theme.colors.glassHover
-                    : theme.colors.glassSoft,
-                  opacity: pressed ? 0.9 : 1
+                    ? theme.colors.fillTertiary
+                    : "transparent"
                 }
               ]}
             >
-              <View
-                style={[
-                  styles.rowIcon,
-                  {
-                    backgroundColor: item.callType === "video" ? theme.colors.accentMuted : theme.colors.glassHover
-                  }
-                ]}
-              >
-                <Feather
-                  name={item.callType === "video" ? "video" : "phone"}
-                  size={16}
-                  color={item.callType === "video" ? theme.colors.accent : theme.colors.textSecondary}
-                />
-              </View>
+              <Feather
+                name={item.callType === "video" ? "video" : "phone"}
+                size={18}
+                color={missed ? theme.colors.danger : theme.colors.accent}
+              />
               <View style={styles.rowCopy}>
-                <Text numberOfLines={1} style={[styles.rowTitle, { color: theme.colors.textPrimary }]}>
+                <AppText variant="body" tone={missed ? "danger" : "primary"} numberOfLines={1}>
                   {item.title}
-                </Text>
-                <Text numberOfLines={1} style={[styles.rowMeta, { color: theme.colors.textMuted }]}>
-                  {CALL_TYPE_LABELS[item.callType]} · {formatRelative(item.updatedAt)}
+                </AppText>
+                <AppText variant="footnote" tone="secondary" numberOfLines={1}>
+                  {CALL_TYPE_LABELS[item.callType]} · {CALL_STATUS_LABELS[item.status]}
                   {durationLabel ? ` · ${durationLabel}` : ""}
-                </Text>
+                </AppText>
               </View>
-              <View style={[styles.stateChip, { backgroundColor: tone.backgroundColor }]}>
-                <Text style={[styles.stateLabel, { color: tone.textColor }]}>
-                  {CALL_STATUS_LABELS[item.status]}
-                </Text>
-              </View>
+              <AppText variant="footnote" tone="tertiary">
+                {formatRelative(item.updatedAt)}
+              </AppText>
+              <Feather name="info" size={17} color={theme.colors.accent} />
             </Pressable>
           );
         }}
@@ -247,43 +223,57 @@ export default function CallsScreen(): JSX.Element {
       <WorkspacePane>
         {selectedCall ? (
           <View style={styles.detail}>
-            <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.detailHero}>
+            <GlassView
+              material="ultraThin"
+              radius={theme.radius.panel}
+              bordered={false}
+              highlight
+              style={styles.detailHero}
+            >
               <View style={[styles.detailIcon, { backgroundColor: theme.colors.accentMuted }]}>
                 <Feather
                   name={selectedCall.callType === "video" ? "video" : "phone"}
-                  size={24}
+                  size={26}
                   color={theme.colors.accent}
                 />
               </View>
-              <Text style={[styles.detailTitle, { color: theme.colors.textPrimary }]}>{selectedCall.title}</Text>
-              <Text style={[styles.detailMeta, { color: theme.colors.textMuted }]}>
+              <AppText variant="title2" style={styles.detailTitle}>
+                {selectedCall.title}
+              </AppText>
+              <AppText variant="subhead" tone="secondary">
                 {CALL_TYPE_LABELS[selectedCall.callType]} call · {CALL_STATUS_LABELS[selectedCall.status]}
-              </Text>
+              </AppText>
             </GlassView>
 
-            <GlassView tone="soft" radius={theme.radius.xxl} bordered={false} style={styles.detailCard}>
-              {[
-                {
-                  label: "Duration",
-                  value: getCallDurationMs(selectedCall) > 0 ? formatCallDuration(getCallDurationMs(selectedCall)) : "—"
-                },
-                { label: "Direction", value: selectedCall.direction === "incoming" ? "Incoming" : "Outgoing" },
-                { label: "Participants", value: `${selectedCall.participants.length}` },
-                { label: "Started", value: selectedCall.startedAt ? formatMessageDate(selectedCall.startedAt) : "—" },
-                { label: "Last update", value: formatMessageDate(selectedCall.updatedAt) }
-              ].map((row) => (
-                <View key={row.label} style={styles.detailRow}>
-                  <Text style={[styles.detailRowLabel, { color: theme.colors.textMuted }]}>{row.label}</Text>
-                  <Text style={[styles.detailRowValue, { color: theme.colors.textPrimary }]}>{row.value}</Text>
-                </View>
-              ))}
-            </GlassView>
+            <ListSection header="Details">
+              <ListRow
+                title="Duration"
+                value={
+                  getCallDurationMs(selectedCall) > 0
+                    ? formatCallDuration(getCallDurationMs(selectedCall))
+                    : "—"
+                }
+                showChevron={false}
+              />
+              <ListRow
+                title="Direction"
+                value={selectedCall.direction === "incoming" ? "Incoming" : "Outgoing"}
+                showChevron={false}
+              />
+              <ListRow title="Participants" value={`${selectedCall.participants.length}`} showChevron={false} />
+              <ListRow
+                title="Started"
+                value={selectedCall.startedAt ? formatMessageDate(selectedCall.startedAt) : "—"}
+                showChevron={false}
+              />
+              <ListRow title="Last update" value={formatMessageDate(selectedCall.updatedAt)} showChevron={false} />
+            </ListSection>
 
             <View style={styles.detailActions}>
               <AppButton
-                label={`Call again`}
+                label="Call again"
                 fullWidth={false}
-                icon={<Feather name="phone-call" size={15} color={theme.colors.onAccent} />}
+                icon={<Feather name="phone-call" size={16} color={theme.colors.onAccent} />}
                 onPress={() => {
                   redial(selectedCall).catch(() => undefined);
                 }}
@@ -327,97 +317,51 @@ const styles = StyleSheet.create({
     minWidth: 0
   },
   header: {
-    paddingHorizontal: 14,
-    paddingTop: 12
+    paddingHorizontal: 16,
+    paddingTop: 14
   },
   list: {
     flex: 1,
     marginTop: 12
   },
   listContent: {
-    paddingBottom: 12,
-    paddingHorizontal: 8
+    paddingBottom: 16
   },
   separator: {
-    height: 8
+    height: StyleSheet.hairlineWidth * 2,
+    marginLeft: 52
   },
   row: {
     alignItems: "center",
     flexDirection: "row",
     gap: 12,
-    minHeight: 72,
-    paddingHorizontal: 12
-  },
-  rowIcon: {
-    alignItems: "center",
-    borderRadius: 14,
-    height: 40,
-    justifyContent: "center",
-    width: 40
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
   rowCopy: {
     flex: 1,
-    gap: 3
-  },
-  rowTitle: {
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  rowMeta: {
-    fontSize: 12
-  },
-  stateChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5
-  },
-  stateLabel: {
-    fontSize: 11,
-    fontWeight: "700"
+    gap: 1
   },
   detail: {
     flex: 1,
-    gap: 12,
-    padding: 16
+    gap: 18,
+    padding: 18
   },
   detailHero: {
     alignItems: "center",
-    gap: 8,
-    paddingVertical: 26
+    gap: 4,
+    paddingVertical: 28
   },
   detailIcon: {
     alignItems: "center",
-    borderRadius: 20,
-    height: 60,
+    borderRadius: 22,
+    height: 64,
     justifyContent: "center",
-    width: 60
+    width: 64
   },
   detailTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-    marginTop: 6
-  },
-  detailMeta: {
-    fontSize: 13
-  },
-  detailCard: {
-    gap: 4,
-    paddingHorizontal: 18,
-    paddingVertical: 14
-  },
-  detailRow: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 38
-  },
-  detailRowLabel: {
-    fontSize: 12
-  },
-  detailRowValue: {
-    fontSize: 13,
-    fontWeight: "600"
+    marginTop: 12
   },
   detailActions: {
     flexDirection: "row",

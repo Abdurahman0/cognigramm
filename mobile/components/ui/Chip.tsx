@@ -1,8 +1,9 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
 
-import { useAppTheme } from "@/hooks/useAppTheme";
+import { AppText } from "@/components/ui/AppText";
 import type { IconName } from "@/components/ui/IconButton";
+import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface ChipProps {
   label: string;
@@ -12,37 +13,47 @@ interface ChipProps {
   onPress?: () => void;
 }
 
+/** Capsule filter control; the selected chip lifts onto tinted glass. */
 export function Chip({ label, active = false, icon, count, onPress }: ChipProps): JSX.Element {
   const { theme } = useAppTheme();
-  const textColor = active ? theme.colors.onAccent : theme.colors.textSecondary;
+  const textColor = active ? theme.colors.onAccent : theme.colors.textPrimary;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      {...(Platform.OS === "web" && !active ? { dataSet: { glass: "thin" } } : null)}
       style={({ pressed, hovered }) => [
         styles.root,
         {
           backgroundColor: active
             ? theme.colors.accent
             : hovered
-            ? theme.colors.glassHover
-            : theme.colors.glassSoft,
-          opacity: pressed ? 0.85 : 1
-        }
+            ? theme.colors.fillSecondary
+            : theme.colors.materialUltraThin,
+          borderColor: active ? "transparent" : theme.colors.glassBorder,
+          opacity: pressed ? 0.8 : 1
+        },
+        active ? theme.elevation.soft : null
       ]}
     >
       {icon ? <Feather name={icon} size={13} color={textColor} /> : null}
-      <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+      <AppText variant="subheadEmphasized" color={textColor}>
+        {label}
+      </AppText>
       {typeof count === "number" && count > 0 ? (
         <View
           style={[
             styles.count,
-            { backgroundColor: active ? "rgba(255,255,255,0.24)" : theme.colors.glassHover }
+            {
+              backgroundColor: active ? "rgba(255, 255, 255, 0.26)" : theme.colors.fillTertiary
+            }
           ]}
         >
-          <Text style={[styles.countLabel, { color: textColor }]}>{count > 99 ? "99+" : count}</Text>
+          <AppText variant="caption2" color={textColor}>
+            {count > 99 ? "99+" : count}
+          </AppText>
         </View>
       ) : null}
     </Pressable>
@@ -53,25 +64,19 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth * 2,
     flexDirection: "row",
     gap: 6,
     minHeight: 34,
-    paddingHorizontal: 13
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: "600"
+    overflow: "hidden",
+    paddingHorizontal: 14
   },
   count: {
     alignItems: "center",
     borderRadius: 999,
     justifyContent: "center",
     minWidth: 20,
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     paddingVertical: 1
-  },
-  countLabel: {
-    fontSize: 11,
-    fontWeight: "700"
   }
 });

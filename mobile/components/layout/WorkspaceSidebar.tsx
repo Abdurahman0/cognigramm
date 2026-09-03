@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
-import { Badge, GlassView, IconButton } from "@/components/ui";
+import { AppText, Badge, GlassView, IconButton } from "@/components/ui";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -30,46 +30,36 @@ function NavRow({ item, active, badgeCount, onPress }: NavRowProps): JSX.Element
       style={({ pressed, hovered }) => [
         styles.navRow,
         {
-          borderRadius: theme.radius.lg,
+          borderRadius: theme.radius.md,
           backgroundColor: active
-            ? theme.colors.glassStrong
+            ? theme.colors.accent
+            : pressed
+            ? theme.colors.fillSecondary
             : hovered
-            ? theme.colors.glassHover
-            : "transparent",
-          opacity: pressed ? 0.9 : 1
+            ? theme.colors.fillTertiary
+            : "transparent"
         }
       ]}
     >
-      <View
-        style={[
-          styles.navIcon,
-          {
-            borderRadius: theme.radius.md,
-            backgroundColor: active ? theme.colors.accentMuted : theme.colors.glassSoft
-          }
-        ]}
-      >
-        <Feather
-          name={item.icon}
-          size={16}
-          color={active ? theme.colors.accent : theme.colors.textSecondary}
-        />
-      </View>
-      <Text
+      <Feather
+        name={item.icon}
+        size={17}
+        color={active ? theme.colors.onAccent : theme.colors.accent}
+      />
+      <AppText
+        variant={active ? "subheadEmphasized" : "subhead"}
+        color={active ? theme.colors.onAccent : theme.colors.textPrimary}
         numberOfLines={1}
-        style={[
-          styles.navLabel,
-          { color: active ? theme.colors.textPrimary : theme.colors.textSecondary }
-        ]}
+        style={styles.navLabel}
       >
         {item.label}
-      </Text>
-      {badgeCount > 0 ? <Badge count={badgeCount} /> : null}
+      </AppText>
+      {badgeCount > 0 ? <Badge count={badgeCount} tone={active ? "muted" : "accent"} /> : null}
     </Pressable>
   );
 }
 
-/** Persistent workspace sidebar: identity, primary navigation, group shortcuts. */
+/** Sidebar in the style of a macOS source list: translucent, tinted selection, grouped. */
 export function WorkspaceSidebar(): JSX.Element {
   const { theme } = useAppTheme();
   const router = useRouter();
@@ -90,13 +80,7 @@ export function WorkspaceSidebar(): JSX.Element {
     return { chats: unreadTotal, contacts: 0, calls: 0, profile: 0 } as Record<WorkspaceNavItem["key"], number>;
   }, [chats]);
 
-  const groups = useMemo(
-    () =>
-      chats
-        .filter((chat) => chat.kind === "group")
-        .slice(0, 12),
-    [chats]
-  );
+  const groups = useMemo(() => chats.filter((chat) => chat.kind === "group").slice(0, 12), [chats]);
 
   const openChat = (chatId: string) => {
     setDesktopChat(chatId);
@@ -105,8 +89,8 @@ export function WorkspaceSidebar(): JSX.Element {
 
   return (
     <GlassView
-      tone="soft"
-      radius={theme.radius.xxl}
+      material="ultraThin"
+      radius={theme.radius.panel}
       bordered={false}
       style={[styles.root, { width: theme.layout.sidebarWidth }]}
     >
@@ -114,22 +98,26 @@ export function WorkspaceSidebar(): JSX.Element {
         accessibilityRole="button"
         accessibilityLabel="Open your profile"
         onPress={() => router.replace("/(app)/(tabs)/profile")}
-        style={({ hovered }) => [
+        style={({ hovered, pressed }) => [
           styles.identity,
           {
             borderRadius: theme.radius.lg,
-            backgroundColor: hovered ? theme.colors.glassHover : "transparent"
+            backgroundColor: pressed
+              ? theme.colors.fillSecondary
+              : hovered
+              ? theme.colors.fillTertiary
+              : "transparent"
           }
         ]}
       >
-        <Avatar uri={user.avatar} name={user.fullName} size={40} showOnlineDot isOnline={user.isOnline} />
+        <Avatar uri={user.avatar} name={user.fullName} size={42} showOnlineDot isOnline={user.isOnline} />
         <View style={styles.identityCopy}>
-          <Text numberOfLines={1} style={[styles.identityName, { color: theme.colors.textPrimary }]}>
+          <AppText variant="subheadEmphasized" numberOfLines={1}>
             {user.fullName}
-          </Text>
-          <Text numberOfLines={1} style={[styles.identityMeta, { color: theme.colors.textMuted }]}>
+          </AppText>
+          <AppText variant="caption1" tone="secondary" numberOfLines={1}>
             {ROLE_LABELS[user.role]} · {user.department}
-          </Text>
+          </AppText>
         </View>
         <IconButton
           icon="settings"
@@ -153,7 +141,9 @@ export function WorkspaceSidebar(): JSX.Element {
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Group spaces</Text>
+        <AppText variant="footnote" tone="secondary">
+          GROUP SPACES
+        </AppText>
         <IconButton
           icon="plus"
           accessibilityLabel="Create a group conversation"
@@ -163,11 +153,15 @@ export function WorkspaceSidebar(): JSX.Element {
         />
       </View>
 
-      <ScrollView style={styles.groups} contentContainerStyle={styles.groupsContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.groups}
+        contentContainerStyle={styles.groupsContent}
+        showsVerticalScrollIndicator={false}
+      >
         {groups.length === 0 ? (
-          <Text style={[styles.emptyGroups, { color: theme.colors.textMuted }]}>
+          <AppText variant="footnote" tone="tertiary" style={styles.emptyGroups}>
             No group spaces yet. Create one to coordinate a team.
-          </Text>
+          </AppText>
         ) : (
           groups.map((chat) => {
             const active = activeDesktopChatId === chat.id && activeKey === "chats";
@@ -183,26 +177,25 @@ export function WorkspaceSidebar(): JSX.Element {
                     borderRadius: theme.radius.md,
                     backgroundColor: active
                       ? theme.colors.accentMuted
+                      : pressed
+                      ? theme.colors.fillSecondary
                       : hovered
-                      ? theme.colors.glassHover
-                      : "transparent",
-                    opacity: pressed ? 0.9 : 1
+                      ? theme.colors.fillTertiary
+                      : "transparent"
                   }
                 ]}
               >
                 <Avatar uri={chat.avatar} name={chat.title} size={30} shape="squircle" />
                 <View style={styles.groupCopy}>
-                  <Text numberOfLines={1} style={[styles.groupTitle, { color: theme.colors.textPrimary }]}>
+                  <AppText variant="subhead" numberOfLines={1}>
                     {chat.title}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.groupMeta, { color: theme.colors.textMuted }]}>
+                  </AppText>
+                  <AppText variant="caption1" tone="tertiary" numberOfLines={1}>
                     {chat.memberIds.length} members
-                  </Text>
+                  </AppText>
                 </View>
                 {chat.unreadCount > 0 ? (
-                  <View
-                    style={[styles.groupDot, { backgroundColor: theme.colors.accent }]}
-                  />
+                  <View style={[styles.groupDot, { backgroundColor: theme.colors.accent }]} />
                 ) : null}
               </Pressable>
             );
@@ -216,9 +209,9 @@ export function WorkspaceSidebar(): JSX.Element {
 const styles = StyleSheet.create({
   root: {
     gap: 10,
-    paddingBottom: 10,
+    paddingBottom: 12,
     paddingHorizontal: 10,
-    paddingTop: 10
+    paddingTop: 12
   },
   identity: {
     alignItems: "center",
@@ -229,14 +222,7 @@ const styles = StyleSheet.create({
   },
   identityCopy: {
     flex: 1,
-    gap: 2
-  },
-  identityName: {
-    fontSize: 14,
-    fontWeight: "700"
-  },
-  identityMeta: {
-    fontSize: 11
+    gap: 1
   },
   nav: {
     gap: 2
@@ -245,32 +231,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
-    minHeight: 44,
-    paddingHorizontal: 8
-  },
-  navIcon: {
-    alignItems: "center",
-    height: 30,
-    justifyContent: "center",
-    width: 30
+    minHeight: 38,
+    paddingHorizontal: 10
   },
   navLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "600"
+    flex: 1
   },
   sectionHeader: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
     paddingLeft: 10,
-    paddingTop: 4
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.6,
-    textTransform: "uppercase"
+    paddingTop: 6
   },
   groups: {
     flex: 1
@@ -280,8 +252,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8
   },
   emptyGroups: {
-    fontSize: 12,
-    lineHeight: 17,
     paddingHorizontal: 10,
     paddingTop: 6
   },
@@ -295,13 +265,6 @@ const styles = StyleSheet.create({
   groupCopy: {
     flex: 1,
     gap: 1
-  },
-  groupTitle: {
-    fontSize: 13,
-    fontWeight: "600"
-  },
-  groupMeta: {
-    fontSize: 11
   },
   groupDot: {
     borderRadius: 999,

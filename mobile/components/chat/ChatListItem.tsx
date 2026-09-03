@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
+import { AppText } from "@/components/ui/AppText";
 import { Badge } from "@/components/ui/Badge";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
@@ -33,6 +34,7 @@ const getDirectPeer = (chat: ChatSummary, users: User[], currentUserId: string):
   return users.find((user) => user.id === peerId);
 };
 
+/** Messages-style conversation row: unread dot, avatar, two-line preview, timestamp. */
 export function ChatListItem({
   chat,
   lastMessage,
@@ -45,7 +47,7 @@ export function ChatListItem({
   const compactMode = useSettingsStore((state) => state.compactMode);
   const peer = getDirectPeer(chat, users, currentUser.id);
   const typing = chat.typingUserIds.length > 0;
-  const preview = typing ? "Typing…" : resolveMessagePreview(lastMessage);
+  const preview = typing ? "typing…" : resolveMessagePreview(lastMessage);
   const timeLabel = lastMessage ? formatChatTimestamp(lastMessage.createdAt) : "";
   const isOwnLastMessage = Boolean(lastMessage && lastMessage.senderId === currentUser.id);
   const unread = chat.unreadCount > 0;
@@ -60,38 +62,38 @@ export function ChatListItem({
         {
           borderRadius: theme.radius.lg,
           minHeight: compactMode ? 62 : 72,
-          paddingVertical: compactMode ? 8 : 11,
+          paddingVertical: compactMode ? 8 : 10,
           backgroundColor: active
             ? theme.colors.accentMuted
+            : pressed
+            ? theme.colors.fillSecondary
             : hovered
-            ? theme.colors.glassHover
-            : "transparent",
-          opacity: pressed ? 0.9 : 1
+            ? theme.colors.fillTertiary
+            : "transparent"
         }
       ]}
     >
+      <View style={styles.unreadSlot}>
+        {unread ? <View style={[styles.unreadDot, { backgroundColor: theme.colors.accent }]} /> : null}
+      </View>
+
       <Avatar
         uri={peer?.avatar ?? chat.avatar}
         name={peer?.fullName ?? chat.title}
-        size={compactMode ? 40 : 48}
+        size={compactMode ? 44 : 52}
         shape={chat.kind === "group" ? "squircle" : "circle"}
         showOnlineDot={chat.kind === "direct"}
         isOnline={peer?.isOnline}
       />
+
       <View style={styles.body}>
         <View style={styles.topLine}>
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.title,
-              { color: theme.colors.textPrimary, fontWeight: unread ? "700" : "600" }
-            ]}
-          >
+          <AppText variant={unread ? "bodyEmphasized" : "body"} numberOfLines={1} style={styles.title}>
             {chat.title}
-          </Text>
-          <Text style={[styles.time, { color: unread ? theme.colors.accent : theme.colors.textMuted }]}>
+          </AppText>
+          <AppText variant="footnote" tone="tertiary">
             {timeLabel}
-          </Text>
+          </AppText>
         </View>
         <View style={styles.bottomLine}>
           {isOwnLastMessage && !typing && lastMessage ? (
@@ -101,21 +103,14 @@ export function ChatListItem({
               color={lastMessage.status === "seen" ? theme.colors.accent : theme.colors.textMuted}
             />
           ) : null}
-          <Text
-            numberOfLines={1}
-            style={[
-              styles.preview,
-              {
-                color: typing
-                  ? theme.colors.online
-                  : unread
-                  ? theme.colors.textSecondary
-                  : theme.colors.textMuted
-              }
-            ]}
+          <AppText
+            variant="subhead"
+            tone={typing ? "accent" : "secondary"}
+            numberOfLines={2}
+            style={styles.preview}
           >
             {preview}
-          </Text>
+          </AppText>
           {unread ? <Badge count={chat.unreadCount} /> : null}
         </View>
       </View>
@@ -127,12 +122,22 @@ const styles = StyleSheet.create({
   root: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 12
+    gap: 10,
+    paddingLeft: 4,
+    paddingRight: 12
+  },
+  unreadSlot: {
+    alignItems: "center",
+    width: 12
+  },
+  unreadDot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8
   },
   body: {
     flex: 1,
-    gap: 4
+    gap: 2
   },
   topLine: {
     alignItems: "center",
@@ -141,21 +146,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between"
   },
   title: {
-    flex: 1,
-    fontSize: 15,
-    letterSpacing: -0.1
-  },
-  time: {
-    fontSize: 11,
-    fontWeight: "600"
+    flex: 1
   },
   bottomLine: {
-    alignItems: "center",
+    alignItems: "flex-start",
     flexDirection: "row",
     gap: 6
   },
   preview: {
-    flex: 1,
-    fontSize: 13
+    flex: 1
   }
 });

@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 
 import { AppButton, AppInput, Avatar, EmptyState, SearchBar, SectionHeader } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
-import { Chip, IconButton } from "@/components/ui";
+import { AppText, Chip, IconButton } from "@/components/ui";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppToast } from "@/hooks/useAppToast";
@@ -161,23 +161,24 @@ export default function NewMessageScreen(): JSX.Element {
                     borderRadius: theme.radius.lg,
                     backgroundColor: selected
                       ? theme.colors.accentMuted
+                      : pressed
+                      ? theme.colors.fillSecondary
                       : hovered
-                      ? theme.colors.glassHover
-                      : theme.colors.glassSoft,
-                    opacity: pressed ? 0.9 : 1
+                      ? theme.colors.fillTertiary
+                      : theme.colors.materialUltraThin
                   }
                 ]}
               >
                 <Avatar uri={item.avatar} name={item.fullName} size={44} showOnlineDot isOnline={item.isOnline} />
                 <View style={styles.rowCopy}>
-                  <Text numberOfLines={1} style={[styles.name, { color: theme.colors.textPrimary }]}>
+                  <AppText variant="body" numberOfLines={1}>
                     {item.fullName}
-                  </Text>
-                  <Text numberOfLines={1} style={[styles.meta, { color: theme.colors.textMuted }]}>
+                  </AppText>
+                  <AppText variant="footnote" tone="secondary" numberOfLines={1}>
                     {ROLE_LABELS[item.role]} · {item.department}
-                  </Text>
+                  </AppText>
                 </View>
-                {selected ? <Feather name="check-circle" size={19} color={theme.colors.accent} /> : null}
+                {selected ? <Feather name="check-circle" size={20} color={theme.colors.accent} /> : null}
               </Pressable>
             );
           }}
@@ -235,13 +236,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3
   },
-  name: {
-    fontSize: 15,
-    fontWeight: "700"
-  },
-  meta: {
-    fontSize: 12
-  },
+
   footer: {
     paddingBottom: 16,
     paddingHorizontal: 16,

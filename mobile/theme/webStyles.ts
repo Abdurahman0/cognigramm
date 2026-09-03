@@ -5,9 +5,9 @@ import type { AppTheme } from "@/theme";
 const STYLE_ELEMENT_ID = "qora-qarga-web-theme";
 
 /**
- * Real backdrop blur is only available through CSS, so web glass surfaces opt in with
- * `dataSet={{ glass: "panel" }}` (rendered as `data-glass="panel"` by react-native-web)
- * and pick up the filters injected here.
+ * Liquid Glass needs a real lens on web: backdrop blur plus saturation and a touch
+ * of brightness so the material picks up the wallpaper's colour. Surfaces opt in with
+ * `dataSet={{ glass: "regular" }}`, which react-native-web renders as `data-glass`.
  */
 export const injectWebThemeStyles = (theme: AppTheme): void => {
   if (Platform.OS !== "web" || typeof document === "undefined") {
@@ -21,7 +21,8 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
     document.head.appendChild(styleTag);
   }
 
-  const { colors, blur } = theme;
+  const { colors, blur, fontFamily } = theme;
+  const lensBoost = theme.mode === "dark" ? "brightness(1.08)" : "brightness(1.04)";
 
   styleTag.textContent = `
     html, body, #root {
@@ -30,8 +31,10 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
     }
     body {
       margin: 0;
+      font-family: ${fontFamily};
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
       overscroll-behavior: none;
     }
     ::selection {
@@ -39,23 +42,27 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
       color: ${colors.textPrimary};
     }
     [data-glass] {
-      -webkit-backdrop-filter: blur(${blur.panel}px) saturate(150%);
-      backdrop-filter: blur(${blur.panel}px) saturate(150%);
+      -webkit-backdrop-filter: blur(${blur.regular}px) saturate(180%) ${lensBoost};
+      backdrop-filter: blur(${blur.regular}px) saturate(180%) ${lensBoost};
     }
-    [data-glass="soft"] {
-      -webkit-backdrop-filter: blur(${blur.soft}px) saturate(130%);
-      backdrop-filter: blur(${blur.soft}px) saturate(130%);
+    [data-glass="ultraThin"] {
+      -webkit-backdrop-filter: blur(${blur.ultraThin}px) saturate(160%) ${lensBoost};
+      backdrop-filter: blur(${blur.ultraThin}px) saturate(160%) ${lensBoost};
     }
-    [data-glass="strong"] {
-      -webkit-backdrop-filter: blur(${blur.strong}px) saturate(165%);
-      backdrop-filter: blur(${blur.strong}px) saturate(165%);
+    [data-glass="thin"] {
+      -webkit-backdrop-filter: blur(${blur.thin}px) saturate(170%) ${lensBoost};
+      backdrop-filter: blur(${blur.thin}px) saturate(170%) ${lensBoost};
+    }
+    [data-glass="thick"] {
+      -webkit-backdrop-filter: blur(${blur.thick}px) saturate(190%) ${lensBoost};
+      backdrop-filter: blur(${blur.thick}px) saturate(190%) ${lensBoost};
     }
     [data-glass="none"] {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
     [data-bloom] {
-      filter: blur(90px);
+      filter: blur(110px);
     }
     * {
       scrollbar-width: thin;

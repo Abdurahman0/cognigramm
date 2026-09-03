@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { GlassView } from "@/components/ui/GlassView";
+import { AppText } from "@/components/ui/AppText";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface EmptyStateProps {
@@ -13,13 +13,17 @@ interface EmptyStateProps {
 export function EmptyState({ title, description, icon = "inbox" }: EmptyStateProps): JSX.Element {
   const { theme } = useAppTheme();
   return (
-    <GlassView tone="soft" radius={theme.radius.xl} bordered={false} style={styles.root}>
-      <View style={[styles.iconWrap, { backgroundColor: theme.colors.glassSoft }]}>
-        <Feather name={icon} size={22} color={theme.colors.textMuted} />
+    <View style={styles.root}>
+      <View style={[styles.iconWrap, { backgroundColor: theme.colors.fillTertiary }]}>
+        <Feather name={icon} size={26} color={theme.colors.textMuted} />
       </View>
-      <Text style={[styles.title, { color: theme.colors.textPrimary }]}>{title}</Text>
-      <Text style={[styles.description, { color: theme.colors.textMuted }]}>{description}</Text>
-    </GlassView>
+      <AppText variant="title3" style={styles.title}>
+        {title}
+      </AppText>
+      <AppText variant="subhead" tone="secondary" style={styles.description}>
+        {description}
+      </AppText>
+    </View>
   );
 }
 
@@ -30,22 +34,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minHeight: 180,
     paddingHorizontal: 24,
-    paddingVertical: 24
+    paddingVertical: 28
   },
   iconWrap: {
     alignItems: "center",
     borderRadius: 999,
-    height: 52,
+    height: 60,
     justifyContent: "center",
-    width: 52
+    marginBottom: 6,
+    width: 60
   },
   title: {
-    fontSize: 16,
-    fontWeight: "700"
+    textAlign: "center"
   },
   description: {
-    fontSize: 13,
-    lineHeight: 19,
     maxWidth: 320,
     textAlign: "center"
   }

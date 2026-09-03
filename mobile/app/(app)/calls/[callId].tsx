@@ -1,11 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { EmptyState } from "@/components/common";
 import { AppShell, WorkspacePane } from "@/components/layout";
-import { GlassView, IconButton } from "@/components/ui";
+import { AppText, GlassView, IconButton } from "@/components/ui";
 import {
   CallControls,
   CallMediaViewport,
@@ -212,13 +212,13 @@ export default function CallDetailsScreen(): JSX.Element {
           onPress={closeStage}
         />
         <View style={styles.stageHeaderCopy}>
-          <Text numberOfLines={1} style={[styles.stageTitle, { color: theme.colors.textPrimary }]}>
+          <AppText variant="headline" numberOfLines={1}>
             {title}
-          </Text>
-          <Text numberOfLines={1} style={[styles.stageMeta, { color: theme.colors.textMuted }]}>
+          </AppText>
+          <AppText variant="footnote" tone="secondary" numberOfLines={1}>
             {CALL_TYPE_LABELS[session.callType]} call · {statusLabel}
             {durationLabel ? ` · ${durationLabel}` : ""}
-          </Text>
+          </AppText>
         </View>
         <IconButton
           icon="user-plus"
@@ -233,11 +233,11 @@ export default function CallDetailsScreen(): JSX.Element {
       </View>
 
       {runtime.status === "connecting" ? (
-        <GlassView tone="soft" radius={theme.radius.lg} bordered={false} style={styles.notice}>
+        <GlassView material="ultraThin" radius={theme.radius.lg} bordered={false} style={styles.notice}>
           <ActivityIndicator size="small" color={theme.colors.accent} />
-          <Text style={[styles.noticeText, { color: theme.colors.textSecondary }]}>
+          <AppText variant="footnote" tone="secondary">
             Establishing a secure connection…
-          </Text>
+          </AppText>
         </GlassView>
       ) : null}
 
@@ -254,7 +254,9 @@ export default function CallDetailsScreen(): JSX.Element {
             }
           ]}
         >
-          <Text style={[styles.noticeText, { color: theme.colors.danger }]}>{runtime.errorMessage}</Text>
+          <AppText variant="footnote" tone="danger">
+            {runtime.errorMessage}
+          </AppText>
         </Pressable>
       ) : null}
 
@@ -266,7 +268,7 @@ export default function CallDetailsScreen(): JSX.Element {
         caption={caption}
       />
 
-      <GlassView tone="strong" radius={theme.radius.panel} highlight style={styles.controlDock}>
+      <GlassView material="thick" radius={theme.radius.sheet} highlight elevation="panel" style={styles.controlDock}>
         <CallControls
           callId={session.id}
           status={runtime.status}
@@ -349,14 +351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2
   },
-  stageTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: -0.2
-  },
-  stageMeta: {
-    fontSize: 12
-  },
+
   notice: {
     alignItems: "center",
     flexDirection: "row",
@@ -364,11 +359,7 @@ const styles = StyleSheet.create({
     minHeight: 42,
     paddingHorizontal: 14
   },
-  noticeText: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: "600"
-  },
+
   controlDock: {
     alignItems: "center",
     paddingHorizontal: 16,

@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
+import { AppText } from "@/components/ui/AppText";
+import { PressableScale } from "@/components/ui/PressableScale";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonSize = "regular" | "small";
 
 interface AppButtonProps {
   label: string;
@@ -13,9 +16,11 @@ interface AppButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   variant?: ButtonVariant;
+  size?: ButtonSize;
   style?: StyleProp<ViewStyle>;
 }
 
+/** Capsule button: filled, glass, plain, or destructive — all with a springy press. */
 export function AppButton({
   label,
   onPress,
@@ -24,84 +29,87 @@ export function AppButton({
   disabled = false,
   fullWidth = true,
   variant = "primary",
+  size = "regular",
   style
 }: AppButtonProps): JSX.Element {
   const { theme } = useAppTheme();
   const isDisabled = disabled || loading;
+  const isGlass = variant === "secondary";
 
-  const variantStyle =
+  const palette =
     variant === "primary"
-      ? {
-          backgroundColor: theme.colors.accent,
-          borderColor: theme.colors.accent,
-          textColor: theme.colors.onAccent
-        }
+      ? { background: theme.colors.accent, border: "transparent", text: theme.colors.onAccent }
+      : variant === "danger"
+      ? { background: theme.colors.danger, border: "transparent", text: theme.colors.onAccent }
       : variant === "secondary"
       ? {
-          backgroundColor: theme.colors.glassSoft,
-          borderColor: theme.colors.glassBorder,
-          textColor: theme.colors.textPrimary
+          background: theme.colors.materialUltraThin,
+          border: theme.colors.glassBorder,
+          text: theme.colors.textPrimary
         }
-      : variant === "danger"
-      ? {
-          backgroundColor: theme.colors.danger,
-          borderColor: theme.colors.danger,
-          textColor: theme.colors.onAccent
-        }
-      : {
-          backgroundColor: "transparent",
-          borderColor: "transparent",
-          textColor: theme.colors.accent
-        };
+      : { background: "transparent", border: "transparent", text: theme.colors.accent };
 
   return (
-    <Pressable
+    <PressableScale
       accessibilityRole="button"
       accessibilityState={{ disabled: isDisabled }}
       onPress={onPress}
       disabled={isDisabled}
-      style={({ pressed, hovered }) => [
-        styles.button,
-        {
-          width: fullWidth ? "100%" : "auto",
-          borderRadius: theme.radius.pill,
-          borderColor: variantStyle.borderColor,
-          backgroundColor: variantStyle.backgroundColor,
-          opacity: isDisabled ? 0.5 : pressed ? 0.86 : hovered ? 0.93 : 1
-        },
-        variant === "primary" || variant === "danger" ? theme.elevation.soft : null,
+      style={[
+        fullWidth ? styles.fullWidth : styles.auto,
+        { opacity: isDisabled ? 0.4 : 1 },
         style
       ]}
     >
-      <View style={styles.inner}>
+      <View
+        {...(Platform.OS === "web" && isGlass ? { dataSet: { glass: "thin" } } : null)}
+        style={[
+          styles.button,
+          size === "small" ? styles.small : styles.regular,
+          {
+            backgroundColor: palette.background,
+            borderColor: palette.border,
+            borderWidth: isGlass ? StyleSheet.hairlineWidth * 2 : 0
+          },
+          variant === "primary" || variant === "danger" ? theme.elevation.soft : null
+        ]}
+      >
         {loading ? (
-          <ActivityIndicator color={variantStyle.textColor} />
+          <ActivityIndicator color={palette.text} />
         ) : (
           <>
             {icon}
-            <Text style={[styles.label, { color: variantStyle.textColor }]}>{label}</Text>
+            <AppText variant="bodyEmphasized" color={palette.text} numberOfLines={1}>
+              {label}
+            </AppText>
           </>
         )}
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 50,
-    paddingHorizontal: 18
+  fullWidth: {
+    width: "100%"
   },
-  inner: {
+  auto: {
+    alignSelf: "flex-start"
+  },
+  button: {
     alignItems: "center",
+    borderRadius: 999,
     flexDirection: "row",
     gap: 8,
-    justifyContent: "center"
+    justifyContent: "center",
+    overflow: "hidden"
   },
-  label: {
-    fontSize: 15,
-    fontWeight: "700"
+  regular: {
+    minHeight: 50,
+    paddingHorizontal: 22
+  },
+  small: {
+    minHeight: 36,
+    paddingHorizontal: 16
   }
 });

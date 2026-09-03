@@ -7,14 +7,13 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   type TextInputKeyPressEventData,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, AppInput } from "@/components/common";
-import { GlassView } from "@/components/ui";
+import { AppText, GlassView } from "@/components/ui";
 import { LoginFormValues, loginSchema } from "@/features/auth/schemas";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -64,18 +63,22 @@ export default function LoginScreen(): JSX.Element {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <GlassView tone="panel" radius={theme.radius.panel} highlight elevation="floating" style={styles.card}>
+        <GlassView material="regular" radius={theme.radius.sheet} highlight elevation="floating" style={styles.card}>
           <View style={styles.brandRow}>
             <View style={[styles.brandMark, { backgroundColor: theme.colors.accentMuted }]}>
-              <Text style={[styles.brandGlyph, { color: theme.colors.accent }]}>QQ</Text>
+              <AppText variant="subheadEmphasized" tone="accent">
+                QQ
+              </AppText>
             </View>
-            <Text style={[styles.brandName, { color: theme.colors.textMuted }]}>Qora Qarg&apos;a</Text>
+            <AppText variant="footnote" tone="secondary">
+              Qora Qarg&apos;a
+            </AppText>
           </View>
 
-          <Text style={[styles.title, { color: theme.colors.textPrimary }]}>Sign in</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
+          <AppText variant="largeTitle">Sign in</AppText>
+          <AppText variant="subhead" tone="secondary">
             Access your internal messaging workspace.
-          </Text>
+          </AppText>
 
           <View style={styles.form}>
             <Controller
@@ -117,7 +120,9 @@ export default function LoginScreen(): JSX.Element {
             onPress={() => router.push("/(auth)/register")}
             style={styles.linkWrap}
           >
-            <Text style={[styles.link, { color: theme.colors.accent }]}>Create account</Text>
+            <AppText variant="bodyEmphasized" tone="accent" style={styles.link}>
+              Create account
+            </AppText>
           </Pressable>
         </GlassView>
       </ScrollView>
@@ -155,24 +160,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40
   },
-  brandGlyph: {
-    fontSize: 15,
-    fontWeight: "800"
-  },
-  brandName: {
-    fontSize: 13,
-    fontWeight: "700",
-    letterSpacing: 0.3
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    letterSpacing: -0.5
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20
-  },
+
+
   form: {
     gap: 14,
     marginTop: 22
@@ -181,8 +170,6 @@ const styles = StyleSheet.create({
     marginTop: 18
   },
   link: {
-    fontSize: 14,
-    fontWeight: "700",
     textAlign: "center"
   }
 });
