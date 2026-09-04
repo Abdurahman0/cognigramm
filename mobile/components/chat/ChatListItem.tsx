@@ -1,5 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Platform, Pressable, StyleSheet, View } from "react-native";
+import Swipeable from "react-native-gesture-handler/Swipeable";
+import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
 import { Avatar } from "@/components/common/Avatar";
 import { AppText } from "@/components/ui/AppText";
@@ -17,6 +19,8 @@ interface ChatListItemProps {
   lastMessage?: ChatMessage;
   active?: boolean;
   onPress: () => void;
+  /** Swipe action; the row springs back once it fires. */
+  onMarkRead?: () => void;
 }
 
 const STATUS_ICON: Record<DeliveryState, keyof typeof Feather.glyphMap> = {
@@ -39,7 +43,8 @@ export function ChatListItem({
   chat,
   lastMessage,
   active = false,
-  onPress
+  onPress,
+  onMarkRead
 }: ChatListItemProps): JSX.Element {
   const { theme } = useAppTheme();
   const currentUser = useCurrentUser();
@@ -52,11 +57,12 @@ export function ChatListItem({
   const isOwnLastMessage = Boolean(lastMessage && lastMessage.senderId === currentUser.id);
   const unread = chat.unreadCount > 0;
 
-  return (
+  const row = (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      {...(Platform.OS === "web" ? { dataSet: { interactive: "true" } } : null)}
       style={({ pressed, hovered }) => [
         styles.root,
         {
@@ -116,6 +122,39 @@ export function ChatListItem({
       </View>
     </Pressable>
   );
+
+  const animatedRow = (
+    <Animated.View entering={FadeInDown.springify().damping(20).mass(0.7)} layout={LinearTransition.springify()}>
+      {row}
+    </Animated.View>
+  );
+
+  if (!onMarkRead || !unread) {
+    return animatedRow;
+  }
+
+  return (
+    <Swipeable
+      friction={1.6}
+      overshootRight={false}
+      rightThreshold={44}
+      onSwipeableOpen={(direction: "left" | "right") => {
+        if (direction === "right") {
+          onMarkRead();
+        }
+      }}
+      renderRightActions={() => (
+        <View style={[styles.swipeAction, { backgroundColor: theme.colors.accent }]}>
+          <Feather name="check" size={20} color={theme.colors.onAccent} />
+          <AppText variant="caption2" color={theme.colors.onAccent}>
+            Read
+          </AppText>
+        </View>
+      )}
+    >
+      {animatedRow}
+    </Swipeable>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -155,5 +194,13 @@ const styles = StyleSheet.create({
   },
   preview: {
     flex: 1
+  },
+  swipeAction: {
+    alignItems: "center",
+    borderRadius: 18,
+    gap: 3,
+    justifyContent: "center",
+    marginVertical: 2,
+    width: 84
   }
 });

@@ -6,6 +6,7 @@ import { AppButton, SectionHeader, ToggleItem } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
 import { AppText, Chip, IconButton, ListRow, ListSection, PresenceDot } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useWebEscape } from "@/hooks/useWebEscape";
 import { useAuthStore } from "@/store/authStore";
 import { useChatStore } from "@/store/chatStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -35,6 +36,8 @@ export default function SettingsScreen(): JSX.Element {
   const logout = useAuthStore((state) => state.logout);
 
   const connectionLive = websocketStatus === "connected";
+
+  useWebEscape(() => router.back());
 
   return (
     <DetailScreenShell maxWidth={680}>

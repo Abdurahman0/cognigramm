@@ -1,7 +1,7 @@
 import { Platform, type ViewStyle } from "react-native";
 
 import { darkColors, lightColors, type AppColors } from "@/theme/colors";
-import { blur, duration, layout, motion, radius, spacing } from "@/theme/tokens";
+import { blur, duration, layout, motion, radius, spacing, transition } from "@/theme/tokens";
 import { fontFamily, typeScale, typography, type TypeVariant } from "@/theme/typography";
 import type { ThemeMode } from "@/types/common";
 
@@ -91,5 +91,16 @@ export const getTheme = (mode: Exclude<ThemeMode, "system">): AppTheme => {
   return theme;
 };
 
-export { blur, duration, fontFamily, layout, motion, radius, spacing, typeScale, typography };
+export {
+  blur,
+  duration,
+  fontFamily,
+  layout,
+  motion,
+  radius,
+  spacing,
+  transition,
+  typeScale,
+  typography
+};
 export type { AppColors, TypeVariant };

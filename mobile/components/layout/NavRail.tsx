@@ -1,23 +1,46 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { usePathname, useRouter } from "expo-router";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, PanResponder, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
-import { AppText, Badge, GlassView, IconButton, PressableScale } from "@/components/ui";
+import { AppText, Badge, GlassView, IconButton, LiquidLens, PressableScale } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useMorphingIndicator, type IndicatorSlot } from "@/hooks/useMorphingIndicator";
 import { useChatStore } from "@/store/chatStore";
 
 interface RailItemProps {
   item: WorkspaceNavItem;
   active: boolean;
   badgeCount?: number;
+  /** The lens is currently over this item while scrubbing. */
+  magnified?: boolean;
   onPress: () => void;
+  onLayout: (event: LayoutChangeEvent) => void;
 }
 
-function RailItem({ item, active, badgeCount = 0, onPress }: RailItemProps): JSX.Element {
+function RailItem({
+  item,
+  active,
+  badgeCount = 0,
+  magnified = false,
+  onPress,
+  onLayout
+}: RailItemProps): JSX.Element {
   const { theme } = useAppTheme();
-  const color = active ? theme.colors.accent : theme.colors.textSecondary;
+  const color = active || magnified ? theme.colors.accent : theme.colors.textSecondary;
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: magnified ? 1.12 : 1,
+      damping: 26,
+      stiffness: 420,
+      mass: 0.7,
+      useNativeDriver: true
+    }).start();
+  }, [magnified, scale]);
 
   return (
     <PressableScale
@@ -26,17 +49,10 @@ function RailItem({ item, active, badgeCount = 0, onPress }: RailItemProps): JSX
       accessibilityLabel={item.label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      onLayout={onLayout}
       style={styles.itemPressable}
     >
-      <View
-        style={[
-          styles.item,
-          {
-            borderRadius: theme.radius.lg,
-            backgroundColor: active ? theme.colors.accentMuted : "transparent"
-          }
-        ]}
-      >
+      <Animated.View style={[styles.item, { transform: [{ scale }] }]}>
         <View>
           <Feather name={item.icon} size={22} color={color} />
           {badgeCount > 0 ? (
@@ -48,19 +64,83 @@ function RailItem({ item, active, badgeCount = 0, onPress }: RailItemProps): JSX
         <AppText variant="caption2" color={color} numberOfLines={1}>
           {item.label}
         </AppText>
-      </View>
+      </Animated.View>
     </PressableScale>
   );
 }
 
-/** Floating vertical navigation used on desktop-width viewports. */
+/**
+ * Floating vertical navigation for desktop. Shares the tab bar's morphing indicator:
+ * one glass pill slides between destinations and stretches vertically as it travels.
+ */
 export function NavRail(): JSX.Element {
   const { theme } = useAppTheme();
   const router = useRouter();
   const pathname = usePathname();
   const chats = useChatStore((state) => state.chats);
   const activeKey = resolveActiveNavKey(pathname ?? "");
+  const activeIndex = Math.max(
+    WORKSPACE_NAV_ITEMS.findIndex((item) => item.key === activeKey),
+    0
+  );
   const unreadTotal = chats.reduce((total, chat) => total + chat.unreadCount, 0);
+  const [slots, setSlots] = useState<IndicatorSlot[]>([]);
+  const [itemWidth, setItemWidth] = useState(0);
+  const [scrubIndex, setScrubIndex] = useState<number | null>(null);
+
+  const measureSlot = useCallback((index: number, event: LayoutChangeEvent) => {
+    const { y, height, width } = event.nativeEvent.layout;
+    setItemWidth((current) => (current === width ? current : width));
+    setSlots((current) => {
+      if (current[index]?.start === y && current[index]?.size === height) {
+        return current;
+      }
+      const next = [...current];
+      next[index] = { start: y, size: height };
+      return next;
+    });
+  }, []);
+
+  const indicator = useMorphingIndicator(activeIndex, slots, "y");
+  const indicatorRef = useRef(indicator);
+  indicatorRef.current = indicator;
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
+
+  const commit = useCallback(
+    (index: number) => {
+      const item = WORKSPACE_NAV_ITEMS[index];
+      indicatorRef.current.release(index);
+      if (item) {
+        router.replace(item.pathname as never);
+      }
+    },
+    [router]
+  );
+
+  // Holding and dragging along the rail scrubs the lens; a plain tap still selects.
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 6,
+        onPanResponderMove: (event) => {
+          const y = event.nativeEvent.locationY;
+          indicatorRef.current.dragTo(y);
+          setScrubIndex(indicatorRef.current.slotAt(y));
+        },
+        onPanResponderRelease: (event) => {
+          const index = indicatorRef.current.slotAt(event.nativeEvent.locationY);
+          setScrubIndex(null);
+          commit(index);
+        },
+        onPanResponderTerminate: () => {
+          setScrubIndex(null);
+          indicatorRef.current.release(activeIndexRef.current);
+        }
+      }),
+    [commit]
+  );
 
   return (
     <GlassView
@@ -74,14 +154,29 @@ export function NavRail(): JSX.Element {
         <Image source={require("@/assets/logo.png")} style={styles.logo} contentFit="contain" />
       </View>
 
-      <View style={styles.items}>
-        {WORKSPACE_NAV_ITEMS.map((item) => (
+      <View style={styles.items} {...panResponder.panHandlers}>
+        {indicator.ready && itemWidth > 0 ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicator,
+              { height: indicator.size, width: itemWidth, borderRadius: theme.radius.lg },
+              indicator.style
+            ]}
+          >
+            <LiquidLens radius={theme.radius.lg} style={styles.indicatorFill} />
+          </Animated.View>
+        ) : null}
+
+        {WORKSPACE_NAV_ITEMS.map((item, index) => (
           <RailItem
             key={item.key}
             item={item}
             active={activeKey === item.key}
             badgeCount={item.key === "chats" ? unreadTotal : 0}
-            onPress={() => router.replace(item.pathname as never)}
+            magnified={scrubIndex === index}
+            onLayout={(event) => measureSlot(index, event)}
+            onPress={() => commit(index)}
           />
         ))}
       </View>
@@ -127,6 +222,16 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 6,
     paddingTop: 8,
+    width: "100%"
+  },
+  indicator: {
+    alignSelf: "center",
+    left: "7%",
+    position: "absolute",
+    top: 0
+  },
+  indicatorFill: {
+    height: "100%",
     width: "100%"
   },
   itemPressable: {

@@ -1,6 +1,7 @@
-import { StyleSheet, Switch, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { GlassSwitch } from "@/components/ui/GlassSwitch";
 import { useAppTheme } from "@/hooks/useAppTheme";
 
 interface ToggleItemProps {
@@ -38,13 +39,7 @@ export function ToggleItem({
           </AppText>
         ) : null}
       </View>
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{ false: theme.colors.fillSecondary, true: theme.colors.success }}
-        thumbColor="#FFFFFF"
-        ios_backgroundColor={theme.colors.fillSecondary}
-      />
+      <GlassSwitch value={value} onValueChange={onValueChange} accessibilityLabel={title} />
     </View>
   );
 }

@@ -1,14 +1,15 @@
 import { Feather } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
-import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Animated, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
-import { AppText, Badge, GlassView, IconButton } from "@/components/ui";
+import { AppText, Badge, GlassView, IconButton, LiquidLens } from "@/components/ui";
 import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useMorphingIndicator, type IndicatorSlot } from "@/hooks/useMorphingIndicator";
 import { useChatStore } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -17,9 +18,10 @@ interface NavRowProps {
   active: boolean;
   badgeCount: number;
   onPress: () => void;
+  onLayout: (event: LayoutChangeEvent) => void;
 }
 
-function NavRow({ item, active, badgeCount, onPress }: NavRowProps): JSX.Element {
+function NavRow({ item, active, badgeCount, onPress, onLayout }: NavRowProps): JSX.Element {
   const { theme } = useAppTheme();
 
   return (
@@ -27,12 +29,13 @@ function NavRow({ item, active, badgeCount, onPress }: NavRowProps): JSX.Element
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       onPress={onPress}
+      onLayout={onLayout}
       style={({ pressed, hovered }) => [
         styles.navRow,
         {
           borderRadius: theme.radius.md,
           backgroundColor: active
-            ? theme.colors.accent
+            ? "transparent"
             : pressed
             ? theme.colors.fillSecondary
             : hovered
@@ -41,20 +44,15 @@ function NavRow({ item, active, badgeCount, onPress }: NavRowProps): JSX.Element
         }
       ]}
     >
-      <Feather
-        name={item.icon}
-        size={17}
-        color={active ? theme.colors.onAccent : theme.colors.accent}
-      />
+      <Feather name={item.icon} size={17} color={theme.colors.accent} />
       <AppText
         variant={active ? "subheadEmphasized" : "subhead"}
-        color={active ? theme.colors.onAccent : theme.colors.textPrimary}
         numberOfLines={1}
         style={styles.navLabel}
       >
         {item.label}
       </AppText>
-      {badgeCount > 0 ? <Badge count={badgeCount} tone={active ? "muted" : "accent"} /> : null}
+      {badgeCount > 0 ? <Badge count={badgeCount} /> : null}
     </Pressable>
   );
 }
@@ -81,6 +79,24 @@ export function WorkspaceSidebar(): JSX.Element {
   }, [chats]);
 
   const groups = useMemo(() => chats.filter((chat) => chat.kind === "group").slice(0, 12), [chats]);
+
+  const activeIndex = Math.max(
+    WORKSPACE_NAV_ITEMS.findIndex((item) => item.key === activeKey),
+    0
+  );
+  const [slots, setSlots] = useState<IndicatorSlot[]>([]);
+  const measureSlot = useCallback((index: number, event: LayoutChangeEvent) => {
+    const { y, height } = event.nativeEvent.layout;
+    setSlots((current) => {
+      if (current[index]?.start === y && current[index]?.size === height) {
+        return current;
+      }
+      const next = [...current];
+      next[index] = { start: y, size: height };
+      return next;
+    });
+  }, []);
+  const indicator = useMorphingIndicator(activeIndex, slots, "y");
 
   const openChat = (chatId: string) => {
     setDesktopChat(chatId);
@@ -129,12 +145,26 @@ export function WorkspaceSidebar(): JSX.Element {
       </Pressable>
 
       <View style={styles.nav}>
-        {WORKSPACE_NAV_ITEMS.map((item) => (
+        {indicator.ready ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.indicator,
+              { height: indicator.size, borderRadius: theme.radius.md },
+              indicator.style
+            ]}
+          >
+            <LiquidLens radius={theme.radius.md} style={styles.indicatorFill} />
+          </Animated.View>
+        ) : null}
+
+        {WORKSPACE_NAV_ITEMS.map((item, index) => (
           <NavRow
             key={item.key}
             item={item}
             active={activeKey === item.key}
             badgeCount={unreadByKey[item.key]}
+            onLayout={(event) => measureSlot(index, event)}
             onPress={() => router.replace(item.pathname as never)}
           />
         ))}
@@ -226,6 +256,16 @@ const styles = StyleSheet.create({
   },
   nav: {
     gap: 2
+  },
+  indicator: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0
+  },
+  indicatorFill: {
+    height: "100%",
+    width: "100%"
   },
   navRow: {
     alignItems: "center",

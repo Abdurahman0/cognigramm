@@ -1,29 +1,7 @@
-import type { NativeStackNavigationOptions } from "@react-navigation/native-stack";
-import { Redirect, Stack } from "expo-router";
-import { Platform } from "react-native";
+import { Redirect } from "expo-router";
 
+import { PlatformStack, modalTransition, pushTransition } from "@/components/navigation";
 import { useAuthStore } from "@/store/authStore";
-
-const isIOS = Platform.OS === "ios";
-
-const transparentContent = { backgroundColor: "transparent" } as const;
-
-const pushScreenOptions: NativeStackNavigationOptions = {
-  presentation: "card",
-  contentStyle: transparentContent,
-  animation: isIOS ? "default" : "ios_from_right",
-  animationDuration: 220,
-  gestureEnabled: true,
-  fullScreenGestureEnabled: isIOS,
-  animationMatchesGesture: isIOS
-};
-
-const modalScreenOptions: NativeStackNavigationOptions = {
-  presentation: "modal",
-  contentStyle: transparentContent,
-  animation: isIOS ? "default" : "fade_from_bottom",
-  gestureEnabled: true
-};
 
 export default function AppLayout(): JSX.Element {
   const session = useAuthStore((state) => state.session);
@@ -33,21 +11,20 @@ export default function AppLayout(): JSX.Element {
   }
 
   return (
-    <Stack
+    <PlatformStack
       screenOptions={{
-        ...pushScreenOptions,
-        headerShown: false,
-        contentStyle: transparentContent
+        ...pushTransition,
+        headerShown: false
       }}
     >
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="chat/[chatId]" options={pushScreenOptions} />
-      <Stack.Screen name="chat-info/[chatId]" options={pushScreenOptions} />
-      <Stack.Screen name="calls/[callId]" options={pushScreenOptions} />
-      <Stack.Screen name="new-message" options={modalScreenOptions} />
-      <Stack.Screen name="resources/[chatId]" options={pushScreenOptions} />
-      <Stack.Screen name="settings/index" />
-      <Stack.Screen name="profile/edit" options={modalScreenOptions} />
-    </Stack>
+      <PlatformStack.Screen name="(tabs)" />
+      <PlatformStack.Screen name="chat/[chatId]" options={pushTransition} />
+      <PlatformStack.Screen name="chat-info/[chatId]" options={pushTransition} />
+      <PlatformStack.Screen name="calls/[callId]" options={pushTransition} />
+      <PlatformStack.Screen name="new-message" options={modalTransition} />
+      <PlatformStack.Screen name="resources/[chatId]" options={pushTransition} />
+      <PlatformStack.Screen name="settings/index" />
+      <PlatformStack.Screen name="profile/edit" options={modalTransition} />
+    </PlatformStack>
   );
 }

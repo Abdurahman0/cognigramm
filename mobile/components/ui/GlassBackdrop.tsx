@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { Platform, StyleSheet, View } from "react-native";
 
 import { useAppTheme } from "@/hooks/useAppTheme";
@@ -6,24 +7,16 @@ import { useResponsive } from "@/hooks/useResponsive";
 interface BloomProps {
   color: string;
   size: number;
-  top?: number;
-  bottom?: number;
-  left?: number;
-  right?: number;
+  x: number;
+  y: number;
 }
 
-/**
- * Soft colour bloom behind the glass. Web gets a real CSS blur through `[data-bloom]`;
- * native fakes the falloff with concentric rings of decreasing opacity.
- */
-function Bloom({ color, size, top, bottom, left, right }: BloomProps): JSX.Element {
-  const rings = Platform.OS === "web" ? [1] : [0.5, 0.72, 1];
+/** A colour blob in the wallpaper. Blur needs structure behind it or it reads as flat paint. */
+function Bloom({ color, size, x, y }: BloomProps): JSX.Element {
+  const rings = Platform.OS === "web" ? [1] : [0.5, 0.75, 1];
 
   return (
-    <View
-      pointerEvents="none"
-      style={[styles.bloomWrap, { width: size, height: size, top, bottom, left, right }]}
-    >
+    <View pointerEvents="none" style={[styles.bloomWrap, { width: size, height: size, left: x, top: y }]}>
       {rings.map((scale, index) => (
         <View
           key={`${scale}`}
@@ -36,7 +29,7 @@ function Bloom({ color, size, top, bottom, left, right }: BloomProps): JSX.Eleme
             height: size * scale,
             borderRadius: (size * scale) / 2,
             backgroundColor: color,
-            opacity: Platform.OS === "web" ? 1 : 0.34 - index * 0.08
+            opacity: Platform.OS === "web" ? 1 : 0.45 - index * 0.12
           }}
         />
       ))}
@@ -45,34 +38,35 @@ function Bloom({ color, size, top, bottom, left, right }: BloomProps): JSX.Eleme
 }
 
 /**
- * App-wide background: a warm base tone with two colour blooms and a veil, so every
- * translucent panel above it has something to actually blur.
+ * The wallpaper every glass surface refracts. Several overlapping colour blobs at
+ * different scales give the blur something to smear; a flat gradient would look
+ * identical blurred or not.
  */
 export function GlassBackdrop(): JSX.Element {
   const { theme } = useAppTheme();
   const { width, height } = useResponsive();
-  const bloomSize = Math.max(width, height) * 0.85;
+  const unit = Math.max(width, height);
+
+  const blobs: BloomProps[] = [
+    { color: theme.colors.backdropBloomWarm, size: unit * 0.62, x: -unit * 0.12, y: -unit * 0.18 },
+    { color: theme.colors.backdropBloomCool, size: unit * 0.58, x: width * 0.52, y: height * 0.08 },
+    { color: theme.colors.accentMuted, size: unit * 0.44, x: width * 0.18, y: height * 0.42 },
+    { color: theme.colors.backdropBloomWarm, size: unit * 0.36, x: width * 0.68, y: height * 0.58 },
+    { color: theme.colors.backdropBloomCool, size: unit * 0.3, x: -unit * 0.06, y: height * 0.72 }
+  ];
 
   return (
-    <View pointerEvents="none" style={[styles.root, { backgroundColor: theme.colors.backdropBase }]}>
-      <Bloom
-        color={theme.colors.backdropBloomWarm}
-        size={bloomSize}
-        top={-bloomSize * 0.35}
-        left={-bloomSize * 0.2}
+    <View pointerEvents="none" style={styles.root}>
+      <LinearGradient
+        colors={[...theme.colors.wallpaper]}
+        locations={[0, 0.5, 1]}
+        start={{ x: 0.05, y: 0 }}
+        end={{ x: 0.95, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-      <Bloom
-        color={theme.colors.backdropBloomCool}
-        size={bloomSize * 0.9}
-        bottom={-bloomSize * 0.32}
-        right={-bloomSize * 0.24}
-      />
-      <Bloom
-        color={theme.colors.accentMuted}
-        size={bloomSize * 0.7}
-        top={height * 0.32}
-        right={-bloomSize * 0.18}
-      />
+      {blobs.map((blob, index) => (
+        <Bloom key={index} {...blob} />
+      ))}
       <View style={[styles.veil, { backgroundColor: theme.colors.backdropVeil }]} />
     </View>
   );

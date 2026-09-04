@@ -21,9 +21,13 @@ const normalizeWsUrl = (value: string): string => {
 	return value
 }
 
-const env =
-	(globalThis as { process?: { env?: Record<string, string | undefined> } })
-		.process?.env ?? {}
+// Read the EXPO_PUBLIC_* keys literally: Expo inlines them at build time only when the
+// property access is static, so a dynamic `env[key]` lookup would silently fall back.
+const env = {
+	EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+	EXPO_PUBLIC_WS_BASE_URL: process.env.EXPO_PUBLIC_WS_BASE_URL,
+	EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD: process.env.EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD,
+}
 const extra = (Constants.expoConfig?.extra ?? {}) as {
 	apiBaseUrl?: string
 	wsBaseUrl?: string

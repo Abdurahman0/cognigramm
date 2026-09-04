@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Animated, Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppButton, EmptyState, SectionHeader } from "@/components/common";
-import { WorkspacePane } from "@/components/layout";
+import { AppButton, EmptyState } from "@/components/common";
+import { FloatingTitleBar, WorkspacePane } from "@/components/layout";
 import { AppText, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
 import { CALL_ROUTE_CONFIG } from "@/features/calls/config/callConfig";
 import { formatCallDuration, getCallDurationMs } from "@/features/calls/utils/formatCallDuration";
@@ -27,6 +27,8 @@ export default function CallsScreen(): JSX.Element {
   const { isDesktop } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCallId, setSelectedCallId] = useState("");
+  const [barHeight, setBarHeight] = useState(52);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const { history, loadingHistory, currentCall, refreshHistory, startCall } = useCallsStore(
     useShallow((state) => ({
@@ -101,39 +103,32 @@ export default function CallsScreen(): JSX.Element {
     router.push({ pathname: "/(app)/chat/[chatId]", params: { chatId: conversationId } });
   };
 
+  const bottomClearance = isDesktop ? 16 : theme.layout.tabBarClearance;
+
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <AppText variant="largeTitle">Calls</AppText>
+      <AppText variant="subhead" tone="secondary" style={styles.subtitle}>
+        {calls.length} in history
+      </AppText>
+    </View>
+  );
+
   const listPane = (
     <View style={styles.pane}>
-      <View style={styles.header}>
-        <SectionHeader
-          title="Calls"
-          subtitle={`${calls.length} in history`}
-          rightSlot={
-            currentCall && LIVE_STATUSES.has(currentCall.status) ? (
-              <IconButton
-                icon="phone-call"
-                accessibilityLabel="Open the active call"
-                tone="success"
-                onPress={() => openCallStage(currentCall.id)}
-              />
-            ) : (
-              <IconButton
-                icon="refresh-cw"
-                accessibilityLabel="Refresh call history"
-                disabled={loadingHistory}
-                onPress={() => {
-                  handleRefresh().catch(() => undefined);
-                }}
-              />
-            )
-          }
-        />
-      </View>
-
-      <FlatList
+      <Animated.FlatList
         data={calls}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: (typeof calls)[number]) => item.id}
         style={styles.list}
-        contentContainerStyle={styles.listContent}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: Platform.OS !== "web"
+        })}
+        scrollEventThrottle={16}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: barHeight + 18, paddingBottom: bottomClearance }
+        ]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing || loadingHistory}
@@ -153,7 +148,7 @@ export default function CallsScreen(): JSX.Element {
             icon="phone-call"
           />
         }
-        renderItem={({ item }) => {
+        renderItem={({ item }: { item: (typeof calls)[number] }) => {
           const live = currentCall?.id === item.id && LIVE_STATUSES.has(item.status);
           const active = selectedCallId === item.id;
           const missed = item.status === "missed" || item.status === "failed";
@@ -205,6 +200,31 @@ export default function CallsScreen(): JSX.Element {
             </Pressable>
           );
         }}
+      />
+
+      <FloatingTitleBar
+        title="Calls"
+        scrollY={scrollY}
+        onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+        actions={
+          currentCall && LIVE_STATUSES.has(currentCall.status) ? (
+            <IconButton
+              icon="phone-call"
+              accessibilityLabel="Open the active call"
+              tone="success"
+              onPress={() => openCallStage(currentCall.id)}
+            />
+          ) : (
+            <IconButton
+              icon="refresh-cw"
+              accessibilityLabel="Refresh call history"
+              disabled={loadingHistory}
+              onPress={() => {
+                handleRefresh().catch(() => undefined);
+              }}
+            />
+          )
+        }
       />
     </View>
   );
@@ -316,17 +336,19 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 14
+  listHeader: {
+    gap: 4,
+    paddingBottom: 10,
+    paddingHorizontal: 8,
+    paddingTop: 6
+  },
+  subtitle: {
+    marginTop: -2
   },
   list: {
-    flex: 1,
-    marginTop: 12
+    flex: 1
   },
-  listContent: {
-    paddingBottom: 16
-  },
+  listContent: {},
   separator: {
     height: StyleSheet.hairlineWidth * 2,
     marginLeft: 52

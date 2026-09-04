@@ -1,14 +1,16 @@
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Animated, Platform, RefreshControl, StyleSheet, View } from "react-native";
 
 import { ChatListItem } from "@/components/chat";
-import { EmptyState, LoadingSkeleton, SearchBar, SectionHeader } from "@/components/common";
-import { Chip, IconButton } from "@/components/ui";
+import { EmptyState, LoadingSkeleton, SearchBar } from "@/components/common";
+import { FloatingTitleBar } from "@/components/layout";
+import { AppText, Chip, IconButton } from "@/components/ui";
 import { CHAT_FILTERS } from "@/constants/chat";
 import { PresenceRail } from "@/features/chat/PresenceRail";
 import { filterChats } from "@/features/chat/selectors";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useResponsive } from "@/hooks/useResponsive";
 import { useChatStore, type ChatFilterKey } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -19,15 +21,21 @@ interface ChatListPaneProps {
   showHeader?: boolean;
 }
 
-/** Search + presence + filtered conversation list. Shared by the chats and call screens. */
+/**
+ * Search, presence, and the conversation list. The title bar floats as glass and the
+ * list scrolls underneath it, the way an iOS navigation bar behaves.
+ */
 export function ChatListPane({
   activeChatId,
   onSelectChat,
   showHeader = true
 }: ChatListPaneProps): JSX.Element {
   const { theme } = useAppTheme();
+  const { isDesktop } = useResponsive();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [barHeight, setBarHeight] = useState(52);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const {
     chats,
@@ -36,7 +44,8 @@ export function ChatListPane({
     searchQuery,
     setFilter,
     setSearchQuery,
-    refreshChats
+    refreshChats,
+    markConversationRead
   } = useChatStore(
     useShallow((state) => ({
       chats: state.chats,
@@ -45,7 +54,8 @@ export function ChatListPane({
       searchQuery: state.chatSearchQuery,
       setFilter: state.setActiveFilter,
       setSearchQuery: state.setChatSearchQuery,
-      refreshChats: state.refreshChats
+      refreshChats: state.refreshChats,
+      markConversationRead: state.markConversationRead
     }))
   );
 
@@ -72,56 +82,59 @@ export function ChatListPane({
     }
   };
 
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <AppText variant="largeTitle">Chats</AppText>
+      <AppText variant="subhead" tone="secondary" style={styles.subtitle}>
+        {counts.all} conversations · {counts.unread} unread
+      </AppText>
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        onClear={() => setSearchQuery("")}
+        placeholder="Search conversations"
+        style={styles.search}
+      />
+      <PresenceRail onOpenConversation={onSelectChat} />
+      <View style={styles.filters}>
+        {CHAT_FILTERS.map((item) => (
+          <Chip
+            key={item.key}
+            label={item.label}
+            active={filter === item.key}
+            count={counts[item.key as keyof typeof counts]}
+            onPress={() => setFilter(item.key as ChatFilterKey)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
   return (
     <View style={styles.root}>
-      {showHeader ? (
-        <View style={styles.header}>
-          <SectionHeader
-            title="Chats"
-            subtitle={`${counts.all} conversations · ${counts.unread} unread`}
-            rightSlot={
-              <IconButton
-                icon="edit-2"
-                accessibilityLabel="Start a new conversation"
-                onPress={() => router.push("/(app)/new-message")}
-              />
-            }
-          />
-        </View>
-      ) : null}
-
-      <View style={styles.controls}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onClear={() => setSearchQuery("")}
-          placeholder="Search conversations"
-        />
-        <PresenceRail onOpenConversation={onSelectChat} />
-        <View style={styles.filters}>
-          {CHAT_FILTERS.map((item) => (
-            <Chip
-              key={item.key}
-              label={item.label}
-              active={filter === item.key}
-              count={counts[item.key as keyof typeof counts]}
-              onPress={() => setFilter(item.key as ChatFilterKey)}
-            />
-          ))}
-        </View>
-      </View>
-
-      <FlatList
+      <Animated.FlatList
         data={filteredChats}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: Platform.OS !== "web"
+        })}
+        scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
         style={styles.list}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingTop: showHeader ? barHeight + 18 : 12,
+            paddingBottom: isDesktop ? 16 : theme.layout.tabBarClearance
+          }
+        ]}
+        ListHeaderComponent={showHeader ? listHeader : null}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
             tintColor={theme.colors.accent}
             colors={[theme.colors.accent]}
+            progressViewOffset={barHeight}
           />
         }
         ListEmptyComponent={
@@ -141,11 +154,30 @@ export function ChatListPane({
             lastMessage={(messagesByChat[item.id] ?? []).slice(-1)[0]}
             active={activeChatId === item.id}
             onPress={() => onSelectChat(item.id)}
+            onMarkRead={() => {
+              markConversationRead(item.id).catch(() => undefined);
+            }}
           />
         )}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
       />
+
+      {showHeader ? (
+        <FloatingTitleBar
+          title="Chats"
+          scrollY={scrollY}
+          onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+          actions={
+            <IconButton
+              icon="edit-2"
+              accessibilityLabel="Start a new conversation"
+              size="md"
+              onPress={() => router.push("/(app)/new-message")}
+            />
+          }
+        />
+      ) : null}
     </View>
   );
 }
@@ -155,29 +187,33 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
-  header: {
-    paddingHorizontal: 14,
-    paddingTop: 12
+  list: {
+    flex: 1
   },
-  controls: {
+  listContent: {
+    paddingHorizontal: 8
+  },
+  listHeader: {
     gap: 10,
-    paddingHorizontal: 14,
-    paddingTop: 12
+    paddingBottom: 6,
+    paddingHorizontal: 8,
+    paddingTop: 6
+  },
+  subtitle: {
+    marginTop: -6
+  },
+  search: {
+    marginTop: 4
   },
   filters: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
   },
-  list: {
-    flex: 1,
-    marginTop: 8
-  },
-  listContent: {
-    paddingBottom: 12,
-    paddingHorizontal: 6
-  },
   separator: {
     height: 2
+  },
+  floatingSpacer: {
+    height: 0
   }
 });

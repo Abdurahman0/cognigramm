@@ -30,7 +30,8 @@ export interface AppColors {
   overlay: string;
   shadow: string;
 
-  /** Wallpaper: base tone plus the colour blooms the glass refracts. */
+  /** Wallpaper: gradient stops plus the colour blooms the glass refracts. */
+  wallpaper: readonly [string, string, string];
   backdropBase: string;
   backdropBloomWarm: string;
   backdropBloomCool: string;
@@ -54,11 +55,29 @@ export interface AppColors {
   glassSoft: string;
   glassHover: string;
   glassBorder: string;
+  /** Fill and rim of the travelling selection lens in the tab bar and nav rail. */
+  selectionFill: string;
+  selectionRim: string;
+  /** The selection lens rendered as a bead of clear liquid, lit rather than tinted. */
+  dropletCrown: string;
+  dropletBody: string;
+  dropletPool: string;
+  dropletMeniscus: string;
+  dropletCaustic: string;
+  dropletGlint: string;
+  dropletDepth: string;
+  dropletRim: string;
+  dropletShadow: string;
   glassHighlight: string;
 
   /** Lens edges: bright specular rim on top, dim refraction underneath. */
   specularTop: string;
   specularBottom: string;
+
+  /** Diagonal sheen sweeping across a glass surface. */
+  sheenStrong: string;
+  sheenSoft: string;
+  sheenEdge: string;
 
   blurTint: "light" | "dark";
 }
@@ -70,12 +89,12 @@ export const lightColors: AppColors = {
   border: "rgba(60, 60, 67, 0.29)",
 
   textPrimary: "#000000",
-  textSecondary: "rgba(60, 60, 67, 0.60)",
+  textSecondary: "rgba(60, 60, 67, 0.72)",
   textMuted: "rgba(60, 60, 67, 0.40)",
   textFaint: "rgba(60, 60, 67, 0.22)",
 
   accent: "#007AFF",
-  accentMuted: "rgba(0, 122, 255, 0.14)",
+  accentMuted: "rgba(0, 122, 255, 0.20)",
   accentStrong: "#0060DF",
   onAccent: "#FFFFFF",
   success: "#34C759",
@@ -85,34 +104,50 @@ export const lightColors: AppColors = {
   online: "#34C759",
 
   messageMine: "#007AFF",
-  messageOther: "rgba(120, 120, 128, 0.20)",
+  messageOther: "rgba(255, 255, 255, 0.55)",
   overlay: "rgba(0, 0, 0, 0.28)",
   shadow: "rgba(28, 24, 40, 0.16)",
 
+  wallpaper: ["#FFE9F3", "#DCE7FF", "#FFF3DC"] as const,
   backdropBase: "#E9E6F2",
-  backdropBloomWarm: "rgba(255, 196, 168, 0.62)",
-  backdropBloomCool: "rgba(150, 182, 255, 0.60)",
-  backdropVeil: "rgba(255, 255, 255, 0.20)",
+  backdropBloomWarm: "rgba(255, 143, 112, 0.45)",
+  backdropBloomCool: "rgba(96, 148, 255, 0.42)",
+  backdropVeil: "rgba(255, 255, 255, 0.30)",
 
-  materialUltraThin: "rgba(255, 255, 255, 0.48)",
-  materialThin: "rgba(255, 255, 255, 0.62)",
-  materialRegular: "rgba(255, 255, 255, 0.74)",
-  materialThick: "rgba(255, 255, 255, 0.86)",
+  materialUltraThin: "rgba(255, 255, 255, 0.20)",
+  materialThin: "rgba(255, 255, 255, 0.30)",
+  materialRegular: "rgba(255, 255, 255, 0.42)",
+  materialThick: "rgba(255, 255, 255, 0.92)",
 
   fillPrimary: "rgba(120, 120, 128, 0.20)",
   fillSecondary: "rgba(120, 120, 128, 0.16)",
   fillTertiary: "rgba(120, 120, 128, 0.12)",
   separator: "rgba(60, 60, 67, 0.18)",
 
-  glass: "rgba(255, 255, 255, 0.74)",
-  glassStrong: "rgba(255, 255, 255, 0.86)",
+  glass: "rgba(255, 255, 255, 0.42)",
+  glassStrong: "rgba(255, 255, 255, 0.92)",
   glassSoft: "rgba(120, 120, 128, 0.12)",
   glassHover: "rgba(120, 120, 128, 0.18)",
   glassBorder: "rgba(255, 255, 255, 0.55)",
+  selectionFill: "rgba(120, 120, 128, 0.16)",
+  selectionRim: "rgba(255, 255, 255, 0.90)",
+  dropletCrown: "rgba(255, 255, 255, 0.80)",
+  dropletBody: "rgba(255, 255, 255, 0.24)",
+  dropletPool: "rgba(255, 255, 255, 0.62)",
+  dropletMeniscus: "rgba(255, 255, 255, 1)",
+  dropletCaustic: "rgba(255, 255, 255, 0.92)",
+  dropletGlint: "rgba(255, 255, 255, 0.95)",
+  dropletDepth: "rgba(84, 88, 110, 0.32)",
+  dropletRim: "rgba(104, 109, 134, 0.46)",
+  dropletShadow: "rgba(66, 70, 94, 0.28)",
   glassHighlight: "rgba(255, 255, 255, 0.95)",
 
-  specularTop: "rgba(255, 255, 255, 0.90)",
-  specularBottom: "rgba(255, 255, 255, 0.28)",
+  specularTop: "rgba(255, 255, 255, 0.95)",
+  specularBottom: "rgba(28, 24, 40, 0.10)",
+
+  sheenStrong: "rgba(255, 255, 255, 0.55)",
+  sheenSoft: "rgba(255, 255, 255, 0.18)",
+  sheenEdge: "rgba(255, 255, 255, 0.22)",
 
   blurTint: "light"
 };
@@ -124,12 +159,12 @@ export const darkColors: AppColors = {
   border: "rgba(84, 84, 88, 0.65)",
 
   textPrimary: "#FFFFFF",
-  textSecondary: "rgba(235, 235, 245, 0.60)",
+  textSecondary: "rgba(235, 235, 245, 0.72)",
   textMuted: "rgba(235, 235, 245, 0.40)",
   textFaint: "rgba(235, 235, 245, 0.22)",
 
   accent: "#0A84FF",
-  accentMuted: "rgba(10, 132, 255, 0.22)",
+  accentMuted: "rgba(10, 132, 255, 0.30)",
   accentStrong: "#409CFF",
   onAccent: "#FFFFFF",
   success: "#30D158",
@@ -139,34 +174,50 @@ export const darkColors: AppColors = {
   online: "#30D158",
 
   messageMine: "#0A84FF",
-  messageOther: "rgba(120, 120, 128, 0.38)",
+  messageOther: "rgba(120, 120, 128, 0.45)",
   overlay: "rgba(0, 0, 0, 0.55)",
   shadow: "rgba(0, 0, 0, 0.55)",
 
+  wallpaper: ["#1B0A33", "#06184A", "#050510"] as const,
   backdropBase: "#07070B",
-  backdropBloomWarm: "rgba(122, 74, 168, 0.55)",
-  backdropBloomCool: "rgba(28, 88, 178, 0.55)",
-  backdropVeil: "rgba(4, 4, 8, 0.30)",
+  backdropBloomWarm: "rgba(168, 62, 224, 0.42)",
+  backdropBloomCool: "rgba(20, 110, 255, 0.40)",
+  backdropVeil: "rgba(4, 4, 10, 0.34)",
 
-  materialUltraThin: "rgba(120, 120, 128, 0.18)",
-  materialThin: "rgba(44, 44, 48, 0.52)",
-  materialRegular: "rgba(36, 36, 40, 0.66)",
-  materialThick: "rgba(24, 24, 28, 0.82)",
+  materialUltraThin: "rgba(255, 255, 255, 0.07)",
+  materialThin: "rgba(20, 20, 26, 0.24)",
+  materialRegular: "rgba(16, 16, 22, 0.34)",
+  materialThick: "rgba(10, 10, 16, 0.90)",
 
   fillPrimary: "rgba(120, 120, 128, 0.36)",
   fillSecondary: "rgba(120, 120, 128, 0.28)",
   fillTertiary: "rgba(120, 120, 128, 0.20)",
   separator: "rgba(84, 84, 88, 0.50)",
 
-  glass: "rgba(36, 36, 40, 0.66)",
-  glassStrong: "rgba(24, 24, 28, 0.82)",
+  glass: "rgba(16, 16, 22, 0.34)",
+  glassStrong: "rgba(10, 10, 16, 0.90)",
   glassSoft: "rgba(120, 120, 128, 0.20)",
   glassHover: "rgba(120, 120, 128, 0.30)",
   glassBorder: "rgba(255, 255, 255, 0.14)",
+  selectionFill: "rgba(255, 255, 255, 0.10)",
+  selectionRim: "rgba(255, 255, 255, 0.22)",
+  dropletCrown: "rgba(255, 255, 255, 0.26)",
+  dropletBody: "rgba(255, 255, 255, 0.07)",
+  dropletPool: "rgba(255, 255, 255, 0.20)",
+  dropletMeniscus: "rgba(255, 255, 255, 0.92)",
+  dropletCaustic: "rgba(255, 255, 255, 0.52)",
+  dropletGlint: "rgba(255, 255, 255, 0.58)",
+  dropletDepth: "rgba(0, 0, 0, 0.40)",
+  dropletRim: "rgba(255, 255, 255, 0.30)",
+  dropletShadow: "rgba(0, 0, 0, 0.50)",
   glassHighlight: "rgba(255, 255, 255, 0.35)",
 
-  specularTop: "rgba(255, 255, 255, 0.42)",
-  specularBottom: "rgba(255, 255, 255, 0.08)",
+  specularTop: "rgba(255, 255, 255, 0.55)",
+  specularBottom: "rgba(0, 0, 0, 0.35)",
+
+  sheenStrong: "rgba(255, 255, 255, 0.16)",
+  sheenSoft: "rgba(255, 255, 255, 0.05)",
+  sheenEdge: "rgba(255, 255, 255, 0.08)",
 
   blurTint: "dark"
 };

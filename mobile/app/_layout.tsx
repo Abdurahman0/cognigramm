@@ -9,9 +9,8 @@ import * as SystemUI from "expo-system-ui";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import Toast from "react-native-toast-message";
 
-import { GlassBackdrop, toastConfig } from "@/components/ui";
+import { GlassBackdrop, NotificationHost } from "@/components/ui";
 import { IncomingCallPrompt } from "@/features/calls/components/IncomingCallPrompt";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
@@ -137,7 +136,7 @@ export default function RootLayout(): JSX.Element {
               <Stack.Screen name="(app)" />
             </Stack>
             <IncomingCallPrompt />
-            <Toast config={toastConfig} position="top" topOffset={52} />
+            <NotificationHost />
           </View>
         </ThemeProvider>
       </QueryClientProvider>

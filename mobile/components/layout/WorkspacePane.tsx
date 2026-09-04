@@ -26,9 +26,10 @@ export function WorkspacePane({ children, width, style }: WorkspacePaneProps): J
 
   return (
     <GlassView
-      material="ultraThin"
+      material="clear"
       radius={theme.radius.panel}
       bordered={false}
+      interactive
       style={[
         styles.pane,
         width

@@ -1,3 +1,5 @@
+import { BlurView } from "expo-blur";
+import { LinearGradient } from "expo-linear-gradient";
 import type { PropsWithChildren } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewProps, type ViewStyle } from "react-native";
 
@@ -15,20 +17,35 @@ const TONE_TO_MATERIAL: Record<GlassTone, GlassMaterial> = {
   clear: "clear"
 };
 
+/** Native blur strength per material, roughly matching the CSS blur radii on web. */
+const BLUR_INTENSITY: Record<Exclude<GlassMaterial, "clear">, number> = {
+  ultraThin: 24,
+  thin: 40,
+  regular: 60,
+  thick: 96
+};
+
 interface GlassViewProps extends PropsWithChildren<Pick<ViewProps, "pointerEvents" | "onLayout">> {
   material?: GlassMaterial;
   tone?: GlassTone;
   radius?: number;
   bordered?: boolean;
-  /** Specular rim: bright lens edge on top, faint refraction underneath. */
+  /** Lens treatment: specular sheen across the surface plus a bevelled rim. */
   highlight?: boolean;
+  /** Eases transform and shadow changes so hover and press feel physical. */
+  interactive?: boolean;
   elevation?: ElevationLevel;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
- * A Liquid Glass surface. On web the CSS `backdrop-filter` from `[data-glass]` does the
- * lensing; native platforms approximate it with layered translucency over the wallpaper.
+ * Liquid Glass surface.
+ *
+ * The tint is deliberately thin — the blur does the work, so whatever sits behind stays
+ * readable through the surface. Native platforms blur with `expo-blur`; web uses the CSS
+ * `backdrop-filter` from the injected `[data-glass]` rules. On top of the blur sit a
+ * diagonal specular sheen and a bevelled rim, which is what makes it read as a lens
+ * rather than a translucent rectangle.
  */
 export function GlassView({
   children,
@@ -37,6 +54,7 @@ export function GlassView({
   radius,
   bordered = true,
   highlight = false,
+  interactive = false,
   elevation = "none",
   style,
   pointerEvents,
@@ -45,47 +63,78 @@ export function GlassView({
   const { theme } = useAppTheme();
   const resolved: GlassMaterial = material ?? TONE_TO_MATERIAL[tone];
   const cornerRadius = radius ?? theme.radius.xl;
+  const isWeb = Platform.OS === "web";
+  const isClear = resolved === "clear";
 
-  const fill =
-    resolved === "ultraThin"
-      ? theme.colors.materialUltraThin
-      : resolved === "thin"
-      ? theme.colors.materialThin
-      : resolved === "thick"
-      ? theme.colors.materialThick
-      : resolved === "clear"
-      ? "transparent"
-      : theme.colors.materialRegular;
+  const fill = isClear
+    ? "transparent"
+    : resolved === "ultraThin"
+    ? theme.colors.materialUltraThin
+    : resolved === "thin"
+    ? theme.colors.materialThin
+    : resolved === "thick"
+    ? theme.colors.materialThick
+    : theme.colors.materialRegular;
+
+  const showLens = highlight && !isClear;
 
   return (
     <View
       onLayout={onLayout}
       pointerEvents={pointerEvents}
-      {...(Platform.OS === "web" ? { dataSet: { glass: resolved } } : null)}
+      {...(isWeb
+        ? {
+            dataSet: {
+              glass: resolved,
+              ...(showLens ? { lens: "true" } : null),
+              ...(interactive ? { interactive: "true" } : null)
+            }
+          }
+        : null)}
       style={[
         {
-          backgroundColor: fill,
           borderRadius: cornerRadius,
           borderWidth: bordered ? StyleSheet.hairlineWidth * 2 : 0,
-          borderColor: bordered ? theme.colors.glassBorder : "transparent"
+          borderColor: bordered ? theme.colors.glassBorder : "transparent",
+          // Web paints the tint through the same node that carries backdrop-filter.
+          backgroundColor: isWeb ? fill : "transparent"
         },
         theme.elevation[elevation],
-        highlight && styles.clip,
+        !isClear && styles.clip,
         style
       ]}
     >
-      {highlight ? (
+      {!isWeb && !isClear ? (
         <>
-          <View
+          <BlurView
             pointerEvents="none"
-            style={[styles.specularTop, { backgroundColor: theme.colors.specularTop }]}
+            intensity={BLUR_INTENSITY[resolved]}
+            tint={theme.colors.blurTint}
+            experimentalBlurMethod="dimezisBlurView"
+            style={StyleSheet.absoluteFill}
           />
+          <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: fill }]} />
+        </>
+      ) : null}
+
+      {showLens && !isWeb ? (
+        <>
+          <LinearGradient
+            pointerEvents="none"
+            colors={[theme.colors.sheenStrong, theme.colors.sheenSoft, "transparent", theme.colors.sheenEdge]}
+            locations={[0, 0.28, 0.62, 1]}
+            start={{ x: 0.05, y: 0 }}
+            end={{ x: 0.95, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <View pointerEvents="none" style={[styles.rimTop, { backgroundColor: theme.colors.specularTop }]} />
           <View
             pointerEvents="none"
-            style={[styles.specularBottom, { backgroundColor: theme.colors.specularBottom }]}
+            style={[styles.rimBottom, { backgroundColor: theme.colors.specularBottom }]}
           />
         </>
       ) : null}
+
       {children}
     </View>
   );
@@ -95,22 +144,18 @@ const styles = StyleSheet.create({
   clip: {
     overflow: "hidden"
   },
-  specularTop: {
-    height: 1,
+  rimTop: {
+    height: StyleSheet.hairlineWidth * 2,
     left: 0,
-    opacity: 0.85,
     position: "absolute",
     right: 0,
-    top: 0,
-    zIndex: 1
+    top: 0
   },
-  specularBottom: {
+  rimBottom: {
     bottom: 0,
-    height: 1,
+    height: StyleSheet.hairlineWidth * 2,
     left: 0,
-    opacity: 0.6,
     position: "absolute",
-    right: 0,
-    zIndex: 1
+    right: 0
   }
 });

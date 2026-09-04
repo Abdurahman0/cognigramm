@@ -17,6 +17,7 @@ import { ROLE_LABELS } from "@/constants/roles";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useWebEscape } from "@/hooks/useWebEscape";
 import { useChatStore } from "@/store/chatStore";
 import type { ChatSummary, User } from "@/types";
 import { useShallow } from "zustand/react/shallow";
@@ -152,6 +153,14 @@ export default function ChatInfoScreen(): JSX.Element {
   );
 
   const [memberQuery, setMemberQuery] = useState("");
+
+  useWebEscape(() => {
+    if (Platform.OS === "web") {
+      router.replace("/(app)/(tabs)/chats");
+      return;
+    }
+    router.back();
+  });
 
   const chat = useMemo(() => chats.find((item) => item.id === chatId), [chats, chatId]);
   const messages = useMemo(() => (chat ? messagesByChat[chat.id] ?? [] : []), [messagesByChat, chat]);

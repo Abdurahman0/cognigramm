@@ -1,6 +1,6 @@
-import { Redirect, Stack } from "expo-router";
-import { Platform } from "react-native";
+import { Redirect } from "expo-router";
 
+import { PlatformStack, pushTransition } from "@/components/navigation";
 import { useAuthStore } from "@/store/authStore";
 
 export default function AuthLayout(): JSX.Element {
@@ -11,17 +11,14 @@ export default function AuthLayout(): JSX.Element {
   }
 
   return (
-    <Stack
+    <PlatformStack
       screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: "transparent" },
-        animation: Platform.OS === "ios" ? "default" : "ios_from_right",
-        animationDuration: 200,
-        gestureEnabled: true
+        ...pushTransition,
+        headerShown: false
       }}
     >
-      <Stack.Screen name="login" />
-      <Stack.Screen name="register" />
-    </Stack>
+      <PlatformStack.Screen name="login" />
+      <PlatformStack.Screen name="register" />
+    </PlatformStack>
   );
 }

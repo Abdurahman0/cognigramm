@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { NavRail } from "@/components/layout/NavRail";
 import { WorkspaceSidebar } from "@/components/layout/WorkspaceSidebar";
@@ -23,12 +23,11 @@ export function AppShell({ children, showSidebar = true }: AppShellProps): JSX.E
   const { isDesktop } = useResponsive();
 
   if (!isDesktop) {
-    // A thin veil over the wallpaper keeps phone content legible without hiding the colour.
+    // A plain tint, deliberately without its own backdrop-filter: a filtered ancestor
+    // would start a new backdrop root and starve the floating bars' blur of the content
+    // scrolling beneath them.
     return (
-      <View
-        {...(Platform.OS === "web" ? { dataSet: { glass: "ultraThin" } } : null)}
-        style={[styles.compactRoot, { backgroundColor: theme.colors.materialUltraThin }]}
-      >
+      <View style={[styles.compactRoot, { backgroundColor: theme.colors.materialUltraThin }]}>
         {children}
       </View>
     );
@@ -41,6 +40,7 @@ export function AppShell({ children, showSidebar = true }: AppShellProps): JSX.E
         material="regular"
         radius={theme.radius.sheet}
         highlight
+        interactive
         elevation="floating"
         style={styles.window}
       >

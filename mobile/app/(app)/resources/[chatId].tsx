@@ -15,6 +15,7 @@ import { DetailScreenShell } from "@/components/layout";
 import { AppText, Chip, IconButton } from "@/components/ui";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useWebEscape } from "@/hooks/useWebEscape";
 import { useChatStore } from "@/store/chatStore";
 import { formatMessageDate } from "@/utils/date";
 import { useShallow } from "zustand/react/shallow";
@@ -47,6 +48,8 @@ export default function MediaScreen(): JSX.Element {
   const { theme } = useAppTheme();
   const { chatId } = useLocalSearchParams<{ chatId: string }>();
   const [filter, setFilter] = useState<MediaFilter>("all");
+
+  useWebEscape(() => router.back());
 
   const { chats, users, messages } = useChatStore(
     useShallow((state) => ({

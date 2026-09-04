@@ -1,5 +1,6 @@
 export { AppShell } from "@/components/layout/AppShell";
 export { DetailScreenShell } from "@/components/layout/DetailScreenShell";
+export { FloatingTitleBar } from "@/components/layout/FloatingTitleBar";
 export { GlassTabBar } from "@/components/layout/GlassTabBar";
 export { NavRail } from "@/components/layout/NavRail";
 export { WorkspacePane } from "@/components/layout/WorkspacePane";

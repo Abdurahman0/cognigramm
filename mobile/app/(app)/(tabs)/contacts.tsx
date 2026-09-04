@@ -1,11 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { FlatList, ScrollView, StyleSheet, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppButton, Avatar, EmptyState, SearchBar, SectionHeader, UserCard } from "@/components/common";
-import { WorkspacePane } from "@/components/layout";
+import { AppButton, Avatar, EmptyState, SearchBar, UserCard } from "@/components/common";
+import { FloatingTitleBar, WorkspacePane } from "@/components/layout";
 import { AppText, Chip, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
 import { PRESENCE_LABELS } from "@/constants/chat";
 import { ROLE_LABELS } from "@/constants/roles";
@@ -35,6 +35,8 @@ export default function ContactsScreen(): JSX.Element {
   const currentUser = useCurrentUser();
   const [filter, setFilter] = useState<DirectoryFilter>("all");
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [barHeight, setBarHeight] = useState(52);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const { users, query, setQuery, startDirectConversation } = useChatStore(
     useShallow((state) => ({
@@ -85,44 +87,49 @@ export default function ContactsScreen(): JSX.Element {
     }
   };
 
+  const bottomClearance = isDesktop ? 16 : theme.layout.tabBarClearance;
+
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <AppText variant="largeTitle">Directory</AppText>
+      <AppText variant="subhead" tone="secondary" style={styles.subtitle}>
+        {filteredUsers.length} colleagues
+      </AppText>
+      <SearchBar
+        value={query}
+        onChangeText={setQuery}
+        onClear={() => setQuery("")}
+        placeholder="Search people, roles, teams"
+        style={styles.search}
+      />
+      <View style={styles.filters}>
+        {DIRECTORY_FILTERS.map((item) => (
+          <Chip
+            key={item.key}
+            label={item.label}
+            active={filter === item.key}
+            onPress={() => setFilter(item.key)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
   const listPane = (
     <View style={styles.pane}>
-      <View style={styles.header}>
-        <SectionHeader
-          title="Directory"
-          subtitle={`${filteredUsers.length} colleagues`}
-          rightSlot={
-            <IconButton
-              icon="user-plus"
-              accessibilityLabel="Start a new conversation"
-              onPress={() => router.push("/(app)/new-message")}
-            />
-          }
-        />
-      </View>
-      <View style={styles.controls}>
-        <SearchBar
-          value={query}
-          onChangeText={setQuery}
-          onClear={() => setQuery("")}
-          placeholder="Search people, roles, teams"
-        />
-        <View style={styles.filters}>
-          {DIRECTORY_FILTERS.map((item) => (
-            <Chip
-              key={item.key}
-              label={item.label}
-              active={filter === item.key}
-              onPress={() => setFilter(item.key)}
-            />
-          ))}
-        </View>
-      </View>
-      <FlatList
+      <Animated.FlatList
         data={filteredUsers}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: (typeof filteredUsers)[number]) => item.id}
         style={styles.list}
-        contentContainerStyle={styles.listContent}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: Platform.OS !== "web"
+        })}
+        scrollEventThrottle={16}
+        ListHeaderComponent={listHeader}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingTop: barHeight + 18, paddingBottom: bottomClearance }
+        ]}
         ItemSeparatorComponent={() => (
           <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
         )}
@@ -130,7 +137,7 @@ export default function ContactsScreen(): JSX.Element {
         ListEmptyComponent={
           <EmptyState title="No colleagues found" description="Try a different name, role, or team." icon="users" />
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }: { item: User }) => (
           <UserCard
             user={item}
             trailingLabel={PRESENCE_LABELS[item.presence]}
@@ -143,6 +150,19 @@ export default function ContactsScreen(): JSX.Element {
             }}
           />
         )}
+      />
+
+      <FloatingTitleBar
+        title="Directory"
+        scrollY={scrollY}
+        onLayout={(event) => setBarHeight(event.nativeEvent.layout.height)}
+        actions={
+          <IconButton
+            icon="user-plus"
+            accessibilityLabel="Start a new conversation"
+            onPress={() => router.push("/(app)/new-message")}
+          />
+        }
       />
     </View>
   );
@@ -268,14 +288,17 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 14
-  },
-  controls: {
+  listHeader: {
     gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 14
+    paddingBottom: 8,
+    paddingHorizontal: 8,
+    paddingTop: 6
+  },
+  subtitle: {
+    marginTop: -6
+  },
+  search: {
+    marginTop: 4
   },
   filters: {
     flexDirection: "row",
@@ -283,12 +306,9 @@ const styles = StyleSheet.create({
     gap: 8
   },
   list: {
-    flex: 1,
-    marginTop: 10
+    flex: 1
   },
-  listContent: {
-    paddingBottom: 16
-  },
+  listContent: {},
   separator: {
     height: StyleSheet.hairlineWidth * 2,
     marginLeft: 72

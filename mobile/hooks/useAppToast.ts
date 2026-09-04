@@ -1,14 +1,18 @@
-import Toast from "react-native-toast-message";
+import { notify } from "@/store/notificationStore";
 
+/**
+ * Raises a notification card. The name is historical — these are now the app's own
+ * glass notifications rather than a third-party toast.
+ */
 export const useAppToast = () => {
   const success = (title: string, message?: string) => {
-    Toast.show({ type: "success", text1: title, text2: message });
+    notify("success", title, message);
   };
   const error = (title: string, message?: string) => {
-    Toast.show({ type: "error", text1: title, text2: message });
+    notify("error", title, message);
   };
   const info = (title: string, message?: string) => {
-    Toast.show({ type: "info", text1: title, text2: message });
+    notify("info", title, message);
   };
   return { success, error, info };
 };

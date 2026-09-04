@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
-import { AppText, IconButton } from '@/components/ui'
+import { AppText, GlassView, IconButton } from '@/components/ui'
 import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
@@ -126,6 +126,7 @@ export function ConversationPanel({
 	const [selectedMessageId, setSelectedMessageId] = useState<string>('')
 	const [composerBottomInset, setComposerBottomInset] = useState(insets.bottom)
 	const [composerHeight, setComposerHeight] = useState(72)
+	const [headerHeight, setHeaderHeight] = useState(72)
 	const [keyboardVisible, setKeyboardVisible] = useState(false)
 	const [entryUnreadCount, setEntryUnreadCount] = useState(0)
 	const [entryFirstUnreadMessageId, setEntryFirstUnreadMessageId] = useState('')
@@ -1069,15 +1070,13 @@ export function ConversationPanel({
 			keyboardVerticalOffset={0}
 			{...(shouldEnableSwipeBack ? swipeBackResponder.panHandlers : {})}
 		>
-			<View
-				{...(Platform.OS === 'web' ? { dataSet: { glass: 'strong' } } : null)}
-				style={[
-					styles.header,
-					{
-						backgroundColor: theme.colors.glassStrong,
-						borderBottomColor: theme.colors.glassBorder,
-					},
-				]}
+			<GlassView
+				material='thick'
+				highlight
+				elevation='floating'
+				radius={theme.radius.panel}
+				onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}
+				style={styles.header}
 			>
 				<View style={styles.headerLeft}>
 					{compact ? (
@@ -1169,7 +1168,7 @@ export function ConversationPanel({
 						/>
 					)}
 				</View>
-			</View>
+			</GlassView>
 
 			<FlatList
 				ref={listRef}
@@ -1201,7 +1200,10 @@ export function ConversationPanel({
 						setNewIncomingCount(0)
 					}
 				}}
-				contentContainerStyle={styles.messagesContainer}
+				contentContainerStyle={[
+					styles.messagesContainer,
+					{ paddingTop: headerHeight + 14 },
+				]}
 				ListFooterComponent={
 					<View
 						style={{
@@ -1303,12 +1305,16 @@ export function ConversationPanel({
 			<Animated.View
 				ref={composerRef}
 				onLayout={handleComposerLayout}
-				{...(Platform.OS === 'web' ? { dataSet: { glass: 'strong' } } : null)}
+				{...(Platform.OS === 'web'
+					? { dataSet: { glass: 'thick', lens: 'true' } }
+					: null)}
 				style={[
 					styles.composerDock,
+					theme.elevation.floating,
 					{
-						backgroundColor: theme.colors.glassStrong,
-						borderTopColor: theme.colors.glassBorder,
+						backgroundColor: theme.colors.materialThick,
+						borderColor: theme.colors.glassBorder,
+						borderRadius: theme.radius.panel,
 						paddingBottom: composerBottomInset,
 						transform: [{ translateY: composerTranslateY }],
 					},
@@ -1456,12 +1462,17 @@ const styles = StyleSheet.create({
 	},
 	header: {
 		alignItems: 'center',
-		borderBottomWidth: StyleSheet.hairlineWidth * 2,
 		flexDirection: 'row',
 		gap: 8,
 		justifyContent: 'space-between',
-		minHeight: 68,
-		paddingHorizontal: 12,
+		left: 10,
+		minHeight: 64,
+		paddingHorizontal: 10,
+		paddingVertical: 6,
+		position: 'absolute',
+		right: 10,
+		top: 10,
+		zIndex: 30,
 	},
 	headerLeft: {
 		alignItems: 'center',
@@ -1504,7 +1515,6 @@ const styles = StyleSheet.create({
 		flexGrow: 1,
 		paddingBottom: 8,
 		paddingHorizontal: 14,
-		paddingTop: 12,
 	},
 	newMessagesDivider: {
 		alignItems: 'center',
@@ -1521,11 +1531,12 @@ const styles = StyleSheet.create({
 		letterSpacing: 0.5,
 	},
 	composerDock: {
-		borderTopWidth: StyleSheet.hairlineWidth * 2,
-		bottom: 0,
-		left: 0,
+		borderWidth: StyleSheet.hairlineWidth * 2,
+		bottom: 10,
+		left: 10,
+		overflow: 'hidden',
 		position: 'absolute',
-		right: 0,
+		right: 10,
 	},
 	typingDock: {
 		left: 0,

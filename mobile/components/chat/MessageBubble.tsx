@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
+import Animated, { FadeInUp } from "react-native-reanimated";
 import {
   Image,
   Linking,
@@ -208,7 +209,8 @@ export function MessageBubble({
 
   return (
     <>
-      <View
+      <Animated.View
+        entering={FadeInUp.springify().damping(22).mass(0.6)}
         style={[
           styles.row,
           {
@@ -415,7 +417,7 @@ export function MessageBubble({
             ) : null}
           </View>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <Modal
         visible={imagePreviewVisible}

@@ -10,6 +10,7 @@ import { GlassView, IconButton } from "@/components/ui";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useWebEscape } from "@/hooks/useWebEscape";
 import { useChatStore } from "@/store/chatStore";
 
 const schema = z.object({
@@ -44,6 +45,8 @@ export default function EditProfileScreen(): JSX.Element {
   });
 
   const previewAvatar = watch("avatar");
+
+  useWebEscape(() => router.back());
   const previewName = watch("fullName");
 
   const save = handleSubmit(async (values) => {

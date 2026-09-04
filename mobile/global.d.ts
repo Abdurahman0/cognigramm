@@ -26,6 +26,9 @@ declare module "react-native" {
 
   interface PressableProps {
     dataSet?: WebDataSet;
+    /** react-native-web forwards ARIA props straight to the DOM node. */
+    "aria-checked"?: boolean;
+    "aria-expanded"?: boolean;
   }
 
   interface ScrollViewProps {

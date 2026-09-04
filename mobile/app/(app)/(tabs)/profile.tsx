@@ -47,7 +47,10 @@ export default function ProfileScreen(): JSX.Element {
 
   const content = (
     <ScrollView
-      contentContainerStyle={[styles.content, isDesktop && styles.contentDesktop]}
+      contentContainerStyle={[
+        styles.content,
+        isDesktop ? styles.contentDesktop : { paddingBottom: theme.layout.tabBarClearance }
+      ]}
       showsVerticalScrollIndicator={false}
     >
       <SectionHeader

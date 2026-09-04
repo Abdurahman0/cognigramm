@@ -30,10 +30,10 @@ export const blur = {
   ultraThin: 20,
   thin: 30,
   regular: 40,
-  thick: 50,
+  thick: 84,
   soft: 20,
   panel: 40,
-  strong: 50
+  strong: 84
 } as const;
 
 export const layout = {
@@ -45,6 +45,8 @@ export const layout = {
   detailMaxWidth: 880,
   authMaxWidth: 420,
   tabBarHeight: 64,
+  /** Space a scroll view leaves so content can pass under the floating tab bar. */
+  tabBarClearance: 104,
   /** Minimum comfortable touch target. */
   hitTarget: 44
 } as const;
@@ -58,7 +60,23 @@ export const duration = {
 /** Spring presets matching the springy, slightly overshooting iOS feel. */
 export const motion = {
   press: { damping: 26, stiffness: 420, mass: 0.7 },
-  enter: { damping: 22, stiffness: 260, mass: 0.9 }
+  enter: { damping: 22, stiffness: 260, mass: 0.9 },
+  /** Scene changes: settles quickly, no visible bounce on a full-screen surface. */
+  screen: { damping: 30, stiffness: 300, mass: 1 },
+  /** Notifications: light and slightly overshooting, so they land like a dropped card. */
+  notification: { damping: 19, stiffness: 240, mass: 0.85 }
+} as const;
+
+/** How far a scene slides during a transition, as a fraction of its own width. */
+export const transition = {
+  /** Tab scenes shift a short distance in the direction of travel. */
+  tabShift: 0.06,
+  /** Tab scenes settle up from slightly small, so the glass reads as coming forward. */
+  tabScale: 0.965,
+  /** The outgoing card in a push parallaxes back by this fraction. */
+  cardParallax: 0.28,
+  /** How dark the covered card gets under a pushed screen. */
+  cardDim: 0.35
 } as const;
 
 export { typeScale, typography, fontFamily, type TypeVariant } from "@/theme/typography";

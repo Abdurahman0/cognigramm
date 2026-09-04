@@ -10,6 +10,7 @@ import { ROLE_LABELS } from "@/constants/roles";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useAppToast } from "@/hooks/useAppToast";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
+import { useWebEscape } from "@/hooks/useWebEscape";
 import { useChatStore } from "@/store/chatStore";
 import { useShallow } from "zustand/react/shallow";
 
@@ -35,6 +36,8 @@ export default function NewMessageScreen(): JSX.Element {
   );
 
   const [mode, setMode] = useState<ComposeMode>("direct");
+
+  useWebEscape(() => router.back());
   const [query, setQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [title, setTitle] = useState("");
