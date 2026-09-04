@@ -1,4 +1,5 @@
-import { API_BASE_URL } from "@/services/api/config";
+import { API_BASE_URL, USE_MOCK_API } from "@/services/api/config";
+import { handleMockRequest, MockNotFoundError } from "@/services/api/mockBackend";
 import { notifyUnauthorized } from "@/services/api/unauthorizedHandler";
 
 interface ApiRequestOptions {
@@ -84,6 +85,29 @@ const isFormDataBody = (body: unknown): body is FormData => {
 };
 
 export async function apiRequest<TResponse>(path: string, options: ApiRequestOptions = {}): Promise<TResponse> {
+  // Every typed API wrapper routes through here, so this is the single place the mock
+  // backend has to stand in for the network.
+  if (USE_MOCK_API) {
+    const normalizedQuery: Record<string, string> = {};
+    Object.entries(options.query ?? {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        normalizedQuery[key] = String(value);
+      }
+    });
+    try {
+      return handleMockRequest({
+        method: options.method ?? "GET",
+        path: path.startsWith("/") ? path : `/${path}`,
+        query: normalizedQuery,
+        body: (options.body ?? {}) as Record<string, unknown>
+      }) as TResponse;
+    } catch (error) {
+      const status = error instanceof MockNotFoundError ? 404 : 500;
+      const message = error instanceof Error ? error.message : "Mock request failed";
+      throw new ApiRequestError(message, status, { detail: message });
+    }
+  }
+
   const query = buildQueryString(options.query);
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}${query}`;
 

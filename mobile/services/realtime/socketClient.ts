@@ -1,4 +1,4 @@
-import { WS_BASE_URL } from "@/services/api/config";
+import { USE_MOCK_API, WS_BASE_URL } from "@/services/api/config";
 import type { ApiSocketEnvelope } from "@/services/api";
 
 export type SocketStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
@@ -86,6 +86,13 @@ class RealtimeSocketClient {
 
   private openSocket(): void {
     if (!this.token) {
+      return;
+    }
+    // Against the in-app mock there is no server to reach. Reporting connected keeps the
+    // UI out of a permanent reconnect loop; nothing is pushed, and the REST-shaped mock
+    // is where all the data comes from.
+    if (USE_MOCK_API) {
+      this.setStatus("connected");
       return;
     }
     if (this.socket && (this.socket.readyState === WebSocket.CONNECTING || this.socket.readyState === WebSocket.OPEN)) {

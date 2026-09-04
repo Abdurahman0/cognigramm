@@ -13,6 +13,25 @@ Internal messenger with shared Android + web codebase connected to the Python ba
 - Expo Image
 - AsyncStorage persistence
 
+## Mock backend
+
+The web build runs against an in-app mock — `services/api/mockBackend.ts` — rather than
+the network, so the preview opens and works with nothing else running. Every typed API
+wrapper already routes through `apiRequest`, so that one function is where the mock stands
+in; the realtime socket reports connected without opening one, since there is no server to
+reach. Sign-in accepts anything, and `features/auth/schemas.ts` relaxes its rules to match:
+there is no account to get wrong. Signing in with a seeded address (`amir@company.uz`,
+`nilufar@company.uz`, …) picks that person, which is how you swap the conversation
+perspective.
+
+The dataset is mutable for the life of the tab: messages you send, edits, reads, new
+conversations and profile changes all stick, which is what makes the preview feel like the
+app rather than a screenshot.
+
+`EXPO_PUBLIC_USE_MOCK_API` controls it — unset it defaults to on for web and off for
+native, so an EAS build still talks to the real API. Set it to `false` to point a web build
+at the backend, or `true` to run the mock on a device.
+
 ## Run
 
 1. Install dependencies:

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import { Platform } from 'react-native'
 
 const DEFAULT_API_BASE_URL = 'https://messanger.cognilabs.org'
 const DEFAULT_WS_BASE_URL = 'wss://messanger.cognilabs.org'
@@ -27,6 +28,7 @@ const env = {
 	EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
 	EXPO_PUBLIC_WS_BASE_URL: process.env.EXPO_PUBLIC_WS_BASE_URL,
 	EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD: process.env.EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD,
+	EXPO_PUBLIC_USE_MOCK_API: process.env.EXPO_PUBLIC_USE_MOCK_API,
 }
 const extra = (Constants.expoConfig?.extra ?? {}) as {
 	apiBaseUrl?: string
@@ -44,6 +46,20 @@ export const WS_BASE_URL = normalizeWsUrl(
 		DEFAULT_WS_BASE_URL,
 	),
 )
+
+/**
+ * The web build runs against the in-app mock backend by default, so the preview needs
+ * nothing else running and sign-in accepts anything. Set EXPO_PUBLIC_USE_MOCK_API=false
+ * to point a web build at the real API; native always uses the real API unless the flag
+ * is explicitly turned on.
+ */
+export const USE_MOCK_API = (() => {
+	const raw = env.EXPO_PUBLIC_USE_MOCK_API
+	if (typeof raw === 'string' && raw.length > 0) {
+		return raw.toLowerCase() !== 'false' && raw !== '0'
+	}
+	return Platform.OS === 'web'
+})()
 
 const localUploadRaw =
 	env.EXPO_PUBLIC_USE_LOCAL_MEDIA_UPLOAD ?? extra.useLocalMediaUpload
