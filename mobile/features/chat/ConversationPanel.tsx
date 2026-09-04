@@ -34,11 +34,13 @@ import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
 	useSendMediaMessage,
+	canSwitchCamera,
 	getVideoNotePreviewStream,
 	pauseRecording,
 	resumeRecording,
 	setTorch,
 	supportsTorch,
+	switchVideoNoteCamera,
 	useVideoNoteRecorder,
 	useVoiceMessageRecorder,
 	type PreparedMediaDraft,
@@ -153,6 +155,8 @@ export function ConversationPanel({
 	// actually begun, so they are read after the recorder reports itself running.
 	const [previewStream, setPreviewStream] = useState<unknown>(null)
 	const [canUseTorch, setCanUseTorch] = useState(false)
+	const [canFlip, setCanFlip] = useState(false)
+	const [rearCamera, setRearCamera] = useState(false)
 	const [newIncomingCount, setNewIncomingCount] = useState(0)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
@@ -268,10 +272,13 @@ export function ConversationPanel({
 			setCanUseTorch(false)
 			setRecordPaused(false)
 			setTorchOn(false)
+			setCanFlip(false)
+			setRearCamera(false)
 			return
 		}
 		setPreviewStream(getVideoNotePreviewStream())
 		setCanUseTorch(supportsTorch())
+		setCanFlip(canSwitchCamera())
 	}, [isRecordingMedia])
 
 
@@ -1375,6 +1382,20 @@ export function ConversationPanel({
 									canPause: Platform.OS === 'web',
 									canUseTorch,
 									torchOn,
+									canFlipCamera: canFlip,
+									mirrored: !rearCamera,
+									onFlipCamera: () => {
+										switchVideoNoteCamera()
+											.then((switched: boolean) => {
+												if (switched) {
+													setRearCamera(current => !current)
+													// The torch belongs to whichever camera is now live.
+													setCanUseTorch(supportsTorch())
+													setTorchOn(false)
+												}
+											})
+											.catch(() => undefined)
+									},
 									onTogglePause: () => {
 										const kind = recordMode === 'video' ? 'video_note' : 'voice'
 										const changed = recordPaused ? resumeRecording(kind) : pauseRecording(kind)

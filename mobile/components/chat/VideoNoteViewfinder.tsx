@@ -6,9 +6,12 @@ import { useAppTheme } from "@/hooks/useAppTheme";
 interface VideoNoteViewfinderProps {
   /** The live capture stream; typed loosely because it goes straight to the element. */
   stream: unknown;
+  /** Mirror the picture, as a viewfinder of yourself should. Off for the rear camera. */
+  mirrored?: boolean;
 }
 
-const SIZE = 64;
+/** Big enough to frame yourself in, the way Telegram fills the screen while filming. */
+const SIZE = 232;
 
 /**
  * What the camera is seeing, while it is being recorded.
@@ -17,7 +20,10 @@ const SIZE = 64;
  * the same round frame the note will be sent in. Web only: the native path hands the
  * capture to the system camera UI, which shows its own preview.
  */
-export function VideoNoteViewfinder({ stream }: VideoNoteViewfinderProps): JSX.Element | null {
+export function VideoNoteViewfinder({
+  stream,
+  mirrored = true
+}: VideoNoteViewfinderProps): JSX.Element | null {
   const { theme } = useAppTheme();
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -38,8 +44,7 @@ export function VideoNoteViewfinder({ stream }: VideoNoteViewfinderProps): JSX.E
 
   return (
     <View
-      style={[styles.frame, { borderColor: theme.colors.danger }]}
-      // Mirrored, because a viewfinder of yourself should behave like a mirror.
+      style={[styles.frame, theme.elevation.floating, { borderColor: theme.colors.danger }]}
       pointerEvents="none"
     >
       <video
@@ -47,7 +52,12 @@ export function VideoNoteViewfinder({ stream }: VideoNoteViewfinderProps): JSX.E
         autoPlay
         muted
         playsInline
-        style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          transform: mirrored ? "scaleX(-1)" : "none"
+        }}
       />
     </View>
   );
@@ -56,7 +66,7 @@ export function VideoNoteViewfinder({ stream }: VideoNoteViewfinderProps): JSX.E
 const styles = StyleSheet.create({
   frame: {
     borderRadius: 999,
-    borderWidth: 2,
+    borderWidth: 3,
     height: SIZE,
     overflow: "hidden",
     width: SIZE

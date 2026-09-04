@@ -7,9 +7,12 @@ export * from "@/features/chat/media-messages/hooks/useVoiceMessageRecorder";
 export * from "@/features/chat/media-messages/services/sendMediaMessage";
 export * from "@/features/chat/media-messages/types";
 export {
+  canSwitchCamera,
+  getFacingMode,
   getVideoNotePreviewStream,
   pauseRecording,
   resumeRecording,
   setTorch,
   supportsTorch,
+  switchVideoNoteCamera,
 } from "@/features/chat/media-messages/services/mediaRecorder";

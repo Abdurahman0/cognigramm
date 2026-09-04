@@ -18,3 +18,6 @@ export const pauseRecording = recorder.pauseRecording;
 export const resumeRecording = recorder.resumeRecording;
 export const supportsTorch = recorder.supportsTorch;
 export const setTorch = recorder.setTorch;
+export const canSwitchCamera = recorder.canSwitchCamera;
+export const switchVideoNoteCamera = recorder.switchVideoNoteCamera;
+export const getFacingMode = recorder.getFacingMode;

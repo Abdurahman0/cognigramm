@@ -30,11 +30,15 @@ export interface ComposerRecorder {
 	canPause: boolean
 	canUseTorch: boolean
 	torchOn: boolean
+	canFlipCamera: boolean
+	/** False once turned to the rear camera, so the picture stops being mirrored. */
+	mirrored: boolean
 	onStart: () => void
 	onStop: () => void
 	onCancel: () => void
 	onTogglePause: () => void
 	onToggleTorch: () => void
+	onFlipCamera: () => void
 	/** A quick tap swaps voice for video, the way Telegram's mic button does. */
 	onToggleMode: () => void
 }
@@ -450,8 +454,18 @@ export function ChatComposer({
 						},
 					]}
 				>
-					<VideoNoteViewfinder stream={recorder.previewStream} />
+					<VideoNoteViewfinder stream={recorder.previewStream} mirrored={recorder.mirrored} />
 					<View style={styles.viewfinderControls}>
+						{recorder.canFlipCamera ? (
+							<Pressable
+								onPress={recorder.onFlipCamera}
+								accessibilityRole='button'
+								accessibilityLabel='Switch camera'
+								style={[styles.viewfinderButton, { backgroundColor: theme.colors.glassHover }]}
+							>
+								<Feather name='rotate-cw' size={16} color={theme.colors.textPrimary} />
+							</Pressable>
+						) : null}
 						{recorder.canPause ? (
 							<Pressable
 								onPress={recorder.onTogglePause}
@@ -781,17 +795,16 @@ const styles = StyleSheet.create({
 	},
 	viewfinderWrap: {
 		alignItems: 'center',
+		alignSelf: 'center',
 		borderWidth: StyleSheet.hairlineWidth * 2,
 		bottom: '100%',
 		flexDirection: 'row',
-		gap: 10,
-		left: 4,
-		marginBottom: 8,
-		padding: 8,
+		gap: 12,
+		marginBottom: 10,
+		padding: 10,
 		position: 'absolute',
 	},
 	viewfinderControls: {
-		flexDirection: 'row',
 		gap: 8,
 	},
 	viewfinderButton: {

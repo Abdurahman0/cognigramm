@@ -144,3 +144,9 @@ export const resumeRecording = (): boolean => false;
 export const supportsTorch = (): boolean => false;
 
 export const setTorch = async (): Promise<boolean> => false;
+
+export const canSwitchCamera = (): boolean => false;
+
+export const switchVideoNoteCamera = async (): Promise<boolean> => false;
+
+export const getFacingMode = (): "user" | "environment" => "user";

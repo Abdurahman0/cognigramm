@@ -192,9 +192,17 @@ sliding **up** past 64pt locks it hands-free (the finger can go, and explicit se
 discard buttons take over), and simply lifting sends. A hint follows the finger while
 sliding. Both recorders behave the same way.
 
-While filming, `VideoNoteViewfinder` floats the live capture above the bar in the same
-round frame the note will be sent in, with pause and — where the camera reports one — a
-torch beside it. That row is absolutely positioned rather than stacked: growing the dock
+While filming, `VideoNoteViewfinder` fills a 232pt round frame above the bar — the same
+shape the note will be sent in, big enough to actually frame yourself in — with rotate,
+pause and, where the camera reports one, a torch stacked beside it.
+
+Turning the camera around needs the recorder decoupled from it: `MediaRecorder` binds to
+the tracks it was handed and cannot swap them, so recording the camera directly would make
+a mid-take flip impossible without losing everything recorded so far. The web service
+instead draws whichever camera is live into a square canvas and records `captureStream()`
+from that, keeping the original microphone track. Flipping is then only a change of what
+gets drawn — the recording never notices, and the picture stops being mirrored once it is
+the rear camera. That row is absolutely positioned rather than stacked: growing the dock
 pushed the composer row past the bottom of the pane, and the dock had to stop clipping for
 the viewfinder to be visible at all. On native the video note is captured by the system
 camera UI, which owns its own preview, pause and torch, so `mediaRecorder.native.ts`
