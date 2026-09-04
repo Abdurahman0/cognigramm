@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CALL_TIMEOUTS_MS } from "@/features/calls/config/callConfig";
 import { useCallPermissions } from "@/features/calls/hooks/useCallPermissions";
+import { callTones } from "@/features/calls/services/callTones";
 import { signalingAdapter } from "@/features/calls/services/signalingAdapter";
 import { createWebRtcAdapter } from "@/features/calls/services/webrtcAdapter";
 import type {
@@ -41,6 +42,8 @@ const initialRuntimeState: CallRuntimeState = {
   speakerEnabled: true,
   outputVolume: 1,
   canSetVolume: false,
+  canRouteAudio: false,
+  isOnHold: false,
   canSwitchCamera: false,
   errorMessage: ""
 };
@@ -165,6 +168,8 @@ export const useCallController = (
         speakerEnabled: snapshot.speakerEnabled,
         outputVolume: snapshot.outputVolume,
         canSetVolume: snapshot.canSetVolume,
+        canRouteAudio: snapshot.canRouteAudio,
+        isOnHold: snapshot.isOnHold,
         canSwitchCamera: snapshot.canSwitchCamera,
         errorMessage: snapshot.errorMessage || state.errorMessage
       }));
@@ -473,14 +478,26 @@ export const useCallController = (
 
   const setOutputVolume = useCallback(
     async (next: number): Promise<void> => {
+      const level = Math.max(0, Math.min(1, next));
+      // The fader is the call's output level, which includes the ringback you hear
+      // before anyone answers, not just the remote audio afterwards.
+      callTones.setLevel(level);
       try {
-        await adapterRef.current.setOutputVolume(Math.max(0, Math.min(1, next)));
+        await adapterRef.current.setOutputVolume(level);
       } catch (error) {
         applyRuntimeError(error instanceof Error ? error.message : "Unable to set the volume.");
       }
     },
     [applyRuntimeError]
   );
+
+  const toggleHold = useCallback(async (): Promise<void> => {
+    try {
+      await adapterRef.current.setHold(!runtime.isOnHold);
+    } catch (error) {
+      applyRuntimeError(error instanceof Error ? error.message : "Unable to hold the call.");
+    }
+  }, [applyRuntimeError, runtime.isOnHold]);
 
   const clearError = useCallback(() => {
     setRuntime((state) => ({
@@ -512,6 +529,7 @@ export const useCallController = (
     switchCamera,
     toggleSpeaker,
     setOutputVolume,
+    toggleHold,
     clearError,
     resetRuntime
   };

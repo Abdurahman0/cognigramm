@@ -42,6 +42,9 @@ class WebWebRtcAdapter implements WebRtcAdapter {
   private lastSignalSenderId = "";
   private hasLocalOffer = false;
   private offerInFlight = false;
+  private cameraBeforeHold = false;
+  private readyPromise: Promise<void> | null = null;
+  private readyCallType: CallType | null = null;
 
   constructor(options: CreateWebRtcAdapterOptions = {}) {
     this.onSignal = options.onSignal;
@@ -59,13 +62,30 @@ class WebWebRtcAdapter implements WebRtcAdapter {
     };
   }
 
+  /**
+   * Overlapping callers share one initialisation. Without this each caller ran its own
+   * `getUserMedia`, and because that await resolves long after the release at the top of
+   * the method, every call but the last left a camera and microphone capturing forever.
+   */
   async ensureReady(callType: CallType): Promise<void> {
     this.assertBrowserWebRtcSupport();
     if (this.localStream && this.peerConnection && this.activeCallType === callType) {
       await this.maybeCreateLocalOffer();
       return;
     }
+    if (this.readyPromise && this.readyCallType === callType) {
+      return this.readyPromise;
+    }
 
+    this.readyCallType = callType;
+    this.readyPromise = this.initialise(callType).finally(() => {
+      this.readyPromise = null;
+      this.readyCallType = null;
+    });
+    return this.readyPromise;
+  }
+
+  private async initialise(callType: CallType): Promise<void> {
     this.activeCallType = callType;
     this.hasLocalOffer = false;
     this.pendingRemoteCandidates = [];
@@ -91,6 +111,14 @@ class WebWebRtcAdapter implements WebRtcAdapter {
         audio: true,
         video: callType === "video" ? { facingMode: "user" } : false
       });
+      // A concurrent teardown may have landed while getUserMedia was in flight; if this
+      // stream is no longer wanted, stop it rather than leaving the camera on.
+      if (!this.peerConnection) {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+        return;
+      }
       this.localStream = stream;
       stream.getTracks().forEach((track) => {
         this.peerConnection?.addTrack(track, stream);
@@ -214,6 +242,27 @@ class WebWebRtcAdapter implements WebRtcAdapter {
     audioTracks.forEach((track) => {
       track.enabled = !nextMuted;
     });
+    this.syncLocalMediaState();
+  }
+
+
+  /**
+   * Hold: stop sending anything and stop playing what arrives, while leaving the peer
+   * connection up so the call resumes without renegotiating. Releasing restores the
+   * camera only if it was on beforehand, so hold never silently switches it back on.
+   */
+  async setHold(next: boolean): Promise<void> {
+    const stream = this.assertLocalStream();
+    if (next) {
+      this.cameraBeforeHold = this.snapshot.isCameraEnabled;
+    }
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = !next;
+    });
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = next ? false : this.cameraBeforeHold;
+    });
+    this.patchSnapshot({ isOnHold: next });
     this.syncLocalMediaState();
   }
 

@@ -12,6 +12,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { GlassBackdrop, NotificationHost } from "@/components/ui";
 import { IncomingCallPrompt } from "@/features/calls/components/IncomingCallPrompt";
+import { useCallTones } from "@/features/calls/hooks/useCallTones";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
 import { useAuthStore, useCallsStore, useChatStore, useSettingsStore } from "@/store";
@@ -53,6 +54,10 @@ export default function RootLayout(): JSX.Element {
   const initializeChats = useChatStore((state) => state.initializeForSession);
   const initializeCalls = useCallsStore((state) => state.initializeForSession);
   const settingsHydrated = useSettingsStore((state) => state.hydrated);
+
+  // Ringback, ringtone and the connect/end blips, driven by the active call. This is the
+  // only mount, because a second one would play every tone twice.
+  useCallTones();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(theme.colors.backdropBase).catch(() => undefined);

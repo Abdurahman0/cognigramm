@@ -117,6 +117,34 @@ by the chat list, directory and call history, which no longer need hairline sepa
 Note the two nested views: a shadow and `overflow: hidden` cannot share one view on
 native, so the outer casts and the inner clips.
 
+**Call audio.** A call with no sound feedback feels broken: you tap dial and nothing
+tells you the far end is ringing. `features/calls/services/callTones.ts` synthesises the
+four cues with Web Audio for the browser — 425Hz ringback on a 1s/2.2s cycle, a 440+480Hz
+double-burst ringtone, and short rising/falling blips on connect and hang-up — while
+`callTones.native.ts` hands the same calls to the platform's own telephony tones through
+InCallManager, so the device's ringtone choice, silent switch and vibration are respected.
+`useCallTones` drives them from the call status and is mounted once, at the root; a second
+mount would play everything twice. Note that answering lands on `connecting`, not
+`connected`, so that is where ringing has to stop.
+
+Hold is a real control rather than a label: it disables every outgoing track and stops
+playing what arrives, while leaving the peer connection up so the call resumes without
+renegotiating. Releasing restores the camera only if it was on beforehand.
+
+`react-native-incall-manager` is what makes speaker routing real on device: the adapter
+claims the audio session when a call starts (loudspeaker for video, earpiece for audio),
+releases it on cleanup, and reports `canRouteAudio`. The dock comes up as soon as the call is yours to run, which includes while it is still
+dialling — putting an outgoing call on speaker before it is answered is normal. An inbound
+ring is the exception: that screen stays Accept and Decline only. Camera and flip appear
+for video calls; mute, speaker and hold are there for both. Mute, hold and the camera
+controls stay inert until the local tracks exist rather than throwing at whoever taps
+first, and the fader scales the ringback too, so it is not a dead control before anyone
+answers.
+
+The full dock — speaker, hold, mute, camera, flip — is shown on every platform. Routing
+is only meaningful on device, where there is an earpiece to route away from; in a browser
+the speaker button is UI state and the level fader is what actually changes what you hear.
+
 **Calls and media messages.** `components/ui/VolumeSlider.tsx` is the in-call output
 level, dragged like a fader. It is plumbed through the WebRTC adapter as `outputVolume`
 plus a `canSetVolume` capability flag: the browser applies the gain to the media element

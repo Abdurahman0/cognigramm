@@ -14,6 +14,9 @@ interface CallControlsProps {
   speakerEnabled: boolean;
   outputVolume: number;
   canSetVolume: boolean;
+  isOnHold: boolean;
+  /** Local tracks are live; mute and hold have nothing to act on before this. */
+  localMediaReady: boolean;
   canSwitchCamera: boolean;
   controlsDisabled?: boolean;
   onAccept: (callId: string) => void;
@@ -23,6 +26,7 @@ interface CallControlsProps {
   onToggleCamera: () => void;
   onSwitchCamera: () => void;
   onToggleSpeaker: () => void;
+  onToggleHold: () => void;
   onChangeVolume: (next: number) => void;
 }
 
@@ -67,6 +71,8 @@ export function CallControls({
   speakerEnabled,
   outputVolume,
   canSetVolume,
+  isOnHold,
+  localMediaReady,
   canSwitchCamera,
   controlsDisabled = false,
   onAccept,
@@ -76,11 +82,20 @@ export function CallControls({
   onToggleCamera,
   onSwitchCamera,
   onToggleSpeaker,
+  onToggleHold,
   onChangeVolume
 }: CallControlsProps): JSX.Element {
   const isIncomingRinging = isIncoming && status === "ringing";
   const canEnd = status === "calling" || status === "ringing" || status === "connecting" || status === "connected";
-  const inCallControlsVisible = status === "connecting" || status === "connected";
+  // The controls come up as soon as the call is yours to run, which includes while it is
+  // still dialling — putting an outgoing call on speaker before it is answered is normal.
+  // An inbound ring is the exception: that screen is Accept and Decline only.
+  const inCallControlsVisible =
+    !isIncomingRinging &&
+    (status === "calling" || status === "ringing" || status === "connecting" || status === "connected");
+  // Mute and hold act on the local tracks, so they stay inert until those exist rather
+  // than throwing "no audio track available" at whoever taps first.
+  const hasLocalMedia = localMediaReady;
 
   return (
     <View style={styles.root}>
@@ -114,7 +129,7 @@ export function CallControls({
                 label={isCameraEnabled ? "Camera" : "Camera off"}
                 icon={isCameraEnabled ? "video" : "video-off"}
                 active={!isCameraEnabled}
-                disabled={controlsDisabled}
+                disabled={controlsDisabled || !hasLocalMedia}
                 onPress={onToggleCamera}
               />
             ) : null}
@@ -122,14 +137,14 @@ export function CallControls({
               label={isMuted ? "Unmute" : "Mute"}
               icon={isMuted ? "mic-off" : "mic"}
               active={isMuted}
-              disabled={controlsDisabled}
+              disabled={controlsDisabled || !hasLocalMedia}
               onPress={onToggleMute}
             />
             {callType === "video" ? (
               <Control
                 label="Flip"
                 icon="refresh-cw"
-                disabled={controlsDisabled || !canSwitchCamera}
+                disabled={controlsDisabled || !hasLocalMedia || !canSwitchCamera}
                 onPress={onSwitchCamera}
               />
             ) : null}
@@ -139,6 +154,15 @@ export function CallControls({
               active={speakerEnabled}
               disabled={controlsDisabled}
               onPress={onToggleSpeaker}
+            />
+            {/* Hold cuts both directions but leaves the session up, so the call resumes
+                without renegotiating. */}
+            <Control
+              label={isOnHold ? "Resume" : "Hold"}
+              icon={isOnHold ? "play" : "pause"}
+              active={isOnHold}
+              disabled={controlsDisabled || !hasLocalMedia}
+              onPress={onToggleHold}
             />
           </>
         ) : null}

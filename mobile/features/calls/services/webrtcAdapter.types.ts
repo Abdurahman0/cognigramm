@@ -18,6 +18,10 @@ export interface WebRtcAdapterSnapshot {
   outputVolume: number;
   /** False where the platform gives no way to set playback gain from JS. */
   canSetVolume: boolean;
+  /** False where there is no second output to route to — every browser, for instance. */
+  canRouteAudio: boolean;
+  /** Held: nothing is sent and nothing is heard, but the session stays open. */
+  isOnHold: boolean;
   canSwitchCamera: boolean;
   errorMessage: string;
 }
@@ -41,6 +45,7 @@ export interface WebRtcAdapter {
   switchCamera: () => Promise<void>;
   toggleSpeaker: (nextEnabled: boolean) => Promise<void>;
   setOutputVolume: (next: number) => Promise<void>;
+  setHold: (next: boolean) => Promise<void>;
   cleanup: () => Promise<void>;
 }
 
@@ -72,6 +77,8 @@ export const createInitialSnapshot = (
   speakerEnabled: true,
   outputVolume: 1,
   canSetVolume: false,
+  canRouteAudio: false,
+  isOnHold: false,
   canSwitchCamera: false,
   errorMessage: unsupportedReason
 });

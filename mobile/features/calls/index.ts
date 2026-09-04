@@ -3,6 +3,7 @@ export * from "@/features/calls/components/CallControls";
 export * from "@/features/calls/components/CallMediaViewport";
 export * from "@/features/calls/components/IncomingCallPrompt";
 export * from "@/features/calls/hooks/useCallController";
+export * from "@/features/calls/hooks/useCallTones";
 export * from "@/features/calls/hooks/useCallPermissions";
 export * from "@/features/calls/services/signalingAdapter";
 export * from "@/features/calls/services/webrtcAdapter";

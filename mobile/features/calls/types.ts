@@ -146,6 +146,10 @@ export interface CallRuntimeState {
   outputVolume: number;
   /** False where the platform gives no way to set playback gain from JS. */
   canSetVolume: boolean;
+  /** False where there is no second output to route to — every browser, for instance. */
+  canRouteAudio: boolean;
+  /** Held: nothing is sent and nothing is heard, but the session stays open. */
+  isOnHold: boolean;
   canSwitchCamera: boolean;
   errorMessage: string;
 }
@@ -175,6 +179,7 @@ export interface CallControllerActions {
   switchCamera: () => Promise<void>;
   toggleSpeaker: () => Promise<void>;
   setOutputVolume: (next: number) => Promise<void>;
+  toggleHold: () => Promise<void>;
   clearError: () => void;
   resetRuntime: () => void;
 }

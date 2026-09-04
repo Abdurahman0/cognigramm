@@ -92,6 +92,10 @@ interface WebRtcModuleLike {
 interface InCallManagerLike {
   setSpeakerphoneOn?: (enabled: boolean) => void;
   setForceSpeakerphoneOn?: (enabled: boolean | null) => void;
+  /** Claims the audio session; routing only takes effect once a call is in progress. */
+  start?: (setup?: { auto?: boolean; media?: "video" | "audio"; ringback?: string }) => void;
+  stop?: (setup?: { busytone?: string }) => void;
+  setKeepScreenOn?: (enabled: boolean) => void;
 }
 
 interface LoadedWebRtcModule {
@@ -155,6 +159,21 @@ const loadWebRtcModule = (): LoadedWebRtcModule => {
 };
 
 const loadInCallManager = (): InCallManagerLike | null => {
+  // Prefer the package's JS wrapper: it normalises the iOS and Android differences that
+  // the raw NativeModule leaves to the caller. Fall back to the bare module so a build
+  // that only links the native side still routes audio.
+  try {
+    const module = require("react-native-incall-manager") as {
+      default?: InCallManagerLike;
+    } & InCallManagerLike;
+    const wrapper = module.default ?? module;
+    if (wrapper && typeof wrapper.setSpeakerphoneOn === "function") {
+      return wrapper;
+    }
+  } catch {
+    // not linked in this build
+  }
+
   const reactNative = require("react-native") as {
     NativeModules?: Record<string, unknown>;
   };
@@ -191,11 +210,18 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
   private lastSignalSenderId = "";
   private hasLocalOffer = false;
   private offerInFlight = false;
+  private audioSessionActive = false;
+  private cameraBeforeHold = false;
+  private readyPromise: Promise<void> | null = null;
+  private readyCallType: CallType | null = null;
 
   constructor(options: CreateWebRtcAdapterOptions = {}) {
     this.inCallManager = loadInCallManager();
     this.onSignal = options.onSignal;
-    this.snapshot = createInitialSnapshot();
+    this.snapshot = {
+      ...createInitialSnapshot(),
+      canRouteAudio: Boolean(this.inCallManager)
+    };
   }
 
   getSnapshot(): WebRtcAdapterSnapshot {
@@ -210,13 +236,31 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
     };
   }
 
+  /**
+   * Overlapping callers share one initialisation. Without this each caller ran its own
+   * `getUserMedia`, and because that await resolves long after the release at the top of
+   * the method, every call but the last left a camera and microphone capturing forever.
+   */
   async ensureReady(callType: CallType): Promise<void> {
-    const module = this.assertWebRtcModule();
+    this.assertWebRtcModule();
     if (this.localStream && this.peerConnection && this.activeCallType === callType) {
       await this.maybeCreateLocalOffer();
       return;
     }
+    if (this.readyPromise && this.readyCallType === callType) {
+      return this.readyPromise;
+    }
 
+    this.readyCallType = callType;
+    this.readyPromise = this.initialise(callType).finally(() => {
+      this.readyPromise = null;
+      this.readyCallType = null;
+    });
+    return this.readyPromise;
+  }
+
+  private async initialise(callType: CallType): Promise<void> {
+    const module = this.assertWebRtcModule();
     this.activeCallType = callType;
     this.hasLocalOffer = false;
     this.pendingRemoteCandidates = [];
@@ -243,6 +287,14 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
         video: callType === "video" ? { facingMode: "user" } : false
       };
       const stream = await module.mediaDevices.getUserMedia(constraints);
+      // A concurrent teardown may have landed while getUserMedia was in flight; if this
+      // stream is no longer wanted, stop it rather than leaving the camera on.
+      if (!this.peerConnection) {
+        stream.getTracks().forEach((track) => {
+          track.stop();
+        });
+        return;
+      }
       this.localStream = stream;
       stream.getTracks().forEach((track) => {
         this.peerConnection?.addTrack(track, stream);
@@ -284,10 +336,14 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
       this.hasLocalOffer = false;
       this.pendingRemoteCandidates = [];
       this.lastSignalSenderId = "";
+      this.releaseAudioSession();
       return;
     }
 
     this.activeCallType = context.callType;
+    // Routing only takes effect once the audio session is claimed, so the speaker
+    // toggle is inert until this runs.
+    this.claimAudioSession(context.callType);
 
     if (previousCallId !== "" && previousCallId !== nextCallId) {
       this.hasLocalOffer = false;
@@ -376,6 +432,27 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
     this.syncLocalMediaState();
   }
 
+
+  /**
+   * Hold: stop sending anything and stop playing what arrives, while leaving the peer
+   * connection up so the call resumes without renegotiating. Releasing restores the
+   * camera only if it was on beforehand, so hold never silently switches it back on.
+   */
+  async setHold(next: boolean): Promise<void> {
+    const stream = this.assertLocalStream();
+    if (next) {
+      this.cameraBeforeHold = this.snapshot.isCameraEnabled;
+    }
+    stream.getAudioTracks().forEach((track) => {
+      track.enabled = !next;
+    });
+    stream.getVideoTracks().forEach((track) => {
+      track.enabled = next ? false : this.cameraBeforeHold;
+    });
+    this.patchSnapshot({ isOnHold: next });
+    this.syncLocalMediaState();
+  }
+
   async toggleCamera(nextEnabled: boolean): Promise<void> {
     if (this.activeCallType !== "video") {
       throw new Error("Camera controls are only available for video calls.");
@@ -413,6 +490,36 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
     throw new Error(volumeUnsupportedReason);
   }
 
+  private claimAudioSession(callType: CallType): void {
+    if (!this.inCallManager || this.audioSessionActive) {
+      return;
+    }
+    this.audioSessionActive = true;
+    try {
+      this.inCallManager.start?.({ media: callType === "video" ? "video" : "audio" });
+      this.inCallManager.setKeepScreenOn?.(true);
+      // Video calls belong on the loudspeaker; audio calls start at the earpiece.
+      this.inCallManager.setForceSpeakerphoneOn?.(callType === "video" ? true : null);
+      this.patchSnapshot({ speakerEnabled: callType === "video" });
+    } catch {
+      this.audioSessionActive = false;
+    }
+  }
+
+  private releaseAudioSession(): void {
+    if (!this.inCallManager || !this.audioSessionActive) {
+      return;
+    }
+    this.audioSessionActive = false;
+    try {
+      this.inCallManager.setKeepScreenOn?.(false);
+      this.inCallManager.setForceSpeakerphoneOn?.(null);
+      this.inCallManager.stop?.();
+    } catch {
+      // session already torn down
+    }
+  }
+
   async toggleSpeaker(nextEnabled: boolean): Promise<void> {
     if (!this.inCallManager) {
       throw new Error(speakerUnsupportedReason);
@@ -426,6 +533,7 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
 
   async cleanup(): Promise<void> {
     callLogger.debug("webrtc.native cleanup");
+    this.releaseAudioSession();
     this.releasePeerResources();
     this.sessionContext = null;
     this.pendingRemoteCandidates = [];
