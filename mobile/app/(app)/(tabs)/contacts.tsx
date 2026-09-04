@@ -130,9 +130,6 @@ export default function ContactsScreen(): JSX.Element {
           styles.listContent,
           { paddingTop: barHeight + 18, paddingBottom: bottomClearance }
         ]}
-        ItemSeparatorComponent={() => (
-          <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
-        )}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState title="No colleagues found" description="Try a different name, role, or team." icon="users" />
@@ -140,6 +137,7 @@ export default function ContactsScreen(): JSX.Element {
         renderItem={({ item }: { item: User }) => (
           <UserCard
             user={item}
+            standalone
             trailingLabel={PRESENCE_LABELS[item.presence]}
             onPress={() => {
               if (isDesktop) {
@@ -308,10 +306,8 @@ const styles = StyleSheet.create({
   list: {
     flex: 1
   },
-  listContent: {},
-  separator: {
-    height: StyleSheet.hairlineWidth * 2,
-    marginLeft: 72
+  listContent: {
+    paddingHorizontal: 8
   },
   profileContent: {
     gap: 18,

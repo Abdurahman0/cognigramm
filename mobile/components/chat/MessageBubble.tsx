@@ -176,7 +176,14 @@ export function MessageBubble({
   const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
   const { theme } = useAppTheme();
-  const bubbleColor = isMine ? theme.colors.messageMine : theme.colors.messageOther;
+  // A round video note is its own shape; a rectangular bubble behind it just clips the
+  // circle and fights the ring, so those messages drop the bubble chrome entirely.
+  const isVideoNote = message.type === "video_note";
+  const bubbleColor = isVideoNote
+    ? "transparent"
+    : isMine
+    ? theme.colors.messageMine
+    : theme.colors.messageOther;
   const textColor = isMine ? theme.colors.onAccent : theme.colors.textPrimary;
   const metaColor = isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted;
   const attachmentUrl = message.attachment?.publicUrl ?? null;
@@ -233,7 +240,8 @@ export function MessageBubble({
               borderBottomRightRadius: isMine ? 8 : 20,
               borderBottomLeftRadius: isMine ? 20 : 8
             },
-            isMine ? theme.elevation.soft : null
+            isVideoNote && styles.bareBubble,
+            isMine && !isVideoNote ? theme.elevation.soft : null
           ]}
         >
           {senderLabel || showWebActionsButton ? (
@@ -347,13 +355,14 @@ export function MessageBubble({
               message={message}
               textColor={textColor}
               mutedTextColor={isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted}
-              accentColor={theme.colors.accent}
+              accentColor={isMine ? "#FFFFFF" : theme.colors.accent}
+              onAccentColor={isMine ? theme.colors.accent : theme.colors.onAccent}
             />
           ) : message.type === "video_note" ? (
             <VideoNoteBubble
               message={message}
               textColor={textColor}
-              mutedTextColor={isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted}
+              accentColor={isMine ? "#FFFFFF" : theme.colors.accent}
             />
           ) : isImageAttachment ? (
             attachmentUrl ? (
@@ -455,6 +464,14 @@ const styles = StyleSheet.create({
     minWidth: 120,
     paddingHorizontal: 14,
     paddingVertical: 9
+  },
+  /* Round video notes carry no bubble, so the padding that positions text would only
+     shrink the circle. */
+  bareBubble: {
+    borderWidth: 0,
+    minWidth: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0
   },
   sender: {
     fontSize: 13,

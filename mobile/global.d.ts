@@ -26,9 +26,11 @@ declare module "react-native" {
 
   interface PressableProps {
     dataSet?: WebDataSet;
-    /** react-native-web forwards ARIA props straight to the DOM node. */
+    /** react-native-web forwards ARIA props straight to the DOM node. It does not read
+     *  `accessibilityState`, so anything a screen reader needs is passed explicitly. */
     "aria-checked"?: boolean;
     "aria-expanded"?: boolean;
+    "aria-selected"?: boolean;
   }
 
   interface ScrollViewProps {

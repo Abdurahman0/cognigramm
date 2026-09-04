@@ -107,6 +107,27 @@ Every transition is a spring, and the presets live in one place (`motion` and `t
   native bundle. Note that the JS stack defaults `animation` to `"none"` on web — naming a preset
   is what re-enables transitions at all.
 
+**Lists.** `components/ui/RaisedCard.tsx` renders a row as a solid object rather than a
+tinted stripe. What reads as depth is consistent lighting: a bright bevel along the top
+edge where the face catches the light, a gradient falling off down the card, a shaded
+underside, and two shadows — a tight contact shadow plus a wider soft one for the gap it
+floats above. Hovering lifts it 2pt and lengthens the shadow; pressing sinks it and turns
+the bevel inside out, moving the lit edge to the bottom the way a real button does. Used
+by the chat list, directory and call history, which no longer need hairline separators.
+Note the two nested views: a shadow and `overflow: hidden` cannot share one view on
+native, so the outer casts and the inner clips.
+
+**Calls and media messages.** `components/ui/VolumeSlider.tsx` is the in-call output
+level, dragged like a fader. It is plumbed through the WebRTC adapter as `outputVolume`
+plus a `canSetVolume` capability flag: the browser applies the gain to the media element
+that plays the remote audio, while native reports it unsupported, because
+react-native-webrtc exposes no gain on a remote track and InCallManager has no volume
+API — routing to the loudspeaker is the loudness control on device. The dock puts the
+level first, secondary controls next, and hanging up on its own row so it is never a
+neighbour of mute. A video note is a free-standing circle rather than a bubble, with
+playback progress running around its rim; a voice message fills its waveform up to the
+playhead and scales the bar under it.
+
 **Notifications.** `components/ui/NotificationHost.tsx` with `store/notificationStore.ts`
 (`useAppToast` is the call site API). A card drops in from above on a spring, overshooting
 slightly so it lands rather than slides to a stop, and stacks up to three deep with older cards

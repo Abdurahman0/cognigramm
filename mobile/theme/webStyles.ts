@@ -178,6 +178,46 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
       mask-composite: exclude;
     }
 
+    /* Raised list cards.
+       A row reads as a solid object rather than a tinted stripe when it is lit from
+       above: a bright bevel along the top edge, a gradient that falls off down the
+       face, a shaded underside, and two shadows — a tight contact shadow plus a wider
+       soft one for the gap it floats above. Hovering lifts the card and lengthens the
+       shadow; pressing sinks it and turns the bevel inside out. */
+    [data-raised] {
+      background-image: linear-gradient(
+        to bottom,
+        ${colors.raisedTop} 0%,
+        transparent 46%,
+        ${colors.raisedBottom} 100%
+      );
+      box-shadow:
+        inset 0 1px 0 ${colors.raisedEdge},
+        inset 0 -1px 0 ${colors.raisedUnder},
+        0 1px 1.5px -0.5px ${colors.raisedShadowNear},
+        0 6px 16px -6px ${colors.raisedShadowFar};
+      transition:
+        box-shadow 200ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 160ms ease-out;
+    }
+
+    [data-raised="hovered"] {
+      box-shadow:
+        inset 0 1px 0 ${colors.raisedEdge},
+        inset 0 -1px 0 ${colors.raisedUnder},
+        0 2px 3px -1px ${colors.raisedShadowNear},
+        0 12px 26px -8px ${colors.raisedShadowFar};
+    }
+
+    /* Pressed: the light moves to the underside, which is what a real button does when
+       it goes below the surface. */
+    [data-raised="pressed"] {
+      box-shadow:
+        inset 0 2px 6px -2px ${colors.raisedUnder},
+        inset 0 -1px 0 ${colors.raisedEdge},
+        0 1px 1px -0.5px ${colors.raisedShadowNear};
+    }
+
     /* Physical response: eased transform and shadow so hover, press and drag settle. */
     [data-interactive] {
       transition:

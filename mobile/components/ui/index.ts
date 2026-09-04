@@ -14,4 +14,6 @@ export { LiquidLens } from "@/components/ui/LiquidLens";
 export { ListRow, ListSection } from "@/components/ui/List";
 export { NotificationHost } from "@/components/ui/NotificationHost";
 export { PressableScale } from "@/components/ui/PressableScale";
+export { RaisedCard } from "@/components/ui/RaisedCard";
+export { VolumeSlider } from "@/components/ui/VolumeSlider";
 export { PresenceDot } from "@/components/ui/PresenceDot";

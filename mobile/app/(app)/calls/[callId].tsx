@@ -53,6 +53,7 @@ export default function CallDetailsScreen(): JSX.Element {
     toggleCamera,
     switchCamera,
     toggleSpeaker,
+    setOutputVolume,
     clearError
   } = useCallController({ callId });
 
@@ -277,6 +278,8 @@ export default function CallDetailsScreen(): JSX.Element {
           isMuted={runtime.isMuted}
           isCameraEnabled={runtime.isCameraEnabled}
           speakerEnabled={runtime.speakerEnabled}
+          outputVolume={runtime.outputVolume}
+          canSetVolume={runtime.canSetVolume}
           canSwitchCamera={runtime.canSwitchCamera}
           controlsDisabled={loading}
           onAccept={(targetCallId) => {
@@ -312,6 +315,11 @@ export default function CallDetailsScreen(): JSX.Element {
           onToggleSpeaker={() => {
             toggleSpeaker().catch((error) => {
               toast.error("Unable to update speaker", error instanceof Error ? error.message : "Unexpected error");
+            });
+          }}
+          onChangeVolume={(next) => {
+            setOutputVolume(next).catch((error) => {
+              toast.error("Unable to set the volume", error instanceof Error ? error.message : "Unexpected error");
             });
           }}
         />

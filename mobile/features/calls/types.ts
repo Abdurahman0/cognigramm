@@ -142,6 +142,10 @@ export interface CallRuntimeState {
   isMuted: boolean;
   isCameraEnabled: boolean;
   speakerEnabled: boolean;
+  /** Playback gain for the remote audio, 0..1. */
+  outputVolume: number;
+  /** False where the platform gives no way to set playback gain from JS. */
+  canSetVolume: boolean;
   canSwitchCamera: boolean;
   errorMessage: string;
 }
@@ -170,6 +174,7 @@ export interface CallControllerActions {
   toggleCamera: () => Promise<void>;
   switchCamera: () => Promise<void>;
   toggleSpeaker: () => Promise<void>;
+  setOutputVolume: (next: number) => Promise<void>;
   clearError: () => void;
   resetRuntime: () => void;
 }

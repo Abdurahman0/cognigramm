@@ -39,6 +39,8 @@ const initialRuntimeState: CallRuntimeState = {
   isMuted: false,
   isCameraEnabled: false,
   speakerEnabled: true,
+  outputVolume: 1,
+  canSetVolume: false,
   canSwitchCamera: false,
   errorMessage: ""
 };
@@ -161,6 +163,8 @@ export const useCallController = (
         isMuted: snapshot.isMuted,
         isCameraEnabled: snapshot.isCameraEnabled,
         speakerEnabled: snapshot.speakerEnabled,
+        outputVolume: snapshot.outputVolume,
+        canSetVolume: snapshot.canSetVolume,
         canSwitchCamera: snapshot.canSwitchCamera,
         errorMessage: snapshot.errorMessage || state.errorMessage
       }));
@@ -467,6 +471,17 @@ export const useCallController = (
     }
   }, [applyRuntimeError, runtime.speakerEnabled]);
 
+  const setOutputVolume = useCallback(
+    async (next: number): Promise<void> => {
+      try {
+        await adapterRef.current.setOutputVolume(Math.max(0, Math.min(1, next)));
+      } catch (error) {
+        applyRuntimeError(error instanceof Error ? error.message : "Unable to set the volume.");
+      }
+    },
+    [applyRuntimeError]
+  );
+
   const clearError = useCallback(() => {
     setRuntime((state) => ({
       ...state,
@@ -496,6 +511,7 @@ export const useCallController = (
     toggleCamera,
     switchCamera,
     toggleSpeaker,
+    setOutputVolume,
     clearError,
     resetRuntime
   };

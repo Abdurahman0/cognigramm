@@ -1,11 +1,12 @@
 import { Feather } from "@expo/vector-icons";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Swipeable from "react-native-gesture-handler/Swipeable";
 import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
 
 import { Avatar } from "@/components/common/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Badge } from "@/components/ui/Badge";
+import { RaisedCard } from "@/components/ui/RaisedCard";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useChatStore } from "@/store/chatStore";
@@ -58,24 +59,18 @@ export function ChatListItem({
   const unread = chat.unreadCount > 0;
 
   const row = (
-    <Pressable
+    <RaisedCard
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      {...(Platform.OS === "web" ? { dataSet: { interactive: "true" } } : null)}
-      style={({ pressed, hovered }) => [
+      active={active}
+      radius={theme.radius.lg}
+      style={styles.cardOuter}
+      contentStyle={[
         styles.root,
         {
-          borderRadius: theme.radius.lg,
           minHeight: compactMode ? 62 : 72,
-          paddingVertical: compactMode ? 8 : 10,
-          backgroundColor: active
-            ? theme.colors.accentMuted
-            : pressed
-            ? theme.colors.fillSecondary
-            : hovered
-            ? theme.colors.fillTertiary
-            : "transparent"
+          paddingVertical: compactMode ? 8 : 10
         }
       ]}
     >
@@ -120,7 +115,7 @@ export function ChatListItem({
           {unread ? <Badge count={chat.unreadCount} /> : null}
         </View>
       </View>
-    </Pressable>
+    </RaisedCard>
   );
 
   const animatedRow = (
@@ -158,11 +153,15 @@ export function ChatListItem({
 }
 
 const styles = StyleSheet.create({
+  /* Cards need air around them or the shadows overlap and they read as one slab. */
+  cardOuter: {
+    paddingVertical: 4
+  },
   root: {
     alignItems: "center",
     flexDirection: "row",
     gap: 10,
-    paddingLeft: 4,
+    paddingLeft: 8,
     paddingRight: 12
   },
   unreadSlot: {

@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Animated, Platform, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Animated, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppButton, EmptyState } from "@/components/common";
 import { FloatingTitleBar, WorkspacePane } from "@/components/layout";
-import { AppText, GlassView, IconButton, ListRow, ListSection } from "@/components/ui";
+import { AppText, GlassView, IconButton, ListRow, ListSection, RaisedCard } from "@/components/ui";
 import { CALL_ROUTE_CONFIG } from "@/features/calls/config/callConfig";
 import { formatCallDuration, getCallDurationMs } from "@/features/calls/utils/formatCallDuration";
 import { CALL_STATUS_LABELS, CALL_TYPE_LABELS } from "@/constants/calls";
@@ -137,9 +137,6 @@ export default function CallsScreen(): JSX.Element {
             colors={[theme.colors.accent]}
           />
         }
-        ItemSeparatorComponent={() => (
-          <View style={[styles.separator, { backgroundColor: theme.colors.separator }]} />
-        )}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           <EmptyState
@@ -156,7 +153,7 @@ export default function CallsScreen(): JSX.Element {
           const durationLabel = durationMs > 0 ? formatCallDuration(durationMs) : "";
 
           return (
-            <Pressable
+            <RaisedCard
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
               onPress={() => {
@@ -166,18 +163,10 @@ export default function CallsScreen(): JSX.Element {
                 }
                 openCallStage(item.id);
               }}
-              style={({ pressed, hovered }) => [
-                styles.row,
-                {
-                  backgroundColor: active || live
-                    ? theme.colors.accentMuted
-                    : pressed
-                    ? theme.colors.fillSecondary
-                    : hovered
-                    ? theme.colors.fillTertiary
-                    : "transparent"
-                }
-              ]}
+              active={active || live}
+              radius={theme.radius.lg}
+              style={styles.rowOuter}
+              contentStyle={styles.row}
             >
               <Feather
                 name={item.callType === "video" ? "video" : "phone"}
@@ -197,7 +186,7 @@ export default function CallsScreen(): JSX.Element {
                 {formatRelative(item.updatedAt)}
               </AppText>
               <Feather name="info" size={17} color={theme.colors.accent} />
-            </Pressable>
+            </RaisedCard>
           );
         }}
       />
@@ -348,10 +337,11 @@ const styles = StyleSheet.create({
   list: {
     flex: 1
   },
-  listContent: {},
-  separator: {
-    height: StyleSheet.hairlineWidth * 2,
-    marginLeft: 52
+  listContent: {
+    paddingHorizontal: 8
+  },
+  rowOuter: {
+    paddingVertical: 4
   },
   row: {
     alignItems: "center",

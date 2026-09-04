@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { Audio } from "expo-av";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
 import type { ChatMessage } from "@/types";
 
@@ -9,7 +9,10 @@ interface VoiceMessageBubbleProps {
   message: ChatMessage;
   textColor: string;
   mutedTextColor: string;
+  /** Fill of the play button and the played portion of the waveform. */
   accentColor: string;
+  /** Glyph drawn on that fill; needed because your own bubble is already accent. */
+  onAccentColor: string;
 }
 
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
@@ -25,12 +28,15 @@ const formatDuration = (durationMs?: number): string => {
 };
 
 const fallbackWaveform = [28, 42, 35, 56, 43, 61, 39, 45, 31, 48, 40, 34];
+/** How many bars the timeline draws, whatever the source waveform length. */
+const BAR_COUNT = 28;
 
 export function VoiceMessageBubble({
   message,
   textColor,
   mutedTextColor,
   accentColor,
+  onAccentColor,
 }: VoiceMessageBubbleProps): JSX.Element {
   const attachmentUrl = message.attachment?.publicUrl ?? message.attachment?.uri ?? null;
   const metadata = (message.attachment?.metadataJson ?? {}) as Record<string, unknown>;
@@ -117,26 +123,52 @@ export function VoiceMessageBubble({
     }
   }, [attachmentUrl]);
 
+  const bars = waveform.slice(0, BAR_COUNT);
+
   return (
     <View style={styles.root}>
-      <Pressable onPress={togglePlayback} style={styles.controlsRow}>
-        <View style={[styles.playButton, { backgroundColor: accentColor }]}>
-          <Feather name={isPlaying ? "pause" : "play"} size={14} color="#FFFFFF" />
-        </View>
+      <View style={styles.controlsRow}>
+        <Pressable
+          onPress={togglePlayback}
+          accessibilityRole="button"
+          accessibilityLabel={isPlaying ? "Pause voice message" : "Play voice message"}
+          style={({ pressed }) => [
+            styles.playButton,
+            { backgroundColor: accentColor, opacity: pressed ? 0.82 : 1 },
+          ]}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color={onAccentColor} />
+          ) : (
+            <Feather
+              name={isPlaying ? "pause" : "play"}
+              size={18}
+              color={onAccentColor}
+              style={isPlaying ? undefined : styles.playGlyph}
+            />
+          )}
+        </Pressable>
+
         <View style={styles.timelineWrap}>
+          {/* Bars carry the playhead: everything left of it is filled, the bar under it
+              is highlighted, and the rest stays quiet. */}
           <View style={styles.waveformRow}>
-            {waveform.slice(0, 24).map((value, index) => {
+            {bars.map((value, index) => {
               const raw = value > 1 ? value / 100 : value;
-              const normalized = Math.max(0.18, Math.min(1, raw));
-              const activeThreshold = (index + 1) / Math.min(24, waveform.length || 1);
+              const normalized = Math.max(0.2, Math.min(1, raw));
+              const barPosition = (index + 0.5) / bars.length;
+              const played = barPosition <= playbackProgress;
+              const isHead = isPlaying && Math.abs(barPosition - playbackProgress) < 0.5 / bars.length;
               return (
                 <View
                   key={`${index}_${value}`}
                   style={[
                     styles.waveformBar,
                     {
-                      height: Math.round(normalized * 22),
-                      backgroundColor: activeThreshold <= playbackProgress ? accentColor : mutedTextColor,
+                      height: Math.round(normalized * 26),
+                      backgroundColor: played ? accentColor : mutedTextColor,
+                      opacity: played ? 1 : 0.45,
+                      transform: [{ scaleY: isHead ? 1.18 : 1 }],
                     },
                   ]}
                 />
@@ -147,12 +179,12 @@ export function VoiceMessageBubble({
             <Text style={[styles.metaText, { color: mutedTextColor }]}>
               {formatDuration(positionMs || durationMs || metadataDuration)}
             </Text>
-            {isLoading ? (
-              <Text style={[styles.metaText, { color: mutedTextColor }]}>Loading...</Text>
-            ) : null}
+            <Text style={[styles.metaText, { color: mutedTextColor }]}>
+              {isLoading ? "Loading…" : formatDuration(durationMs || metadataDuration)}
+            </Text>
           </View>
         </View>
-      </Pressable>
+      </View>
       {playbackError ? <Text style={[styles.errorText, { color: textColor }]}>{playbackError}</Text> : null}
     </View>
   );
@@ -161,29 +193,33 @@ export function VoiceMessageBubble({
 const styles = StyleSheet.create({
   root: {
     gap: 4,
-    width: 220,
+    width: 244,
   },
   controlsRow: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
   },
   playButton: {
     alignItems: "center",
     borderRadius: 999,
-    height: 28,
+    height: 40,
     justifyContent: "center",
-    width: 28,
+    width: 40,
+  },
+  /* The play triangle is visually off-centre in its own box; nudge it back. */
+  playGlyph: {
+    marginLeft: 2,
   },
   timelineWrap: {
     flex: 1,
     gap: 4,
   },
   waveformRow: {
-    alignItems: "flex-end",
+    alignItems: "center",
     columnGap: 2,
     flexDirection: "row",
-    height: 24,
+    height: 28,
   },
   waveformBar: {
     borderRadius: 999,

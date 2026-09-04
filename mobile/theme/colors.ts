@@ -58,6 +58,14 @@ export interface AppColors {
   /** Fill and rim of the travelling selection lens in the tab bar and nav rail. */
   selectionFill: string;
   selectionRim: string;
+  /** Raised list cards: a lit top bevel, a shaded underside, and the shadow they cast. */
+  raisedFill: string;
+  raisedTop: string;
+  raisedBottom: string;
+  raisedEdge: string;
+  raisedUnder: string;
+  raisedShadowNear: string;
+  raisedShadowFar: string;
   /** The selection lens rendered as a bead of clear liquid, lit rather than tinted. */
   dropletCrown: string;
   dropletBody: string;
@@ -131,6 +139,13 @@ export const lightColors: AppColors = {
   glassBorder: "rgba(255, 255, 255, 0.55)",
   selectionFill: "rgba(120, 120, 128, 0.16)",
   selectionRim: "rgba(255, 255, 255, 0.90)",
+  raisedFill: "rgba(255, 255, 255, 0.72)",
+  raisedTop: "rgba(255, 255, 255, 0.85)",
+  raisedBottom: "rgba(118, 124, 150, 0.10)",
+  raisedEdge: "rgba(255, 255, 255, 1)",
+  raisedUnder: "rgba(112, 118, 145, 0.30)",
+  raisedShadowNear: "rgba(80, 86, 115, 0.16)",
+  raisedShadowFar: "rgba(80, 86, 115, 0.24)",
   dropletCrown: "rgba(255, 255, 255, 0.80)",
   dropletBody: "rgba(255, 255, 255, 0.24)",
   dropletPool: "rgba(255, 255, 255, 0.62)",
@@ -201,6 +216,13 @@ export const darkColors: AppColors = {
   glassBorder: "rgba(255, 255, 255, 0.14)",
   selectionFill: "rgba(255, 255, 255, 0.10)",
   selectionRim: "rgba(255, 255, 255, 0.22)",
+  raisedFill: "rgba(255, 255, 255, 0.05)",
+  raisedTop: "rgba(255, 255, 255, 0.10)",
+  raisedBottom: "rgba(0, 0, 0, 0.18)",
+  raisedEdge: "rgba(255, 255, 255, 0.26)",
+  raisedUnder: "rgba(0, 0, 0, 0.60)",
+  raisedShadowNear: "rgba(0, 0, 0, 0.45)",
+  raisedShadowFar: "rgba(0, 0, 0, 0.55)",
   dropletCrown: "rgba(255, 255, 255, 0.26)",
   dropletBody: "rgba(255, 255, 255, 0.07)",
   dropletPool: "rgba(255, 255, 255, 0.20)",

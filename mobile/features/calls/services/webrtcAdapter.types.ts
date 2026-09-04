@@ -14,6 +14,10 @@ export interface WebRtcAdapterSnapshot {
   isMuted: boolean;
   isCameraEnabled: boolean;
   speakerEnabled: boolean;
+  /** Playback gain for the remote audio, 0..1. */
+  outputVolume: number;
+  /** False where the platform gives no way to set playback gain from JS. */
+  canSetVolume: boolean;
   canSwitchCamera: boolean;
   errorMessage: string;
 }
@@ -36,6 +40,7 @@ export interface WebRtcAdapter {
   toggleCamera: (nextEnabled: boolean) => Promise<void>;
   switchCamera: () => Promise<void>;
   toggleSpeaker: (nextEnabled: boolean) => Promise<void>;
+  setOutputVolume: (next: number) => Promise<void>;
   cleanup: () => Promise<void>;
 }
 
@@ -65,6 +70,8 @@ export const createInitialSnapshot = (
   isMuted: false,
   isCameraEnabled: false,
   speakerEnabled: true,
+  outputVolume: 1,
+  canSetVolume: false,
   canSwitchCamera: false,
   errorMessage: unsupportedReason
 });

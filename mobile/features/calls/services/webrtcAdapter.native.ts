@@ -105,6 +105,8 @@ const expoGoUnsupportedReason =
   "WebRTC is not available in Expo Go. Build and open a development client with react-native-webrtc linked.";
 const speakerUnsupportedReason =
   "Speaker routing control is unavailable. Install a native audio routing module (for example react-native-incall-manager).";
+const volumeUnsupportedReason =
+  "In-app playback volume is unavailable on this platform. Use the device volume keys, or install a native audio module that exposes an output gain.";
 
 const isExpoGoRuntime = (): boolean => {
   try {
@@ -400,6 +402,15 @@ class NativeWebRtcAdapter implements WebRtcAdapter {
     }
     track._switchCamera();
     this.syncLocalMediaState();
+  }
+
+  /**
+   * react-native-webrtc exposes no gain on a remote track and InCallManager has no
+   * volume API, so this is deliberately unsupported rather than silently doing nothing.
+   * Routing to the loudspeaker with `toggleSpeaker` is the loudness control on device.
+   */
+  async setOutputVolume(): Promise<void> {
+    throw new Error(volumeUnsupportedReason);
   }
 
   async toggleSpeaker(nextEnabled: boolean): Promise<void> {

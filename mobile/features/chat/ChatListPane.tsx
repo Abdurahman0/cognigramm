@@ -159,7 +159,6 @@ export function ChatListPane({
             }}
           />
         )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
         showsVerticalScrollIndicator={false}
       />
 
@@ -209,9 +208,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8
-  },
-  separator: {
-    height: 2
   },
   floatingSpacer: {
     height: 0

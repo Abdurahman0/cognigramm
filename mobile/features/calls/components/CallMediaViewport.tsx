@@ -128,6 +128,21 @@ export function CallMediaViewport({
     }
   }, [isWeb, remoteWebStream]);
 
+  // Remote audio arrives through whichever element is mounted, so the call's output
+  // level is applied to both rather than to the audio tag alone.
+  useEffect(() => {
+    if (!isWeb) {
+      return;
+    }
+    const level = Math.max(0, Math.min(1, runtime.outputVolume));
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.volume = level;
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.volume = level;
+    }
+  }, [isWeb, runtime.outputVolume, remoteWebStream, remoteHasVideo]);
+
   const webVideoStyle: CSSProperties = {
     width: "100%",
     height: "100%",

@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { usePathname, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import { Animated, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import { Avatar } from "@/components/common/Avatar";
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
@@ -28,6 +28,7 @@ function NavRow({ item, active, badgeCount, onPress, onLayout }: NavRowProps): J
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
+      {...(Platform.OS === "web" ? { "aria-selected": active } : null)}
       onPress={onPress}
       onLayout={onLayout}
       style={({ pressed, hovered }) => [

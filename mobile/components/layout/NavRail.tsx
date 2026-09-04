@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { usePathname, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, PanResponder, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Animated, PanResponder, Platform, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 
 import { WORKSPACE_NAV_ITEMS, resolveActiveNavKey, type WorkspaceNavItem } from "@/components/layout/navItems";
 import { AppText, Badge, GlassView, IconButton, LiquidLens, PressableScale } from "@/components/ui";
@@ -13,6 +13,8 @@ import { useChatStore } from "@/store/chatStore";
 interface RailItemProps {
   item: WorkspaceNavItem;
   active: boolean;
+  /** The bead is resting on this item, which is what the accent tint follows. */
+  lit: boolean;
   badgeCount?: number;
   /** The lens is currently over this item while scrubbing. */
   magnified?: boolean;
@@ -23,13 +25,14 @@ interface RailItemProps {
 function RailItem({
   item,
   active,
+  lit,
   badgeCount = 0,
   magnified = false,
   onPress,
   onLayout
 }: RailItemProps): JSX.Element {
   const { theme } = useAppTheme();
-  const color = active || magnified ? theme.colors.accent : theme.colors.textSecondary;
+  const color = lit ? theme.colors.accent : theme.colors.textSecondary;
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -48,6 +51,7 @@ function RailItem({
       accessibilityRole="tab"
       accessibilityLabel={item.label}
       accessibilityState={{ selected: active }}
+      {...(Platform.OS === "web" ? { "aria-selected": active } : null)}
       onPress={onPress}
       onLayout={onLayout}
       style={styles.itemPressable}
@@ -173,6 +177,7 @@ export function NavRail(): JSX.Element {
             key={item.key}
             item={item}
             active={activeKey === item.key}
+            lit={(scrubIndex ?? activeIndex) === index}
             badgeCount={item.key === "chats" ? unreadTotal : 0}
             magnified={scrubIndex === index}
             onLayout={(event) => measureSlot(index, event)}

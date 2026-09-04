@@ -1,7 +1,7 @@
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, PanResponder, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { Animated, PanResponder, Platform, StyleSheet, View, type LayoutChangeEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { WORKSPACE_NAV_ITEMS } from "@/components/layout/navItems";
@@ -40,6 +40,7 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
   }, []);
 
   const indicator = useMorphingIndicator(state.index, slots, "x");
+  const litIndex = scrubIndex ?? state.index;
   const indicatorRef = useRef(indicator);
   indicatorRef.current = indicator;
   const routesRef = useRef(state.routes);
@@ -121,7 +122,10 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
           const focused = state.index === index;
           const scrubbedOver = scrubIndex === index;
           const badgeCount = route.name === "chats" ? unreadTotal : 0;
-          const color = focused || scrubbedOver ? theme.colors.accent : theme.colors.textSecondary;
+          // The tint belongs to whatever the bead is sitting on, not to the route: while
+          // a drag scrubs across the bar the tab you came from goes quiet, so exactly one
+          // tab is ever lit. Selection for assistive tech still tracks the real route.
+          const color = litIndex === index ? theme.colors.accent : theme.colors.textSecondary;
 
           return (
             <PressableScale
@@ -129,6 +133,7 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
               scaleTo={0.92}
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
+              {...(Platform.OS === "web" ? { "aria-selected": focused } : null)}
               accessibilityLabel={navItem?.label ?? route.name}
               onLayout={(event) => measureSlot(index, event)}
               onPress={() => commit(index)}

@@ -22,11 +22,17 @@ import {
 const defaultUnsupportedReason =
   "This browser does not support required WebRTC APIs (RTCPeerConnection/getUserMedia).";
 
+/** Browsers can set playback gain on the media element, so the volume control is live. */
+const createWebSnapshot = (): WebRtcAdapterSnapshot => ({
+  ...createInitialSnapshot(),
+  canSetVolume: true
+});
+
 class WebWebRtcAdapter implements WebRtcAdapter {
   private readonly listeners = new Set<WebRtcAdapterListener>();
   private readonly onSignal: ((signal: CallSignalEnvelope) => void) | undefined;
 
-  private snapshot: WebRtcAdapterSnapshot = createInitialSnapshot();
+  private snapshot: WebRtcAdapterSnapshot = createWebSnapshot();
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
   private remoteStream: MediaStream | null = null;
@@ -236,6 +242,13 @@ class WebWebRtcAdapter implements WebRtcAdapter {
     });
   }
 
+  /** The viewport reads this off the snapshot and applies it to the media elements. */
+  async setOutputVolume(next: number): Promise<void> {
+    this.patchSnapshot({
+      outputVolume: Math.max(0, Math.min(1, next))
+    });
+  }
+
   async cleanup(): Promise<void> {
     callLogger.debug("webrtc.web cleanup");
     this.releasePeerResources();
@@ -244,7 +257,7 @@ class WebWebRtcAdapter implements WebRtcAdapter {
     this.lastSignalSenderId = "";
     this.hasLocalOffer = false;
     this.offerInFlight = false;
-    this.snapshot = createInitialSnapshot();
+    this.snapshot = createWebSnapshot();
     this.emit();
   }
 
