@@ -193,7 +193,11 @@ export function VoiceMessageBubble({
 const styles = StyleSheet.create({
   root: {
     gap: 4,
-    width: 244,
+    // A fixed width overflowed the bubble on a narrow screen, where the bubble itself is
+    // capped at 78% of the viewport. It now fills what it is given, within a range.
+    maxWidth: 244,
+    minWidth: 180,
+    width: "100%",
   },
   controlsRow: {
     alignItems: "center",

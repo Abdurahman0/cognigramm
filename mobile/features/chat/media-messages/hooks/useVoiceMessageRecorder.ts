@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { createVoiceMetadata } from "@/features/chat/media-messages/services/mediaMetadata";
 import {
@@ -42,6 +42,12 @@ const safeRevokePreviewUrl = (draft: PreparedMediaDraft | null): void => {
 export const useVoiceMessageRecorder = () => {
   const [state, setState] = useState<RecorderState<RecordedVoiceMessage>>(initialState);
   const [draft, setDraft] = useState<PreparedMediaDraft | null>(null);
+  /**
+   * Opening the device is async, so a hold can end before it finishes. Each start takes
+   * a ticket; cancelling bumps the counter, and a start that finds its ticket stale
+   * releases the device instead of announcing itself as recording.
+   */
+  const startTicket = useRef(0);
 
   const clearDraft = useCallback(() => {
     setDraft((current) => {
@@ -51,10 +57,16 @@ export const useVoiceMessageRecorder = () => {
   }, []);
 
   const start = useCallback(async () => {
+    const ticket = (startTicket.current += 1);
     try {
       clearDraft();
       setState({ step: "requesting_permission" });
       await startVoiceRecording();
+      if (startTicket.current !== ticket) {
+        // The gesture ended while the microphone was still opening.
+        await cancelVoiceRecording().catch(() => undefined);
+        return;
+      }
       setState({ step: "recording" });
     } catch (error) {
       setState({
@@ -86,6 +98,7 @@ export const useVoiceMessageRecorder = () => {
   }, []);
 
   const cancel = useCallback(async () => {
+    startTicket.current += 1;
     try {
       await cancelVoiceRecording();
     } finally {

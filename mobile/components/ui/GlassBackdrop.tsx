@@ -50,7 +50,7 @@ export function GlassBackdrop(): JSX.Element {
   const blobs: BloomProps[] = [
     { color: theme.colors.backdropBloomWarm, size: unit * 0.62, x: -unit * 0.12, y: -unit * 0.18 },
     { color: theme.colors.backdropBloomCool, size: unit * 0.58, x: width * 0.52, y: height * 0.08 },
-    { color: theme.colors.accentMuted, size: unit * 0.44, x: width * 0.18, y: height * 0.42 },
+    { color: theme.colors.backdropBloomWarm, size: unit * 0.44, x: width * 0.18, y: height * 0.42 },
     { color: theme.colors.backdropBloomWarm, size: unit * 0.36, x: width * 0.68, y: height * 0.58 },
     { color: theme.colors.backdropBloomCool, size: unit * 0.3, x: -unit * 0.06, y: height * 0.72 }
   ];

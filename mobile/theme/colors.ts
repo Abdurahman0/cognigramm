@@ -66,16 +66,9 @@ export interface AppColors {
   raisedUnder: string;
   raisedShadowNear: string;
   raisedShadowFar: string;
-  /** The selection lens rendered as a bead of clear liquid, lit rather than tinted. */
-  dropletCrown: string;
+  /** The selection lens: a clear bead, drawn with the palette's own neutrals. */
   dropletBody: string;
-  dropletPool: string;
-  dropletMeniscus: string;
-  dropletCaustic: string;
-  dropletGlint: string;
-  dropletDepth: string;
   dropletRim: string;
-  dropletShadow: string;
   glassHighlight: string;
 
   /** Lens edges: bright specular rim on top, dim refraction underneath. */
@@ -114,12 +107,12 @@ export const lightColors: AppColors = {
   messageMine: "#007AFF",
   messageOther: "rgba(255, 255, 255, 0.55)",
   overlay: "rgba(0, 0, 0, 0.28)",
-  shadow: "rgba(28, 24, 40, 0.16)",
+  shadow: "rgba(46, 36, 26, 0.16)",
 
-  wallpaper: ["#FFE9F3", "#DCE7FF", "#FFF3DC"] as const,
-  backdropBase: "#E9E6F2",
-  backdropBloomWarm: "rgba(255, 143, 112, 0.45)",
-  backdropBloomCool: "rgba(96, 148, 255, 0.42)",
+  wallpaper: ["#F6EEE4", "#EFE5D9", "#FAF5EE"] as const,
+  backdropBase: "#EFE8DE",
+  backdropBloomWarm: "rgba(214, 168, 118, 0.42)",
+  backdropBloomCool: "rgba(178, 158, 136, 0.36)",
   backdropVeil: "rgba(255, 255, 255, 0.30)",
 
   materialUltraThin: "rgba(255, 255, 255, 0.20)",
@@ -127,34 +120,27 @@ export const lightColors: AppColors = {
   materialRegular: "rgba(255, 255, 255, 0.42)",
   materialThick: "rgba(255, 255, 255, 0.92)",
 
-  fillPrimary: "rgba(120, 120, 128, 0.20)",
-  fillSecondary: "rgba(120, 120, 128, 0.16)",
-  fillTertiary: "rgba(120, 120, 128, 0.12)",
-  separator: "rgba(60, 60, 67, 0.18)",
+  fillPrimary: "rgba(150, 132, 112, 0.20)",
+  fillSecondary: "rgba(150, 132, 112, 0.16)",
+  fillTertiary: "rgba(150, 132, 112, 0.12)",
+  separator: "rgba(78, 66, 54, 0.18)",
 
   glass: "rgba(255, 255, 255, 0.42)",
   glassStrong: "rgba(255, 255, 255, 0.92)",
-  glassSoft: "rgba(120, 120, 128, 0.12)",
-  glassHover: "rgba(120, 120, 128, 0.18)",
+  glassSoft: "rgba(150, 132, 112, 0.12)",
+  glassHover: "rgba(150, 132, 112, 0.18)",
   glassBorder: "rgba(255, 255, 255, 0.55)",
-  selectionFill: "rgba(120, 120, 128, 0.16)",
+  selectionFill: "rgba(150, 132, 112, 0.16)",
   selectionRim: "rgba(255, 255, 255, 0.90)",
-  raisedFill: "rgba(255, 255, 255, 0.72)",
+  raisedFill: "rgba(255, 253, 250, 0.72)",
   raisedTop: "rgba(255, 255, 255, 0.85)",
-  raisedBottom: "rgba(118, 124, 150, 0.10)",
+  raisedBottom: "rgba(148, 128, 106, 0.10)",
   raisedEdge: "rgba(255, 255, 255, 1)",
-  raisedUnder: "rgba(112, 118, 145, 0.30)",
-  raisedShadowNear: "rgba(80, 86, 115, 0.16)",
-  raisedShadowFar: "rgba(80, 86, 115, 0.24)",
-  dropletCrown: "rgba(255, 255, 255, 0.80)",
-  dropletBody: "rgba(255, 255, 255, 0.24)",
-  dropletPool: "rgba(255, 255, 255, 0.62)",
-  dropletMeniscus: "rgba(255, 255, 255, 1)",
-  dropletCaustic: "rgba(255, 255, 255, 0.92)",
-  dropletGlint: "rgba(255, 255, 255, 0.95)",
-  dropletDepth: "rgba(84, 88, 110, 0.32)",
-  dropletRim: "rgba(104, 109, 134, 0.46)",
-  dropletShadow: "rgba(66, 70, 94, 0.28)",
+  raisedUnder: "rgba(140, 122, 100, 0.30)",
+  raisedShadowNear: "rgba(96, 80, 62, 0.16)",
+  raisedShadowFar: "rgba(96, 80, 62, 0.24)",
+  dropletBody: "rgba(150, 132, 112, 0.22)",
+  dropletRim: "rgba(126, 110, 90, 0.34)",
   glassHighlight: "rgba(255, 255, 255, 0.95)",
 
   specularTop: "rgba(255, 255, 255, 0.95)",
@@ -189,30 +175,30 @@ export const darkColors: AppColors = {
   online: "#30D158",
 
   messageMine: "#0A84FF",
-  messageOther: "rgba(120, 120, 128, 0.45)",
+  messageOther: "rgba(154, 148, 140, 0.34)",
   overlay: "rgba(0, 0, 0, 0.55)",
   shadow: "rgba(0, 0, 0, 0.55)",
 
-  wallpaper: ["#1B0A33", "#06184A", "#050510"] as const,
-  backdropBase: "#07070B",
-  backdropBloomWarm: "rgba(168, 62, 224, 0.42)",
-  backdropBloomCool: "rgba(20, 110, 255, 0.40)",
-  backdropVeil: "rgba(4, 4, 10, 0.34)",
+  wallpaper: ["#343029", "#26231F", "#161514"] as const,
+  backdropBase: "#161514",
+  backdropBloomWarm: "rgba(172, 138, 100, 0.22)",
+  backdropBloomCool: "rgba(122, 116, 108, 0.24)",
+  backdropVeil: "rgba(16, 15, 14, 0.36)",
 
-  materialUltraThin: "rgba(255, 255, 255, 0.07)",
-  materialThin: "rgba(20, 20, 26, 0.24)",
-  materialRegular: "rgba(16, 16, 22, 0.34)",
-  materialThick: "rgba(10, 10, 16, 0.90)",
+  materialUltraThin: "rgba(255, 252, 248, 0.06)",
+  materialThin: "rgba(44, 41, 38, 0.26)",
+  materialRegular: "rgba(38, 36, 33, 0.38)",
+  materialThick: "rgba(30, 28, 26, 0.90)",
 
-  fillPrimary: "rgba(120, 120, 128, 0.36)",
-  fillSecondary: "rgba(120, 120, 128, 0.28)",
-  fillTertiary: "rgba(120, 120, 128, 0.20)",
-  separator: "rgba(84, 84, 88, 0.50)",
+  fillPrimary: "rgba(154, 148, 140, 0.30)",
+  fillSecondary: "rgba(154, 148, 140, 0.22)",
+  fillTertiary: "rgba(154, 148, 140, 0.15)",
+  separator: "rgba(118, 112, 105, 0.46)",
 
-  glass: "rgba(16, 16, 22, 0.34)",
-  glassStrong: "rgba(10, 10, 16, 0.90)",
-  glassSoft: "rgba(120, 120, 128, 0.20)",
-  glassHover: "rgba(120, 120, 128, 0.30)",
+  glass: "rgba(38, 36, 33, 0.38)",
+  glassStrong: "rgba(30, 28, 26, 0.90)",
+  glassSoft: "rgba(154, 148, 140, 0.15)",
+  glassHover: "rgba(154, 148, 140, 0.24)",
   glassBorder: "rgba(255, 255, 255, 0.14)",
   selectionFill: "rgba(255, 255, 255, 0.10)",
   selectionRim: "rgba(255, 255, 255, 0.22)",
@@ -223,15 +209,8 @@ export const darkColors: AppColors = {
   raisedUnder: "rgba(0, 0, 0, 0.60)",
   raisedShadowNear: "rgba(0, 0, 0, 0.45)",
   raisedShadowFar: "rgba(0, 0, 0, 0.55)",
-  dropletCrown: "rgba(255, 255, 255, 0.26)",
-  dropletBody: "rgba(255, 255, 255, 0.07)",
-  dropletPool: "rgba(255, 255, 255, 0.20)",
-  dropletMeniscus: "rgba(255, 255, 255, 0.92)",
-  dropletCaustic: "rgba(255, 255, 255, 0.52)",
-  dropletGlint: "rgba(255, 255, 255, 0.58)",
-  dropletDepth: "rgba(0, 0, 0, 0.40)",
-  dropletRim: "rgba(255, 255, 255, 0.30)",
-  dropletShadow: "rgba(0, 0, 0, 0.50)",
+  dropletBody: "rgba(255, 252, 248, 0.14)",
+  dropletRim: "rgba(255, 252, 248, 0.24)",
   glassHighlight: "rgba(255, 255, 255, 0.35)",
 
   specularTop: "rgba(255, 255, 255, 0.55)",

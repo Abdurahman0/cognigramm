@@ -95,6 +95,10 @@ export function VideoNoteBubble({
           source={{ uri: attachmentUrl }}
           resizeMode={ResizeMode.COVER}
           style={styles.video}
+          // expo-av styles its own container on web; without this the inner <video>
+          // keeps its natural size (640x360 here) and the circle shows that frame's
+          // top-left corner instead of a centred crop.
+          videoStyle={styles.videoElement}
           useNativeControls={false}
           shouldPlay={false}
           isLooping={false}
@@ -159,6 +163,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
     top: 0,
+  },
+  videoElement: {
+    height: "100%",
+    width: "100%"
   },
   ring: {
     borderRadius: 999,

@@ -21,7 +21,12 @@ import {
 import { FlatList } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { ChatComposer, MessageBubble, TypingIndicator } from '@/components/chat'
+import {
+	ChatComposer,
+	MessageBubble,
+	TypingIndicator,
+	type ComposerRecordMode,
+} from '@/components/chat'
 import { Avatar } from '@/components/common/Avatar'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AppText, GlassView, IconButton } from '@/components/ui'
@@ -29,6 +34,11 @@ import { CALL_ROUTE_CONFIG } from '@/features/calls/config/callConfig'
 import {
 	MediaMessageComposerActions,
 	useSendMediaMessage,
+	getVideoNotePreviewStream,
+	pauseRecording,
+	resumeRecording,
+	setTorch,
+	supportsTorch,
 	useVideoNoteRecorder,
 	useVoiceMessageRecorder,
 	type PreparedMediaDraft,
@@ -134,6 +144,15 @@ export function ConversationPanel({
 	const [uploadingAttachment, setUploadingAttachment] = useState(false)
 	const [editingMessageId, setEditingMessageId] = useState('')
 	const [composerDraft, setComposerDraft] = useState('')
+	// Which recorder the composer's right-hand button is armed with; a long press on it
+	// swaps the two, the way Telegram's mic button does.
+	const [recordMode, setRecordMode] = useState<ComposerRecordMode>('voice')
+	const [recordPaused, setRecordPaused] = useState(false)
+	const [torchOn, setTorchOn] = useState(false)
+	// The capture stream and the camera's capabilities are only known once recording has
+	// actually begun, so they are read after the recorder reports itself running.
+	const [previewStream, setPreviewStream] = useState<unknown>(null)
+	const [canUseTorch, setCanUseTorch] = useState(false)
 	const [newIncomingCount, setNewIncomingCount] = useState(0)
 	const isNearBottomRef = useRef(true)
 	const lastMessageIdRef = useRef('')
@@ -241,6 +260,21 @@ export function ConversationPanel({
 	const startCall = useCallsStore(state => state.startCall)
 	const voiceRecorder = useVoiceMessageRecorder()
 	const videoRecorder = useVideoNoteRecorder()
+
+	const isRecordingMedia = voiceRecorder.isRecording || videoRecorder.isRecording
+	useEffect(() => {
+		if (!isRecordingMedia) {
+			setPreviewStream(null)
+			setCanUseTorch(false)
+			setRecordPaused(false)
+			setTorchOn(false)
+			return
+		}
+		setPreviewStream(getVideoNotePreviewStream())
+		setCanUseTorch(supportsTorch())
+	}, [isRecordingMedia])
+
+
 	const mediaSender = useSendMediaMessage({
 		chatId,
 		sendMessage,
@@ -1329,6 +1363,65 @@ export function ConversationPanel({
 					onDraftChange={setComposerDraft}
 					editingLabel={isEditingMessage ? 'Editing message' : undefined}
 					onCancelEditing={cancelInlineEdit}
+					recorder={
+						isEditingMessage
+							? undefined
+							: {
+									mode: recordMode,
+									recording: voiceRecorder.isRecording || videoRecorder.isRecording,
+									busy: voiceRecorder.isBusy || videoRecorder.isBusy,
+									paused: recordPaused,
+									previewStream,
+									canPause: Platform.OS === 'web',
+									canUseTorch,
+									torchOn,
+									onTogglePause: () => {
+										const kind = recordMode === 'video' ? 'video_note' : 'voice'
+										const changed = recordPaused ? resumeRecording(kind) : pauseRecording(kind)
+										if (changed) {
+											setRecordPaused(current => !current)
+										}
+									},
+									onToggleTorch: () => {
+										const next = !torchOn
+										setTorch(next)
+											.then((applied: boolean) => {
+												if (applied) {
+													setTorchOn(next)
+												}
+											})
+											.catch(() => undefined)
+									},
+									// Start and stop must do exactly that. Routing them through the
+									// press toggles meant a release could re-enter "not recording
+									// yet" and start a second recording instead of ending the first.
+									onStart: () => {
+										if (recordMode === 'video') {
+											videoRecorder.start().catch(() => undefined)
+											return
+										}
+										voiceRecorder.start().catch(() => undefined)
+									},
+									onStop: () => {
+										if (recordMode === 'video') {
+											videoRecorder.stop().catch(() => undefined)
+											return
+										}
+										voiceRecorder.stop().catch(() => undefined)
+									},
+									onCancel: () => {
+										if (videoRecorder.isRecording) {
+											videoRecorder.cancel().catch(() => undefined)
+										} else {
+											voiceRecorder.cancel().catch(() => undefined)
+										}
+										mediaSender.reset()
+									},
+									onToggleMode: () => {
+										setRecordMode(current => (current === 'voice' ? 'video' : 'voice'))
+									},
+							  }
+					}
 					mediaActionsSlot={
 						isEditingMessage ? null : (
 							<MediaMessageComposerActions
@@ -1534,7 +1627,6 @@ const styles = StyleSheet.create({
 		borderWidth: StyleSheet.hairlineWidth * 2,
 		bottom: 10,
 		left: 10,
-		overflow: 'hidden',
 		position: 'absolute',
 		right: 10,
 	},

@@ -129,3 +129,18 @@ export const stopVideoNoteRecording = async (): Promise<RecordedVideoNoteMessage
 export const cancelVideoNoteRecording = async (): Promise<void> => {
   return Promise.resolve();
 };
+
+/**
+ * The native video note is captured by the system camera UI, which owns its own preview,
+ * pause and torch. Nothing here can drive them, so these report honestly rather than
+ * pretending, and the composer hides the controls they would have driven.
+ */
+export const getVideoNotePreviewStream = (): unknown => null;
+
+export const pauseRecording = (): boolean => false;
+
+export const resumeRecording = (): boolean => false;
+
+export const supportsTorch = (): boolean => false;
+
+export const setTorch = async (): Promise<boolean> => false;

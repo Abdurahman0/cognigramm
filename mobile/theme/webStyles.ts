@@ -13,8 +13,8 @@ const STYLE_ELEMENT_ID = "qora-qarga-web-theme";
  * - `[data-glass]`       blurs and saturates whatever sits behind the surface
  * - `[data-lens]`        adds the specular sheen (lit from the pointer), grain, and a
  *                        refracting edge band that re-blurs the backdrop at the rim
- * - `[data-droplet]`    the selection lens: a bead of clear liquid, drawn with edge
- *                        light and a caustic rather than a tint
+ * - `[data-raised]`     list cards, lit from above so a row reads as a solid object
+ * - `[data-droplet]`    the selection lens: a clear bead, tint and rim only
  * - `[data-interactive]` eases transform/shadow changes so hover and press feel physical
  */
 export const injectWebThemeStyles = (theme: AppTheme): void => {
@@ -31,9 +31,8 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
 
   const { colors, blur, fontFamily } = theme;
   const lensBoost = theme.mode === "dark" ? "brightness(1.08)" : "brightness(1.04)";
-  // Water magnifies what is behind it, so the bead reads a shade brighter than the bar.
-  const dropletGain = theme.mode === "dark" ? "1.35" : "1.05";
-  const dropletEdgeGain = theme.mode === "dark" ? "1.5" : "1.08";
+  // Keeps the refracted rim from going muddy against the warm panel behind it.
+  const dropletEdgeGain = theme.mode === "dark" ? "1.14" : "1.03";
   const grain =
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.10'/%3E%3C/svg%3E\")";
 
@@ -116,62 +115,28 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
         inset 0 -1px 2px ${colors.specularBottom};
     }
 
-    /* A bead of clear water sitting on the glass.
-       Almost no tint — the shape is drawn entirely with light: a bright meniscus where
-       the surface curves away at the top, a caustic along the bottom where light bends
-       through and focuses, a shaded band under the top edge to give the bead thickness,
-       and a soft contact shadow. */
+    /* The selection lens: a clear bead, and nothing more.
+       An earlier pass lit it with a white meniscus, a caustic and a black inner shade,
+       which on a warm neutral palette read as a chrome lozenge rather than glass. The
+       shape now comes from the material alone — a faint tint, a hairline rim, and the
+       rim refraction that makes it behave like a lens. */
     [data-droplet] {
-      background-image: linear-gradient(
-        to bottom,
-        ${colors.dropletCrown} 0%,
-        ${colors.dropletBody} 34%,
-        transparent 56%,
-        ${colors.dropletPool} 100%
-      );
-      -webkit-backdrop-filter: blur(0.5px) saturate(210%) brightness(${dropletGain});
-      backdrop-filter: blur(0.5px) saturate(210%) brightness(${dropletGain});
-      box-shadow:
-        /* the two edges that actually catch light: a crisp meniscus on top, and the
-           base where the bead meets the surface */
-        inset 0 1px 0.5px -0.25px ${colors.dropletMeniscus},
-        inset 0 -1.5px 1px -0.75px ${colors.dropletCaustic},
-        /* a thin shade under the crown gives the bead thickness, and light pools just
-           above the base as it leaves */
-        inset 0 5px 9px -8px ${colors.dropletDepth},
-        inset 0 -8px 11px -9px ${colors.dropletCaustic},
-        0 0 0 0.5px ${colors.dropletRim},
-        0 1px 2px -1px ${colors.dropletShadow},
-        0 3px 9px -3px ${colors.dropletShadow};
+      background-color: ${colors.dropletBody};
+      box-shadow: inset 0 0 0 0.5px ${colors.dropletRim};
     }
 
-    /* Specular glint where the light source reflects off the crown, and the caustic
-       where that focused light leaves the far side. */
-    [data-droplet]::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      pointer-events: none;
-      z-index: 1;
-      background-image:
-        radial-gradient(34% 56% at 27% 23%, ${colors.dropletGlint}, transparent 72%),
-        radial-gradient(44% 74% at 76% 88%, ${colors.dropletCaustic}, transparent 68%);
-    }
-
-    /* Refraction: the rim re-blurs and brightens what is behind it, which is what
-       separates a bead of liquid from a highlight painted on a flat pill. */
+    /* Refraction: the rim re-blurs what is behind it, which is what separates a bead of
+       liquid from a flat capsule — without adding any highlight of its own. */
     [data-droplet]::after {
       content: "";
       position: absolute;
       inset: 0;
       border-radius: inherit;
       pointer-events: none;
-      z-index: 2;
       padding: 3px;
       box-sizing: border-box;
-      -webkit-backdrop-filter: blur(4px) saturate(260%) brightness(${dropletEdgeGain});
-      backdrop-filter: blur(4px) saturate(260%) brightness(${dropletEdgeGain});
+      -webkit-backdrop-filter: blur(4px) saturate(150%) brightness(${dropletEdgeGain});
+      backdrop-filter: blur(4px) saturate(150%) brightness(${dropletEdgeGain});
       -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
       mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
       -webkit-mask-composite: xor;

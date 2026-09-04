@@ -7,10 +7,18 @@ type BrowserMediaRecorder = {
   onstop: (() => void) | null;
   start: (timeslice?: number) => void;
   stop: () => void;
+  pause: () => void;
+  resume: () => void;
+};
+type BrowserVideoTrack = {
+  stop: () => void;
+  getSettings?: () => { width?: number; height?: number; torch?: boolean };
+  getCapabilities?: () => { torch?: boolean };
+  applyConstraints?: (constraints: { advanced?: { torch?: boolean }[] }) => Promise<void>;
 };
 type BrowserMediaStream = {
-  getTracks: () => Array<{ stop: () => void }>;
-  getVideoTracks: () => Array<{ getSettings?: () => { width?: number; height?: number } }>;
+  getTracks: () => { stop: () => void }[];
+  getVideoTracks: () => BrowserVideoTrack[];
 };
 
 let voiceRecorder: BrowserMediaRecorder | null = null;
@@ -88,7 +96,7 @@ export const startVoiceRecording = async (): Promise<void> => {
   };
   recorder.start(250);
   voiceRecorder = recorder;
-  voiceStream = stream;
+  voiceStream = stream as unknown as BrowserMediaStream;
 };
 
 export const stopVoiceRecording = async (): Promise<RecordedVoiceMessage> => {
@@ -151,7 +159,7 @@ export const startVideoNoteRecording = async (): Promise<VideoNoteStartResult> =
   };
   recorder.start(250);
   videoRecorder = recorder;
-  videoStream = stream;
+  videoStream = stream as unknown as BrowserMediaStream;
   return { requiresStop: true };
 };
 
@@ -183,6 +191,51 @@ export const stopVideoNoteRecording = async (): Promise<RecordedVideoNoteMessage
     width: typeof settings?.width === "number" ? settings.width : undefined,
     height: typeof settings?.height === "number" ? settings.height : undefined,
   };
+};
+
+/**
+ * The live capture stream, so the composer can show what is being filmed rather than an
+ * opaque "recording" label. Returned as `unknown` because the caller hands it straight to
+ * a `<video>` element and never inspects it.
+ */
+export const getVideoNotePreviewStream = (): unknown => videoStream;
+
+/** Pausing keeps the take: resume appends to the same recording. */
+export const pauseRecording = (kind: "voice" | "video_note"): boolean => {
+  const recorder = kind === "voice" ? voiceRecorder : videoRecorder;
+  if (!recorder || recorder.state !== "recording") {
+    return false;
+  }
+  recorder.pause();
+  return true;
+};
+
+export const resumeRecording = (kind: "voice" | "video_note"): boolean => {
+  const recorder = kind === "voice" ? voiceRecorder : videoRecorder;
+  if (!recorder || recorder.state !== "paused") {
+    return false;
+  }
+  recorder.resume();
+  return true;
+};
+
+/** Only some cameras expose a torch, so this reports whether the control is real. */
+export const supportsTorch = (): boolean => {
+  const track = videoStream?.getVideoTracks()[0];
+  return Boolean(track?.getCapabilities?.().torch);
+};
+
+export const setTorch = async (enabled: boolean): Promise<boolean> => {
+  const track = videoStream?.getVideoTracks()[0];
+  if (!track?.getCapabilities?.().torch || !track.applyConstraints) {
+    return false;
+  }
+  try {
+    await track.applyConstraints({ advanced: [{ torch: enabled }] });
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export const cancelVideoNoteRecording = async (): Promise<void> => {

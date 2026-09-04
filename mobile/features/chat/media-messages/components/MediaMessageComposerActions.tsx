@@ -126,6 +126,8 @@ export function MediaMessageComposerActions({
           <View style={styles.previewActions}>
             <Pressable
               onPress={isSending ? undefined : onDiscardDraft}
+              accessibilityRole="button"
+              accessibilityLabel="Discard recording"
               style={[
                 styles.previewActionButton,
                 { backgroundColor: theme.colors.glassHover, borderColor: theme.colors.glassBorder },
@@ -135,6 +137,8 @@ export function MediaMessageComposerActions({
             </Pressable>
             <Pressable
               onPress={isSending ? undefined : () => onSendDraft(draft)}
+              accessibilityRole="button"
+              accessibilityLabel={draft.type === "voice" ? "Send voice message" : "Send video note"}
               style={[
                 styles.previewActionButton,
                 { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
@@ -144,61 +148,7 @@ export function MediaMessageComposerActions({
             </Pressable>
           </View>
         </View>
-      ) : (
-        <View style={styles.actionsRow}>
-          <Pressable
-            onPress={controlsDisabled ? undefined : voiceRecording ? onStopVoiceRecording : onStartVoiceRecording}
-            style={[
-              styles.recorderButton,
-              {
-                borderColor: voiceRecording ? theme.colors.accent : theme.colors.glassBorder,
-                backgroundColor: voiceRecording ? theme.colors.accentMuted : theme.colors.glassSoft,
-              },
-            ]}
-          >
-            <Feather name={voiceRecording ? "square" : "mic"} size={14} color={theme.colors.textSecondary} />
-            <Text style={[styles.recorderLabel, { color: theme.colors.textSecondary }]}>
-              {voiceRecording ? "Stop voice" : "Voice"}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={
-              controlsDisabled
-                ? undefined
-                : videoNeedsStopAction
-                ? onStopVideoRecording
-                : onStartVideoRecording
-            }
-            style={[
-              styles.recorderButton,
-              {
-                borderColor: videoRecording ? theme.colors.accent : theme.colors.glassBorder,
-                backgroundColor: videoRecording ? theme.colors.accentMuted : theme.colors.glassSoft,
-              },
-            ]}
-          >
-            <Feather
-              name={videoNeedsStopAction ? "square" : "video"}
-              size={14}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={[styles.recorderLabel, { color: theme.colors.textSecondary }]}>
-              {videoNeedsStopAction ? "Stop video" : "Video note"}
-            </Text>
-          </Pressable>
-          {isAnyRecording ? (
-            <Pressable
-              onPress={voiceRecording ? onCancelVoiceRecording : onCancelVideoRecording}
-              style={[
-                styles.cancelRecordingButton,
-                { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glassSoft },
-              ]}
-            >
-              <Feather name="x" size={14} color={theme.colors.textSecondary} />
-            </Pressable>
-          ) : null}
-        </View>
-      )}
+      ) : null}
       {sendErrorMessage ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{sendErrorMessage}</Text> : null}
     </View>
   );
@@ -207,31 +157,6 @@ export function MediaMessageComposerActions({
 const styles = StyleSheet.create({
   root: {
     gap: 6,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  recorderButton: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    minHeight: 34,
-    paddingHorizontal: 10,
-  },
-  recorderLabel: {
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  cancelRecordingButton: {
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1,
-    justifyContent: "center",
-    minHeight: 34,
-    width: 34,
   },
   previewRow: {
     alignItems: "center",

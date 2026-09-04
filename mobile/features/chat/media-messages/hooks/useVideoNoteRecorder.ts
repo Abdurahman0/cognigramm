@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 import { createVideoNoteMetadata } from "@/features/chat/media-messages/services/mediaMetadata";
 import {
@@ -45,6 +45,12 @@ const safeRevokePreviewUrl = (draft: PreparedMediaDraft | null): void => {
 export const useVideoNoteRecorder = () => {
   const [state, setState] = useState<RecorderState<RecordedVideoNoteMessage>>(initialState);
   const [draft, setDraft] = useState<PreparedMediaDraft | null>(null);
+  /**
+   * Opening the device is async, so a hold can end before it finishes. Each start takes
+   * a ticket; cancelling bumps the counter, and a start that finds its ticket stale
+   * releases the device instead of announcing itself as recording.
+   */
+  const startTicket = useRef(0);
   const [awaitingStop, setAwaitingStop] = useState(false);
 
   const clearDraft = useCallback(() => {
@@ -64,10 +70,16 @@ export const useVideoNoteRecorder = () => {
   }, []);
 
   const start = useCallback(async () => {
+    const ticket = (startTicket.current += 1);
     try {
       clearDraft();
       setState({ step: "requesting_permission" });
       const startResult = await startVideoNoteRecording();
+      if (startTicket.current !== ticket) {
+        // The gesture ended while the camera was still opening.
+        await cancelVideoNoteRecording().catch(() => undefined);
+        return;
+      }
       if (startResult.requiresStop) {
         setAwaitingStop(true);
         setState({ step: "recording" });
@@ -115,6 +127,7 @@ export const useVideoNoteRecorder = () => {
   }, [awaitingStop, finalize]);
 
   const cancel = useCallback(async () => {
+    startTicket.current += 1;
     try {
       await cancelVideoNoteRecording();
     } finally {

@@ -115,7 +115,7 @@ export function RaisedCard({
             styles.card,
             {
               borderRadius: cornerRadius,
-              backgroundColor: active ? theme.colors.accentMuted : theme.colors.raisedFill
+              backgroundColor: active ? theme.colors.fillPrimary : theme.colors.raisedFill
             },
             contentStyle
           ]}

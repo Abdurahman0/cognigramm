@@ -236,8 +236,8 @@ const styles = StyleSheet.create({
     top: 0
   },
   indicatorFill: {
-    height: "100%",
-    width: "100%"
+    flex: 1,
+    margin: 3
   },
   itemPressable: {
     width: "86%"

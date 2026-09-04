@@ -67,7 +67,11 @@ npm run build:ios
 Apple-style Liquid Glass, shared by mobile and web, in light and dark.
 
 - `theme/colors.ts`: system colours, label/fill opacity tiers, separators, and the material
-  stack (`materialUltraThin` -> `materialThick`) plus specular rim colours
+  stack (`materialUltraThin` -> `materialThick`) plus specular rim colours. The palette is
+  warm neutral: the wallpaper is a warm room, but the panels themselves sit close to grey
+  and only pick that warmth up through the blur — saturating the materials makes the whole
+  UI read sepia. Blue is reserved for accents (own messages, badges, active glyphs) and
+  selection is marked with a lighter neutral rather than a tint.
 - `theme/typography.ts`: the iOS type ramp (largeTitle -> caption2), SF on Apple platforms
 - `theme/tokens.ts`: spacing, continuous-corner radii, blur strength per material, layout widths, spring presets
 - `theme/webStyles.ts`: injects the CSS `backdrop-filter` (blur + saturation + brightness) behind `dataSet={{ glass: ... }}`
@@ -153,8 +157,40 @@ react-native-webrtc exposes no gain on a remote track and InCallManager has no v
 API — routing to the loudspeaker is the loudness control on device. The dock puts the
 level first, secondary controls next, and hanging up on its own row so it is never a
 neighbour of mute. A video note is a free-standing circle rather than a bubble, with
-playback progress running around its rim; a voice message fills its waveform up to the
+playback progress running around its rim — note the `videoStyle` prop, without which
+expo-av leaves the inner `<video>` at its natural size on web and the circle shows that
+frame's top-left corner instead of a centred crop; a voice message fills its waveform up to the
 playhead and scales the bar under it.
+
+**Composer.** `components/chat/ChatComposer.tsx` follows Telegram's shape: one row of
+`emoji · input · attach · action`, where a single button on the right carries the whole
+right-hand side. It sends while there is text and is the recorder while there is not —
+**hold to record, release to finish, tap to swap voice for video note**. While recording,
+the text field is replaced by a live indicator and the paperclip becomes a discard button.
+
+The gesture continues after the hold: sliding **left** past 90pt throws the take away,
+sliding **up** past 64pt locks it hands-free (the finger can go, and explicit send and
+discard buttons take over), and simply lifting sends. A hint follows the finger while
+sliding. Both recorders behave the same way.
+
+While filming, `VideoNoteViewfinder` floats the live capture above the bar in the same
+round frame the note will be sent in, with pause and — where the camera reports one — a
+torch beside it. That row is absolutely positioned rather than stacked: growing the dock
+pushed the composer row past the bottom of the pane, and the dock had to stop clipping for
+the viewfinder to be visible at all. On native the video note is captured by the system
+camera UI, which owns its own preview, pause and torch, so `mediaRecorder.native.ts`
+reports those unsupported and the controls are hidden rather than faked.
+
+That button is a `PanResponder`, not a `Pressable`, for two reasons found the hard way:
+react-native-web releases a press a few milliseconds after `onLongPress` fires, so
+`onPressOut` arrives while the finger is still down and cannot mean "let go"; and starting
+a recording re-renders the row, which makes the responder system try to hand the gesture
+away mid-hold — hence `onPanResponderTerminationRequest: () => false`. The recorder hooks
+also take a ticket per `start()`, so a hold released before the device finished opening
+releases it instead of announcing itself as recording a moment later.
+`MediaMessageComposerActions` is now only the draft preview that lets you hear a
+recording back before sending it; the labelled Voice / Video note chips it used to show
+above the field are what the inline button replaced.
 
 **Notifications.** `components/ui/NotificationHost.tsx` with `store/notificationStore.ts`
 (`useAppToast` is the call site API). A card drops in from above on a spring, overshooting
