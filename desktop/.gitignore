@@ -1,0 +1,20 @@
+node_modules/
+dist/
+dist-ssr/
+.env
+.env.local
+*.local
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+.vitest/
+
+# Editors
+.idea/
+.DS_Store

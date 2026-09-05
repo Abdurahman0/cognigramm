@@ -70,7 +70,8 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
       -webkit-backdrop-filter: blur(${blur.thick}px) saturate(190%) ${lensBoost};
       backdrop-filter: blur(${blur.thick}px) saturate(190%) ${lensBoost};
     }
-    [data-glass="none"] {
+    [data-glass="none"],
+    [data-glass="clear"] {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
@@ -101,6 +102,15 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
       border-radius: inherit;
       pointer-events: none;
       z-index: 2;
+      box-shadow:
+        inset 0 1px 0 ${colors.specularTop},
+        inset 0 0 0 0.5px ${colors.glassBorder},
+        inset 0 -1px 2px ${colors.specularBottom};
+    }
+
+    /* Only small surfaces pay for a refracting rim; on a window-sized pane the same
+       effect costs a whole extra composite pass to show a five-pixel band. */
+    [data-lens="rim"]::after {
       padding: 5px;
       box-sizing: border-box;
       -webkit-backdrop-filter: blur(6px) saturate(220%) brightness(1.12);
@@ -109,10 +119,6 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
       mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
       -webkit-mask-composite: xor;
       mask-composite: exclude;
-      box-shadow:
-        inset 0 1px 0 ${colors.specularTop},
-        inset 0 0 0 0.5px ${colors.glassBorder},
-        inset 0 -1px 2px ${colors.specularBottom};
     }
 
     /* The selection lens: a clear bead, and nothing more.
@@ -200,10 +206,6 @@ export const injectWebThemeStyles = (theme: AppTheme): void => {
 
     [data-grab]:active {
       cursor: grabbing;
-    }
-
-    [data-bloom] {
-      filter: blur(64px);
     }
 
     * {

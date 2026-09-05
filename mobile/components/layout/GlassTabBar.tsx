@@ -100,6 +100,7 @@ export function GlassTabBar({ state, navigation }: BottomTabBarProps): JSX.Eleme
         material="thick"
         radius={theme.radius.pill}
         highlight
+        refract
         elevation="floating"
         style={styles.bar}
       >

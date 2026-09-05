@@ -3,7 +3,10 @@ import type {
   ApiCallsHistoryResponse,
   ApiCallSession,
   ApiConversation,
+  ApiDeliveryReceipt,
   ApiDeliveryState,
+  ApiMessageSearchHit,
+  ApiTypingState,
   ApiLocalUploadResponse,
   ApiMessage,
   ApiMessageAttachmentOut,
@@ -82,6 +85,14 @@ export const usersApi = {
       }
     });
   },
+  /** Presence status is its own endpoint, separate from the profile patch. */
+  updateStatus(token: string, status: ApiUser["status"]): Promise<ApiUser> {
+    return apiRequest<ApiUser>("/users/me/status", {
+      method: "PATCH",
+      token,
+      body: { status }
+    });
+  },
   updateMe(token: string, payload: Partial<{
     full_name: string | null;
     avatar_url: string | null;
@@ -149,6 +160,32 @@ export const messagesApi = {
       }
     });
   },
+  listPinned(token: string, conversationId: number, params: ListParams = {}): Promise<ApiMessage[]> {
+    return apiRequest<ApiMessage[]>(`/conversations/${conversationId}/messages/pinned`, {
+      token,
+      query: { limit: params.limit ?? 50, offset: params.offset ?? 0 }
+    });
+  },
+  search(
+    token: string,
+    conversationId: number,
+    term: string,
+    params: ListParams = {}
+  ): Promise<ApiMessageSearchHit[]> {
+    return apiRequest<ApiMessageSearchHit[]>(`/conversations/${conversationId}/messages/search`, {
+      token,
+      query: { q: term, limit: params.limit ?? 25, offset: params.offset ?? 0 }
+    });
+  },
+  pin(token: string, messageId: number): Promise<ApiMessage> {
+    return apiRequest<ApiMessage>(`/messages/${messageId}/pin`, { method: "POST", token });
+  },
+  unpin(token: string, messageId: number): Promise<ApiMessage> {
+    return apiRequest<ApiMessage>(`/messages/${messageId}/unpin`, { method: "POST", token });
+  },
+  getDeliveryReceipts(token: string, messageId: number): Promise<ApiDeliveryReceipt[]> {
+    return apiRequest<ApiDeliveryReceipt[]>(`/messages/${messageId}/delivery`, { token });
+  },
   getLatestByConversation(token: string, conversationId: number): Promise<ApiMessage | null> {
     return apiRequest<ApiMessage | null>(`/conversations/${conversationId}/messages/latest`, { token });
   },
@@ -188,6 +225,9 @@ export const messagesApi = {
 };
 
 export const presenceApi = {
+  getTyping(token: string, conversationId: number): Promise<ApiTypingState> {
+    return apiRequest<ApiTypingState>(`/presence/conversations/${conversationId}/typing`, { token });
+  },
   getOnlineUsers(token: string, limit = 5000): Promise<number[]> {
     return apiRequest<number[]>("/presence/users/online", {
       token,
@@ -205,6 +245,13 @@ export const presenceApi = {
         conversation_id: conversationId
       }
     });
+  }
+};
+
+export const systemApi = {
+  /** Cheap reachability probe; the only endpoint that needs no token. */
+  health(): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>("/health");
   }
 };
 
@@ -227,7 +274,10 @@ export type {
   ApiCallsHistoryResponse,
   ApiCallSession,
   ApiConversation,
+  ApiDeliveryReceipt,
   ApiDeliveryState,
+  ApiMessageSearchHit,
+  ApiTypingState,
   ApiMessage,
   ApiMessageAttachmentIn,
   ApiMessageAttachmentOut,

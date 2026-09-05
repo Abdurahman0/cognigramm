@@ -1,0 +1,5 @@
+# esbuild's postinstall only links the prebuilt binary Vite needs.
+allowBuilds:
+  esbuild: true
+onlyBuiltDependencies:
+  - esbuild

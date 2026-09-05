@@ -11,16 +11,38 @@ interface BloomProps {
   y: number;
 }
 
-/** A colour blob in the wallpaper. Blur needs structure behind it or it reads as flat paint. */
+/**
+ * A colour blob in the wallpaper. Blur needs structure behind it or it reads as flat
+ * paint, but on web these were `filter: blur(64px)` over roughly two viewports' worth of
+ * area — recomposited every frame for a shape that never moves. A radial gradient with
+ * the same falloff is indistinguishable and costs the compositor nothing.
+ */
 function Bloom({ color, size, x, y }: BloomProps): JSX.Element {
-  const rings = Platform.OS === "web" ? [1] : [0.5, 0.75, 1];
+  if (Platform.OS === "web") {
+    return (
+      <View
+        pointerEvents="none"
+        style={[
+          styles.bloomWrap,
+          {
+            width: size,
+            height: size,
+            left: x,
+            top: y,
+            // backgroundImage is a web-only style; react-native-web forwards it verbatim.
+            backgroundImage: `radial-gradient(closest-side, ${color}, transparent 88%)`
+          }
+        ]}
+      />
+    );
+  }
 
+  const rings = [0.5, 0.75, 1];
   return (
     <View pointerEvents="none" style={[styles.bloomWrap, { width: size, height: size, left: x, top: y }]}>
       {rings.map((scale, index) => (
         <View
           key={`${scale}`}
-          {...(Platform.OS === "web" ? { dataSet: { bloom: "true" } } : null)}
           style={{
             position: "absolute",
             top: (size * (1 - scale)) / 2,
@@ -29,7 +51,7 @@ function Bloom({ color, size, x, y }: BloomProps): JSX.Element {
             height: size * scale,
             borderRadius: (size * scale) / 2,
             backgroundColor: color,
-            opacity: Platform.OS === "web" ? 1 : 0.45 - index * 0.12
+            opacity: 0.45 - index * 0.12
           }}
         />
       ))}

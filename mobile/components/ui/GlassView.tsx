@@ -32,6 +32,18 @@ interface GlassViewProps extends PropsWithChildren<Pick<ViewProps, "pointerEvent
   bordered?: boolean;
   /** Lens treatment: specular sheen across the surface plus a bevelled rim. */
   highlight?: boolean;
+  /**
+   * Adds a refracting rim that re-blurs the backdrop at the edge. It is a second
+   * compositing pass over the whole element, so it is reserved for small controls where
+   * the band is a large share of what you see — never window-sized panes.
+   */
+  refract?: boolean;
+  /**
+   * Set false to keep the tint and rim but skip the backdrop blur. Worth it on surfaces
+   * the size of the window: the blur costs a full-viewport composite pass every frame,
+   * and over a smooth wallpaper there is nothing there for it to soften.
+   */
+  blurred?: boolean;
   /** Eases transform and shadow changes so hover and press feel physical. */
   interactive?: boolean;
   elevation?: ElevationLevel;
@@ -54,6 +66,8 @@ export function GlassView({
   radius,
   bordered = true,
   highlight = false,
+  refract = false,
+  blurred = true,
   interactive = false,
   elevation = "none",
   style,
@@ -85,8 +99,8 @@ export function GlassView({
       {...(isWeb
         ? {
             dataSet: {
-              glass: resolved,
-              ...(showLens ? { lens: "true" } : null),
+              glass: blurred ? resolved : "none",
+              ...(showLens ? { lens: refract ? "rim" : "true" } : null),
               ...(interactive ? { interactive: "true" } : null)
             }
           }

@@ -1,5 +1,4 @@
 import Constants from 'expo-constants'
-import { Platform } from 'react-native'
 
 const DEFAULT_API_BASE_URL = 'https://messanger.cognilabs.org'
 const DEFAULT_WS_BASE_URL = 'wss://messanger.cognilabs.org'
@@ -48,17 +47,13 @@ export const WS_BASE_URL = normalizeWsUrl(
 )
 
 /**
- * The web build runs against the in-app mock backend by default, so the preview needs
- * nothing else running and sign-in accepts anything. Set EXPO_PUBLIC_USE_MOCK_API=false
- * to point a web build at the real API; native always uses the real API unless the flag
- * is explicitly turned on.
+ * Every platform talks to the real API. The in-app mock backend is still there for
+ * working on the UI with nothing running — set EXPO_PUBLIC_USE_MOCK_API=true to use it —
+ * but it is opt-in, so a plain build is always the integrated one.
  */
 export const USE_MOCK_API = (() => {
 	const raw = env.EXPO_PUBLIC_USE_MOCK_API
-	if (typeof raw === 'string' && raw.length > 0) {
-		return raw.toLowerCase() !== 'false' && raw !== '0'
-	}
-	return Platform.OS === 'web'
+	return typeof raw === 'string' && (raw.toLowerCase() === 'true' || raw === '1')
 })()
 
 const localUploadRaw =

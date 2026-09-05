@@ -16,6 +16,8 @@ export type SocketOutgoingEvent =
   | "leave_conversation"
   | "active_conversation"
   | "sync_missed"
+  | "pin_message"
+  | "unpin_message"
   | "call_invite"
   | "call_accept"
   | "call_reject"

@@ -181,8 +181,8 @@ export const darkColors: AppColors = {
 
   wallpaper: ["#343029", "#26231F", "#161514"] as const,
   backdropBase: "#161514",
-  backdropBloomWarm: "rgba(172, 138, 100, 0.22)",
-  backdropBloomCool: "rgba(122, 116, 108, 0.24)",
+  backdropBloomWarm: "rgba(178, 142, 102, 0.30)",
+  backdropBloomCool: "rgba(126, 120, 110, 0.30)",
   backdropVeil: "rgba(16, 15, 14, 0.36)",
 
   materialUltraThin: "rgba(255, 252, 248, 0.06)",

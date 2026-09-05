@@ -25,15 +25,21 @@ export const radius = {
   pill: 999
 } as const;
 
-/** Backdrop blur strength per material tier. */
+/**
+ * Backdrop blur strength per material tier.
+ *
+ * These are deliberately modest. A backdrop filter costs the compositor roughly in
+ * proportion to radius across the whole element, and past about 24px the picture behind
+ * is already unrecognisable — the extra radius buys no legibility, only frame time.
+ */
 export const blur = {
-  ultraThin: 20,
-  thin: 30,
-  regular: 40,
-  thick: 84,
-  soft: 20,
-  panel: 40,
-  strong: 84
+  ultraThin: 12,
+  thin: 18,
+  regular: 24,
+  thick: 40,
+  soft: 12,
+  panel: 24,
+  strong: 40
 } as const;
 
 export const layout = {

@@ -40,6 +40,7 @@ export function AppShell({ children, showSidebar = true }: AppShellProps): JSX.E
         material="regular"
         radius={theme.radius.sheet}
         highlight
+        blurred={false}
         interactive
         elevation="floating"
         style={styles.window}

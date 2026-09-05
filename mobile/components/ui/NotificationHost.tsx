@@ -209,6 +209,7 @@ function NotificationCard({ item, depth }: NotificationCardProps): JSX.Element {
         material="regular"
         radius={theme.radius.xl}
         highlight
+        refract
         elevation="floating"
         style={styles.card}
       >

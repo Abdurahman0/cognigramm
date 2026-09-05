@@ -13,6 +13,24 @@ Internal messenger with shared Android + web codebase connected to the Python ba
 - Expo Image
 - AsyncStorage persistence
 
+## Backend
+
+Production API: `https://messanger.cognilabs.org` — REST and the WebSocket share the one
+domain, `wss://messanger.cognilabs.org/ws/chat?token=<jwt>`. These are the defaults in
+`services/api/config.ts`; `EXPO_PUBLIC_API_BASE_URL` / `EXPO_PUBLIC_WS_BASE_URL` override
+them. No localhost anywhere in the client.
+
+The REST surface in `services/api/index.ts` covers all 27 paths the backend publishes,
+including pin/unpin, the pinned list, message search, delivery receipts, per-conversation
+typing, `PATCH /users/me/status` and `/health`. Attachments go to `/files/upload-local` as
+multipart with the field named `file` — `/files/presign` answers 503 in this deployment,
+which is expected.
+
+**CORS gates the browser build.** The backend keeps an origin allowlist:
+`https://messanger.cognilabs.org` is accepted, anything else gets `400 Disallowed CORS
+origin` on the preflight. Serving the web build from that same origin needs nothing; from
+any other host the backend has to add it to the allowlist. Native builds are unaffected.
+
 ## Mock backend
 
 The web build runs against an in-app mock — `services/api/mockBackend.ts` — rather than
@@ -107,6 +125,30 @@ Chrome floats above live content rather than boxing it in: navigation bars, the 
 header, the composer, and the tab bar are glass capsules with the list scrolling under them, and
 a bar's glass and compact title fade in with scroll (`FloatingTitleBar`). Panes themselves are
 transparent, so the only glass is the window and the floating controls.
+
+## Performance
+
+The glass is cheap on purpose. A `backdrop-filter` costs the compositor roughly in
+proportion to its radius across the whole element, every frame, so the rules are:
+
+- **Nothing window-sized blurs.** `GlassView` takes `blurred={false}`, used by the desktop
+  shell: the pane covers most of the viewport, and a smooth wallpaper has nothing in it
+  worth softening. Measured, turning it off moves 0.1% of pixels.
+- **`clear` means clear.** The base `[data-glass]` rule used to blur `clear` surfaces too,
+  so both workspace panes paid for a filter that could not show.
+- **The refracting rim is opt-in** (`refract`), because it is a second full-element
+  composite pass to draw a five-pixel band. Only small controls get it.
+- **The wallpaper blooms are gradients, not blurs.** They were `filter: blur(64px)` over
+  roughly two viewports; a radial gradient looks the same and costs nothing.
+- **Blur radii stay modest** (12/18/24/40). Past about 24px the picture behind is already
+  unrecognisable, so the extra radius buys no legibility, only frame time.
+
+Together that took the filtered area from 4.76M px² to 417K on a 1440×900 viewport, and
+the worst frame during a scroll from 158ms to 73ms.
+
+The conversation poll commits state only when something actually changed. It runs every
+few seconds regardless, and handing React fresh object identities re-rendered the whole
+list — cards, shadows and all — on a timer.
 
 ## Motion
 

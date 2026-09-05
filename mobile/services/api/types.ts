@@ -69,6 +69,25 @@ export interface ApiMessageAttachmentOut {
   created_at: string;
 }
 
+export interface ApiMessageSearchHit {
+  message: ApiMessage;
+  /** Full-text rank from the backend, highest first. */
+  rank: number;
+}
+
+export interface ApiDeliveryReceipt {
+  id: number;
+  message_id: number;
+  conversation_id: number;
+  user_id: number;
+  read_at: string | null;
+}
+
+export interface ApiTypingState {
+  conversation_id: number;
+  user_ids: number[];
+}
+
 export interface ApiMessage {
   id: number;
   conversation_id: number;
@@ -80,6 +99,11 @@ export interface ApiMessage {
   client_message_id: string;
   content: string | null;
   message_type: ApiMessageType;
+  reply_to_message_id?: number | null;
+  forwarded_from_message_id?: number | null;
+  is_pinned?: boolean;
+  pinned_by_user_id?: number | null;
+  pinned_at?: string | null;
   status: ApiMessageStatus;
   delivery_state: ApiDeliveryState;
   attachments: ApiMessageAttachmentOut[];

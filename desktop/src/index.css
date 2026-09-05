@@ -1,0 +1,311 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Qora Qarg'a desktop — warm-neutral Liquid Glass, matching the mobile client.
+ *
+ * Performance note, learned the hard way on the web build: `backdrop-filter`
+ * costs the compositor roughly radius x area, and a window-sized pane blurring
+ * a smooth wallpaper moves almost no pixels for that price. So the large
+ * surfaces here are translucent *fills* over a gradient, and blur is reserved
+ * for small floating chrome — the composer, popovers, the call overlay — where
+ * genuinely varied content passes underneath. Radii stay at or under 24px:
+ * past that the backdrop is unrecognisable anyway.
+ */
+
+:root {
+  --radius: 0.85rem;
+
+  --wallpaper-a: #f6eee4;
+  --wallpaper-b: #efe5d9;
+  --wallpaper-c: #faf5ee;
+  --bloom-warm: rgba(214, 168, 118, 0.42);
+  --bloom-cool: rgba(178, 158, 136, 0.36);
+  --veil: rgba(255, 255, 255, 0.3);
+
+  --background: #efe8de;
+  --foreground: #000000;
+  --muted-foreground: rgba(60, 60, 67, 0.72);
+  --faint-foreground: rgba(60, 60, 67, 0.45);
+
+  --card: rgba(255, 253, 250, 0.72);
+  --card-foreground: #000000;
+  --popover: rgba(255, 255, 255, 0.92);
+  --popover-foreground: #000000;
+
+  --primary: #007aff;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(150, 132, 112, 0.16);
+  --secondary-foreground: #000000;
+  --accent: rgba(150, 132, 112, 0.2);
+  --accent-foreground: #000000;
+  --destructive: #ff3b30;
+  --destructive-foreground: #ffffff;
+  --success: #34c759;
+  --warning: #ff9500;
+
+  --border: rgba(78, 66, 54, 0.18);
+  --input: rgba(150, 132, 112, 0.16);
+  --ring: rgba(0, 122, 255, 0.55);
+
+  /* Material tiers, thinnest to thickest. */
+  --material-ultra-thin: rgba(255, 255, 255, 0.2);
+  --material-thin: rgba(255, 255, 255, 0.3);
+  --material-regular: rgba(255, 255, 255, 0.42);
+  --material-thick: rgba(255, 255, 255, 0.92);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-highlight: rgba(255, 255, 255, 0.95);
+  --raised-top: rgba(255, 255, 255, 0.85);
+  --raised-bottom: rgba(148, 128, 106, 0.1);
+  --raised-edge: rgba(255, 255, 255, 1);
+  --raised-shadow: rgba(96, 80, 62, 0.16);
+  --selection-fill: rgba(150, 132, 112, 0.16);
+  --selection-rim: rgba(255, 255, 255, 0.9);
+
+  --bubble-mine: #007aff;
+  --bubble-mine-foreground: #ffffff;
+  --bubble-other: rgba(255, 255, 255, 0.62);
+  --bubble-other-foreground: #000000;
+}
+
+.dark {
+  --wallpaper-a: #343029;
+  --wallpaper-b: #26231f;
+  --wallpaper-c: #161514;
+  --bloom-warm: rgba(178, 142, 102, 0.3);
+  --bloom-cool: rgba(126, 120, 110, 0.3);
+  --veil: rgba(16, 15, 14, 0.36);
+
+  --background: #161514;
+  --foreground: #ffffff;
+  --muted-foreground: rgba(235, 235, 245, 0.72);
+  --faint-foreground: rgba(235, 235, 245, 0.45);
+
+  --card: rgba(255, 255, 255, 0.05);
+  --card-foreground: #ffffff;
+  --popover: rgba(30, 28, 26, 0.94);
+  --popover-foreground: #ffffff;
+
+  --primary: #0a84ff;
+  --primary-foreground: #ffffff;
+  --secondary: rgba(154, 148, 140, 0.22);
+  --secondary-foreground: #ffffff;
+  --accent: rgba(154, 148, 140, 0.3);
+  --accent-foreground: #ffffff;
+  --destructive: #ff453a;
+  --destructive-foreground: #ffffff;
+  --success: #30d158;
+  --warning: #ff9f0a;
+
+  --border: rgba(118, 112, 105, 0.46);
+  --input: rgba(154, 148, 140, 0.22);
+  --ring: rgba(10, 132, 255, 0.6);
+
+  --material-ultra-thin: rgba(255, 252, 248, 0.06);
+  --material-thin: rgba(44, 41, 38, 0.26);
+  --material-regular: rgba(38, 36, 33, 0.38);
+  --material-thick: rgba(30, 28, 26, 0.9);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: rgba(255, 255, 255, 0.35);
+  --raised-top: rgba(255, 255, 255, 0.1);
+  --raised-bottom: rgba(0, 0, 0, 0.18);
+  --raised-edge: rgba(255, 255, 255, 0.26);
+  --raised-shadow: rgba(0, 0, 0, 0.45);
+  --selection-fill: rgba(255, 255, 255, 0.1);
+  --selection-rim: rgba(255, 255, 255, 0.22);
+
+  --bubble-mine: #0a84ff;
+  --bubble-mine-foreground: #ffffff;
+  --bubble-other: rgba(154, 148, 140, 0.28);
+  --bubble-other-foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--secondary);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-material-ultra-thin: var(--material-ultra-thin);
+  --color-material-thin: var(--material-thin);
+  --color-material-regular: var(--material-regular);
+  --color-material-thick: var(--material-thick);
+  --color-glass-border: var(--glass-border);
+  --color-selection-fill: var(--selection-fill);
+  --color-selection-rim: var(--selection-rim);
+  --color-bubble-mine: var(--bubble-mine);
+  --color-bubble-mine-foreground: var(--bubble-mine-foreground);
+  --color-bubble-other: var(--bubble-other);
+  --color-bubble-other-foreground: var(--bubble-other-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+    /* The window chrome is ours; a stray text selection drag looks broken. */
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  [contenteditable],
+  [data-selectable] {
+    user-select: text;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted-foreground) 35%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+    min-height: 32px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+}
+
+@layer components {
+  /* The wallpaper every glass surface sits on. Gradients only — an earlier
+     version blurred five circles here and cost 2.3M px of filter per frame. */
+  .app-wallpaper {
+    background-color: var(--wallpaper-c);
+    background-image:
+      radial-gradient(closest-side at 12% 8%, var(--bloom-warm), transparent 88%),
+      radial-gradient(closest-side at 82% 22%, var(--bloom-cool), transparent 88%),
+      radial-gradient(closest-side at 32% 78%, var(--bloom-warm), transparent 88%),
+      linear-gradient(
+        145deg,
+        var(--wallpaper-a) 0%,
+        var(--wallpaper-b) 52%,
+        var(--wallpaper-c) 100%
+      );
+    background-size:
+      70% 70%,
+      64% 64%,
+      52% 52%,
+      100% 100%;
+    background-repeat: no-repeat;
+  }
+
+  /* A large panel: translucent fill and a hairline rim, no filter. */
+  .glass-panel {
+    background-color: var(--material-regular);
+    box-shadow:
+      inset 0 0 0 0.5px var(--glass-border),
+      inset 0 1px 0 var(--glass-highlight);
+  }
+
+  /* Small floating chrome, where a real blur earns its cost. */
+  .glass-floating {
+    background-color: var(--material-thin);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    box-shadow:
+      inset 0 0 0 0.5px var(--glass-border),
+      0 12px 32px -12px var(--raised-shadow);
+  }
+
+  /* A row that reads as a solid object: lit along the top, shaded underneath. */
+  .raised-card {
+    background-image: linear-gradient(
+      to bottom,
+      var(--raised-top) 0%,
+      transparent 46%,
+      var(--raised-bottom) 100%
+    );
+    box-shadow:
+      inset 0 1px 0 var(--raised-edge),
+      0 1px 1.5px -0.5px var(--raised-shadow);
+  }
+
+  /* The travelling selection lens, as in the mobile nav bar. */
+  .selection-bead {
+    background-color: var(--selection-fill);
+    box-shadow: inset 0 0 0 0.5px var(--selection-rim);
+  }
+
+  .drag-region {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

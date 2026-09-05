@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import { useAuthStore } from '@/store/authStore'
+import { notify } from '@/store/notificationStore'
 import { useCallsStore } from '@/store/callsStore'
 import {
 	conversationsApi,
@@ -1015,6 +1016,24 @@ export const useChatStore = create<ChatStore>()(
 							})
 						}
 
+						// The poll runs every few seconds whether or not anything moved, and
+						// committing fresh object identities re-rendered the entire list —
+						// cards, shadows and all — on a timer. Commit only on a real change.
+						const signature = (rows: ChatSummary[]): string =>
+							rows
+								.map(
+									chat =>
+										`${chat.id}:${chat.title}:${chat.unreadCount}:${chat.lastMessageId ?? ''}:${chat.memberIds.length}`,
+								)
+								.join('|')
+
+						if (
+							newChatIds.length === 0 &&
+							signature(sortedChats) === signature(state.chats)
+						) {
+							return
+						}
+
 						set({
 							chats: sortedChats,
 							messagesByChat,
@@ -1469,6 +1488,69 @@ export const useChatStore = create<ChatStore>()(
 						if (changed) {
 							set({ messagesByChat })
 						}
+						return
+					}
+
+					// The server refusing something used to vanish silently; surface it so the
+					// state can be reconciled rather than drifting.
+					if (event === 'error' || event === 'rate_limited') {
+						const detailRaw = (payload as { detail?: unknown }).detail
+						const detail =
+							typeof detailRaw === 'string'
+								? detailRaw
+								: Array.isArray(detailRaw) && typeof detailRaw[0] === 'object'
+									? String((detailRaw[0] as { msg?: unknown }).msg ?? 'Request rejected')
+									: event === 'rate_limited'
+										? 'You are sending messages too quickly.'
+										: 'The server rejected that request.'
+						notify('error', event === 'rate_limited' ? 'Slow down' : 'Sync problem', detail)
+						get()
+							.syncConversations(true)
+							.catch(() => undefined)
+						return
+					}
+
+					// A message reaching another device is the same state change as a delivery
+					// receipt; the backend just announces it under its own name.
+					if (event === 'message_delivered' || event === 'message_retrying') {
+						const messageIdRaw = (payload as { message_id?: unknown }).message_id
+						const parsedId =
+							typeof messageIdRaw === 'number' || typeof messageIdRaw === 'string'
+								? parseNumericId(messageIdRaw)
+								: null
+						if (parsedId == null) {
+							return
+						}
+						const messageId = String(parsedId)
+						const nextState: ChatMessage['status'] =
+							event === 'message_delivered' ? 'delivered' : 'sending'
+						const messagesByChat: Record<string, ChatMessage[]> = {}
+						Object.entries(state.messagesByChat).forEach(([chatId, messages]) => {
+							messagesByChat[chatId] = messages.map(message =>
+								message.id === messageId ? { ...message, status: nextState } : message,
+							)
+						})
+						set({ messagesByChat })
+						return
+					}
+
+					// Membership changes arrive as the whole conversation, so the simplest
+					// correct response is to take the server's version of the list.
+					if (
+						event === 'conversation_members_added' ||
+						event === 'conversation_member_removed' ||
+						event === 'conversation_removed'
+					) {
+						get()
+							.syncConversations(true)
+							.catch(() => undefined)
+						return
+					}
+
+					if (event === 'message_pinned' || event === 'message_unpinned') {
+						get()
+							.refreshChats()
+							.catch(() => undefined)
 						return
 					}
 
