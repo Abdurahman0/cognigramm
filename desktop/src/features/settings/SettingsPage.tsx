@@ -20,6 +20,7 @@ import {
   initialsOf,
   toast,
 } from '@/components/ui'
+import { DeviceSessions } from '@/features/settings/DeviceSessions'
 import { API_BASE_URL, WS_BASE_URL } from '@/lib/config'
 import { isDesktopRuntime } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
@@ -217,12 +218,16 @@ export function SettingsPage() {
             </dl>
           </Section>
 
+          <Section title="Devices">
+            <DeviceSessions />
+          </Section>
+
           <Separator />
 
           <Button
             variant="ghost"
             className="text-destructive hover:bg-destructive/15"
-            onClick={signOut}
+            onClick={() => void signOut()}
           >
             <LogOut className="size-4" /> Sign out
           </Button>

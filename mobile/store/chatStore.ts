@@ -91,6 +91,8 @@ interface ChatStore extends PersistedFields {
 	messagesByChat: Record<string, ChatMessage[]>
 	loadingOlderByChat: Record<string, boolean>
 	loadedMessageLimitByChat: Record<string, number>
+	/** Per-conversation cursor into the server's change feed. */
+	changeCursorByChat: Record<string, number>
 	activeConversationId: string
 	websocketStatus: SocketStatus
 	appVisible: boolean
@@ -104,6 +106,10 @@ interface ChatStore extends PersistedFields {
 	setChatSearchQuery: (query: string) => void
 	setActiveDesktopChatId: (chatId: string) => void
 	setActiveConversationId: (chatId: string) => void
+	/** Replays the server's change feed for one conversation. */
+	recoverConversationChanges: (chatId: string) => Promise<void>
+	/** Sends an existing message into another conversation. */
+	forwardMessage: (message: ChatMessage, targetChatId: string) => void
 	setAppVisibility: (visible: boolean) => void
 	handleSocketEvent: (envelope: ApiSocketEnvelope) => void
 	appendSystemMessage: (payload: AppendSystemMessageInput) => void
@@ -316,6 +322,25 @@ const sortMessages = (messages: ChatMessage[]): ChatMessage[] =>
 		}
 		return a.id.localeCompare(b.id)
 	})
+
+/**
+ * After a reconnect, replay the change feed for the open conversation first and
+ * then for the rest, in order. Serial on purpose: a client coming back from a
+ * tunnel should not open thirty requests at once.
+ */
+const recoverAfterReconnect = (get: () => ChatStore): void => {
+	void (async () => {
+		const state = get()
+		const active = state.activeConversationId
+		const ids = state.chats.map(chat => chat.id)
+		const ordered = active ? [active, ...ids.filter(id => id !== active)] : ids
+		for (const chatId of ordered.slice(0, 30)) {
+			await get()
+				.recoverConversationChanges(chatId)
+				.catch(() => undefined)
+		}
+	})()
+}
 
 const withSession = (): { token: string; userId: string } => {
 	const session = useAuthStore.getState().session
@@ -720,6 +745,7 @@ export const useChatStore = create<ChatStore>()(
 				messagesByChat: {},
 				loadingOlderByChat: {},
 				loadedMessageLimitByChat: {},
+				changeCursorByChat: {},
 				activeConversationId: '',
 				websocketStatus: 'idle',
 				appVisible: true,
@@ -746,6 +772,7 @@ export const useChatStore = create<ChatStore>()(
 							messagesByChat: {},
 							loadingOlderByChat: {},
 							loadedMessageLimitByChat: {},
+							changeCursorByChat: {},
 							activeConversationId: '',
 						})
 						return
@@ -754,7 +781,7 @@ export const useChatStore = create<ChatStore>()(
 					const state = get()
 					if (
 						!state.initializing &&
-						state.currentToken === session.token &&
+						state.currentUserId === session.userId &&
 						state.users.length > 0
 					) {
 						if (
@@ -767,7 +794,13 @@ export const useChatStore = create<ChatStore>()(
 									useChatStore.getState().handleSocketEvent(envelope)
 									useCallsStore.getState().handleSocketEvent(envelope)
 								},
-								onStatusChange: status => set({ websocketStatus: status }),
+								onStatusChange: status => {
+									const previous = get().websocketStatus
+									set({ websocketStatus: status })
+									if (status === 'connected' && previous !== 'idle') {
+										recoverAfterReconnect(get)
+									}
+								},
 								getActiveConversationId: () =>
 									parseNumericId(useChatStore.getState().activeConversationId),
 							})
@@ -890,7 +923,13 @@ export const useChatStore = create<ChatStore>()(
 								useChatStore.getState().handleSocketEvent(envelope)
 								useCallsStore.getState().handleSocketEvent(envelope)
 							},
-							onStatusChange: status => set({ websocketStatus: status }),
+							onStatusChange: status => {
+								const previous = get().websocketStatus
+								set({ websocketStatus: status })
+								if (status === 'connected' && previous !== 'idle') {
+									recoverAfterReconnect(get)
+								}
+							},
 							getActiveConversationId: () =>
 								parseNumericId(useChatStore.getState().activeConversationId),
 						})
@@ -1048,6 +1087,110 @@ export const useChatStore = create<ChatStore>()(
 				setActiveFilter: filter => set({ activeFilter: filter }),
 				setChatSearchQuery: query => set({ chatSearchQuery: query }),
 				setActiveDesktopChatId: chatId => set({ activeDesktopChatId: chatId }),
+				/**
+				 * Recovery from the per-conversation change feed.
+				 *
+				 * Redis-delivered socket events can be missed — a dropped
+				 * connection, a worker restart, a phone that slept. The feed
+				 * replays creates, edits, deletes and pin changes since a stored
+				 * cursor, each entry carrying the message's *current* state, so
+				 * they apply as upserts and their order does not matter.
+				 */
+				/**
+				 * Forwarding sends the source message id and no attachments: the
+				 * server copies the stored attachment metadata itself, after
+				 * checking membership of the conversation it came from.
+				 */
+				forwardMessage: (message, targetChatId) => {
+					const conversationId = parseNumericId(targetChatId)
+					const sourceId = Number(message.id)
+					if (!conversationId || !Number.isFinite(sourceId)) {
+						return
+					}
+
+					realtimeSocketClient.send('send_message', {
+						conversation_id: conversationId,
+						content: message.body || null,
+						type: message.type,
+						client_message_id: createId('fwd'),
+						forwarded_from_message_id: sourceId,
+						attachments: [],
+					})
+				},
+				recoverConversationChanges: async chatId => {
+					const conversationId = parseNumericId(chatId)
+					if (!conversationId) {
+						return
+					}
+					const token =
+						get().currentToken || useAuthStore.getState().session?.token
+					if (!token) {
+						return
+					}
+
+					let cursor = get().changeCursorByChat[chatId] ?? 0
+
+					for (let page = 0; page < 20; page += 1) {
+						let response
+						try {
+							response = await conversationsApi.changes(
+								token,
+								conversationId,
+								cursor,
+								100,
+							)
+						} catch {
+							return
+						}
+
+						const items = Array.isArray(response?.items) ? response.items : []
+						for (const item of items) {
+							const apiMessage = item?.message
+							if (!apiMessage || typeof apiMessage.conversation_id !== 'number') {
+								continue
+							}
+
+							// The feed can reach further back than the loaded window.
+							// Splicing a months-old message above the newest page would
+							// read as a gap, so only what the client already knows, or
+							// what is at least as new as the oldest loaded message, is
+							// applied; the rest is left to normal history paging.
+							const loaded = get().messagesByChat[chatId] ?? []
+							const known = loaded.some(
+								message => message.id === String(apiMessage.id),
+							)
+							const oldest = loaded[0]
+							if (!known && oldest && apiMessage.created_at < oldest.createdAt) {
+								continue
+							}
+
+							set(
+								applyApiMessage(get(), apiMessage, {
+									incrementUnread: false,
+								}),
+							)
+						}
+
+						// Persist the cursor only after a whole page is applied: a
+						// crash mid-page must replay it rather than skip it.
+						if (
+							typeof response?.next_cursor === 'number' &&
+							response.next_cursor > cursor
+						) {
+							cursor = response.next_cursor
+							set(state => ({
+								changeCursorByChat: {
+									...state.changeCursorByChat,
+									[chatId]: cursor,
+								},
+							}))
+						}
+
+						if (!response?.has_more) {
+							break
+						}
+					}
+				},
 				setActiveConversationId: chatId => {
 					const normalizedChatId = chatId || ''
 					const state = get()
@@ -1072,6 +1215,11 @@ export const useChatStore = create<ChatStore>()(
 					if (normalizedChatId) {
 						get()
 							.markConversationRead(normalizedChatId)
+							.catch(() => undefined)
+						// Anything that changed while this chat was closed is only in
+						// the feed: the socket delivers edits and pins to open rooms.
+						get()
+							.recoverConversationChanges(normalizedChatId)
 							.catch(() => undefined)
 						const activeChat = state.chats.find(
 							chat => chat.id === normalizedChatId,
@@ -2208,6 +2356,7 @@ export const useChatStore = create<ChatStore>()(
 			storage: createJSONStorage(() => AsyncStorage),
 			partialize: state => ({
 				unreadByChatId: state.unreadByChatId,
+				changeCursorByChat: state.changeCursorByChat,
 				lastReadMessageIdByChatId: state.lastReadMessageIdByChatId,
 				activeFilter: state.activeFilter,
 				chatSearchQuery: state.chatSearchQuery,

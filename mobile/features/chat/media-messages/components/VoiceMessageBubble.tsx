@@ -3,6 +3,7 @@ import { Audio } from "expo-av";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useMediaUri } from "@/hooks/useMediaUri";
 import type { ChatMessage } from "@/types";
 
 interface VoiceMessageBubbleProps {
@@ -38,7 +39,10 @@ export function VoiceMessageBubble({
   accentColor,
   onAccentColor,
 }: VoiceMessageBubbleProps): JSX.Element {
-  const attachmentUrl = message.attachment?.publicUrl ?? message.attachment?.uri ?? null;
+  // Leased rather than read off the message: a signed S3 URL dies in about
+  // fifteen minutes, and a chat left open outlives that easily.
+  const { uri: leasedUrl, retry: retryAttachment } = useMediaUri(message.attachment);
+  const attachmentUrl = leasedUrl ?? null;
   const metadata = (message.attachment?.metadataJson ?? {}) as Record<string, unknown>;
   const metadataDuration = isFiniteNumber(metadata.duration_ms) ? metadata.duration_ms : undefined;
   const metadataWaveform = Array.isArray(metadata.waveform)
@@ -117,11 +121,15 @@ export function VoiceMessageBubble({
         await sound.playAsync();
       }
     } catch (error) {
+      // The usual cause is an expired signature rather than a broken file, so
+      // re-sign once and let the next press play it.
+      retryAttachment();
+      await cleanupSound().catch(() => undefined);
       setPlaybackError(error instanceof Error ? error.message : "Playback failed.");
     } finally {
       setIsLoading(false);
     }
-  }, [attachmentUrl]);
+  }, [attachmentUrl, cleanupSound, retryAttachment]);
 
   const bars = waveform.slice(0, BAR_COUNT);
 

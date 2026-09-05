@@ -14,6 +14,7 @@ import { GlassBackdrop, NotificationHost } from "@/components/ui";
 import { IncomingCallPrompt } from "@/features/calls/components/IncomingCallPrompt";
 import { useCallTones } from "@/features/calls/hooks/useCallTones";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { scheduleProactiveRefresh } from "@/services/api/session";
 import { setUnauthorizedHandler } from "@/services/api/unauthorizedHandler";
 import { useAuthStore, useCallsStore, useChatStore, useSettingsStore } from "@/store";
 import { injectWebThemeStyles } from "@/theme/webStyles";
@@ -50,6 +51,7 @@ export default function RootLayout(): JSX.Element {
   const router = useRouter();
   const authHydrated = useAuthStore((state) => state.hydrated);
   const session = useAuthStore((state) => state.session);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
   const chatHydrated = useChatStore((state) => state.hydrated);
   const initializeChats = useChatStore((state) => state.initializeForSession);
   const initializeCalls = useCallsStore((state) => state.initializeForSession);
@@ -89,19 +91,39 @@ export default function RootLayout(): JSX.Element {
     }
   }, [authHydrated, chatHydrated, settingsHydrated]);
 
+  // Startup order: exchange the stored refresh token for an access token
+  // before anything asks for data or opens a socket. An access token does not
+  // survive a restart, so without this every launch would look signed out.
+  useEffect(() => {
+    if (!authHydrated) {
+      return;
+    }
+    restoreSession().catch(() => undefined);
+  }, [authHydrated, restoreSession]);
+
+  // Keep the token ahead of its 15-minute expiry while the app is open.
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    return scheduleProactiveRefresh();
+  }, [session?.userId]);
+
+  // Keyed on the user, not the token: the token rotates every quarter of an
+  // hour, and re-initialising the whole chat store that often would be absurd.
   useEffect(() => {
     if (!authHydrated || !chatHydrated) {
       return;
     }
     initializeChats().catch(() => undefined);
-  }, [authHydrated, chatHydrated, initializeChats, session?.token]);
+  }, [authHydrated, chatHydrated, initializeChats, session?.userId]);
 
   useEffect(() => {
     if (!authHydrated) {
       return;
     }
     initializeCalls().catch(() => undefined);
-  }, [authHydrated, initializeCalls, session?.token]);
+  }, [authHydrated, initializeCalls, session?.userId]);
 
   const navigationTheme = createNavigationTheme(
     theme.mode === "dark",

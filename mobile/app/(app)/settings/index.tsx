@@ -5,6 +5,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import { AppButton, SectionHeader, ToggleItem } from "@/components/common";
 import { DetailScreenShell } from "@/components/layout";
 import { AppText, Chip, IconButton, ListRow, ListSection, PresenceDot } from "@/components/ui";
+import { DeviceSessions } from "@/features/settings/components/DeviceSessions";
 import { useAppTheme } from "@/hooks/useAppTheme";
 import { useWebEscape } from "@/hooks/useWebEscape";
 import { useAuthStore } from "@/store/authStore";
@@ -81,6 +82,8 @@ export default function SettingsScreen(): JSX.Element {
             }
           />
         </ListSection>
+
+        <DeviceSessions onSignedOut={() => router.replace("/(auth)/login")} />
 
         <View style={styles.signOutRow}>
           <AppButton

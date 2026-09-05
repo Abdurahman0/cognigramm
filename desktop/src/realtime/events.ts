@@ -29,11 +29,34 @@ export interface ConnectedPayload {
   rate_limit_per_second: number
 }
 
+/**
+ * Delivery updates.
+ *
+ * Observed on the wire as `{message_id, state, updated_at}` — no
+ * conversation_id, and the field is `state`, not `delivery_state`. The
+ * documented spelling is accepted too, since `message_delivered` and
+ * `message_read` are emitted by a different code path.
+ */
 export interface DeliveryStatePayload {
   message_id: number
-  conversation_id: number
-  delivery_state: ApiDeliveryState
+  conversation_id?: number
+  state?: ApiDeliveryState
+  delivery_state?: ApiDeliveryState
+  updated_at?: string
   user_id?: number
+}
+
+/** `message_queued`: the broker accepted it; nothing is persisted yet. */
+export interface QueuedPayload {
+  client_message_id: string
+  conversation_id: number
+}
+
+/** `message_persisted_ack`: binds a client id to the id the database assigned. */
+export interface PersistedAckPayload {
+  client_message_id: string
+  conversation_id: number
+  message_id: number
 }
 
 export interface TypingPayload {
@@ -84,9 +107,9 @@ export interface ErrorPayload {
  */
 export interface ServerEventMap {
   connected: ConnectedPayload
-  message_queued: ApiMessage
+  message_queued: QueuedPayload
   message_persisted: ApiMessage
-  message_persisted_ack: ApiMessage
+  message_persisted_ack: PersistedAckPayload
   message_retrying: { client_message_id: string; attempt: number }
   message_failed: { client_message_id: string; detail?: string }
   message_delivered: DeliveryStatePayload
@@ -97,6 +120,8 @@ export interface ServerEventMap {
   message_pinned: ApiMessage
   message_unpinned: ApiMessage
   missed_messages: { conversation_id: number; messages: ApiMessage[] }
+  /** Sent to every member the moment a conversation is created. */
+  conversation_created: ApiConversation
   conversation_members_added: ApiConversation
   conversation_member_removed: { conversation: ApiConversation; removed_user_id: number }
   conversation_removed: { conversation_id: number }

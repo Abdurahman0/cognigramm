@@ -30,7 +30,12 @@ export interface Attachment {
   mimeType: string
   sizeBytes: number
   sizeLabel: string
-  url: string | null
+  /**
+   * A signed GET URL that expires in about 15 minutes. It is a lease, not an
+   * identity — persist `bucket`/`objectKey` and re-sign through
+   * `GET /files/access` when this runs out.
+   */
+  signedUrl: string | null
   bucket: string
   objectKey: string
   metadata: Record<string, unknown> | null
@@ -47,6 +52,8 @@ export interface Message {
   delivery: DeliveryState
   attachments: Attachment[]
   replyToMessageId: number | null
+  /** Set when this message was forwarded; the server copies the attachments. */
+  forwardedFromMessageId: number | null
   isPinned: boolean
   isDeleted: boolean
   createdAt: string

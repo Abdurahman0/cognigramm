@@ -299,7 +299,47 @@ export const handleMockRequest = ({ method, path, query, body }: MockRequest): u
       (user) => user.email.toLowerCase() === identifier || user.username.toLowerCase() === identifier
     );
     currentUserId = known?.id ?? 1;
-    return { access_token: `mock-token-${currentUserId}`, token_type: "bearer" };
+    // Shaped like the real response, so the session layer stores a refresh
+    // token and the preview survives a reload the same way the app does.
+    return {
+      access_token: `mock-token-${currentUserId}`,
+      token_type: "bearer",
+      refresh_token: `mock-refresh-${currentUserId}`,
+      expires_in: 900,
+      session_id: `mock-session-${currentUserId}`
+    };
+  }
+
+  if (method === "POST" && path === "/auth/refresh") {
+    return {
+      access_token: `mock-token-${currentUserId}`,
+      token_type: "bearer",
+      refresh_token: `mock-refresh-${currentUserId}`,
+      expires_in: 900,
+      session_id: `mock-session-${currentUserId}`
+    };
+  }
+
+  if (method === "GET" && path === "/auth/sessions") {
+    return [
+      {
+        id: `mock-session-${currentUserId}`,
+        device_name: "This device",
+        created_at: new Date(Date.now() - 3_600_000).toISOString(),
+        last_used_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 180 * 86_400_000).toISOString(),
+        is_current: true
+      }
+    ];
+  }
+
+  if (method === "POST" && (path === "/auth/logout" || path === "/auth/logout-all")) {
+    return { status: "ok" };
+  }
+
+  if (method === "GET" && path === "/files/access") {
+    // The preview's media is already a plain URL; hand it back unchanged.
+    return { url: String(query.object_key ?? ""), expires_in: 900 };
   }
 
   if (method === "POST" && path === "/auth/register") {
@@ -374,6 +414,12 @@ export const handleMockRequest = ({ method, path, query, body }: MockRequest): u
   hit = match(/^\/conversations\/(\d+)\/messages$/);
   if (hit && method === "GET") {
     return messagesByConversation[Number(hit[1])] ?? [];
+  }
+
+  hit = match(/^\/conversations\/(\d+)\/changes$/);
+  if (hit) {
+    // Nothing is ever missed in the preview: every event is generated locally.
+    return { items: [], next_cursor: 0, has_more: false };
   }
 
   hit = match(/^\/conversations\/(\d+)\/messages\/latest$/);

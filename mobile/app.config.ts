@@ -41,6 +41,8 @@ const config: ExpoConfig = {
 	plugins: [
 		'expo-router',
 		'expo-system-ui',
+		// Keychain / Keystore-backed storage for the refresh token.
+		'expo-secure-store',
 		[
 			'expo-build-properties',
 			{

@@ -1,4 +1,4 @@
-import { Copy, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2 } from 'lucide-react'
+import { Copy, CornerUpRight, MoreVertical, Pencil, Pin, PinOff, Reply, Trash2 } from 'lucide-react'
 import { memo } from 'react'
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import { AttachmentView } from '@/features/chat/AttachmentView'
 import { DeliveryTicks } from '@/features/chat/DeliveryTicks'
+import { VoiceMessage } from '@/features/chat/VoiceMessage'
 import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { Message, User } from '@/types'
@@ -31,6 +32,7 @@ interface MessageBubbleProps {
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
   onDelete: (message: Message) => void
+  onForward: (message: Message) => void
   onTogglePin: (message: Message) => void
   onJumpTo: (messageId: number) => void
 }
@@ -45,6 +47,7 @@ function MessageBubbleBase({
   onReply,
   onEdit,
   onDelete,
+  onForward,
   onTogglePin,
   onJumpTo,
 }: MessageBubbleProps) {
@@ -57,6 +60,13 @@ function MessageBubbleBase({
       </div>
     )
   }
+
+  const mediaOnly =
+    message.attachments.length > 0 &&
+    !message.body &&
+    !message.forwardedFromMessageId &&
+    message.kind !== 'voice' &&
+    !(showAuthor && !isMine && isGroupStart)
 
   const copy = () => {
     void navigator.clipboard.writeText(message.body)
@@ -87,7 +97,10 @@ function MessageBubbleBase({
 
       <div
         className={cn(
-          'relative max-w-[min(68ch,72%)] rounded-2xl px-3 py-2 text-[14px] leading-snug',
+          'relative max-w-[min(68ch,72%)] rounded-2xl text-[14px] leading-snug',
+          // A picture with no caption fills its bubble; a wide blue frame
+          // around a photo reads as a mistake rather than a design.
+          mediaOnly ? 'p-1' : 'px-3 py-2',
           isMine
             ? 'bg-bubble-mine text-bubble-mine-foreground'
             : 'bg-bubble-other text-bubble-other-foreground',
@@ -117,11 +130,33 @@ function MessageBubbleBase({
           </button>
         ) : null}
 
+        {message.forwardedFromMessageId ? (
+          <p className="mb-1 flex items-center gap-1 text-[11px] font-medium opacity-75">
+            <CornerUpRight className="size-3" /> Forwarded
+          </p>
+        ) : null}
+
         {message.attachments.length > 0 ? (
-          <div className={cn('space-y-1.5', message.body && 'mb-1.5')}>
-            {message.attachments.map((attachment) => (
-              <AttachmentView key={`${attachment.id}-${attachment.name}`} attachment={attachment} />
-            ))}
+          <div
+            className={cn(
+              'space-y-1.5',
+              message.body && 'mb-1.5',
+              mediaOnly && 'overflow-hidden rounded-xl',
+            )}
+          >
+            {message.attachments.map((attachment) => {
+              // Keyed by object key, not by attachment id: the id changes from
+              // a placeholder to the real one when the server echoes the
+              // message, and a changing key would remount the player and stop
+              // a voice message mid-playback.
+              const key = attachment.objectKey || `${attachment.id}-${attachment.name}`
+              // A voice message is a player, not a file row.
+              return message.kind === 'voice' || attachment.mimeType.startsWith('audio/') ? (
+                <VoiceMessage key={key} attachment={attachment} mine={isMine} />
+              ) : (
+                <AttachmentView key={key} attachment={attachment} />
+              )
+            })}
           </div>
         ) : null}
 
@@ -135,8 +170,12 @@ function MessageBubbleBase({
 
         <div
           className={cn(
-            'mt-0.5 flex items-center justify-end gap-1 text-[10px]',
-            isMine ? 'text-white/70' : 'text-muted-foreground',
+            'flex items-center justify-end gap-1 text-[10px]',
+            // Over an image the timestamp needs its own backing to stay legible.
+            mediaOnly
+              ? 'absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 text-white'
+              : 'mt-0.5',
+            !mediaOnly && (isMine ? 'text-white/70' : 'text-muted-foreground'),
           )}
         >
           {message.isPinned ? <Pin className="size-3" aria-label="Pinned" /> : null}
@@ -171,6 +210,9 @@ function MessageBubbleBase({
                   <Copy /> Copy text
                 </DropdownMenuItem>
               ) : null}
+              <DropdownMenuItem onSelect={() => onForward(message)}>
+                <CornerUpRight /> Forward
+              </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => onTogglePin(message)}>
                 {message.isPinned ? <PinOff /> : <Pin />}
                 {message.isPinned ? 'Unpin' : 'Pin'}
@@ -213,6 +255,7 @@ export const MessageBubble = memo(MessageBubbleBase, (previous, next) => {
     a.pending === b.pending &&
     a.error === b.error &&
     a.attachments.length === b.attachments.length &&
+    a.forwardedFromMessageId === b.forwardedFromMessageId &&
     previous.isGroupStart === next.isGroupStart &&
     previous.showAuthor === next.showAuthor &&
     previous.sender === next.sender &&

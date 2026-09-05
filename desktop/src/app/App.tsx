@@ -12,6 +12,7 @@ import { useSession } from '@/hooks/use-session'
 import { useThemeEffect } from '@/hooks/use-theme'
 import { useOnlinePresence } from '@/hooks/use-users'
 import { useAuthStore } from '@/stores/auth'
+import { useEffect } from 'react'
 
 function Splash() {
   return (
@@ -23,16 +24,24 @@ function Splash() {
 
 export function App() {
   const status = useAuthStore((state) => state.status)
-  const token = useAuthStore((state) => state.token)
+  const bootstrap = useAuthStore((state) => state.bootstrap)
+  const isAuthenticated = status === 'authenticated'
 
   useThemeEffect()
   useSession()
-  useOnlinePresence(Boolean(token))
+  useOnlinePresence(isAuthenticated)
 
-  // `unknown` only lasts until the persisted store rehydrates; showing the
-  // login form during it would flash for anyone already signed in.
+  // Startup order matters: refresh the token first, then read the profile,
+  // then let the socket open. Doing it the other way round opens a socket with
+  // an access token that expired while the app was closed.
+  useEffect(() => {
+    void bootstrap()
+  }, [bootstrap])
+
+  // `unknown` lasts until that first refresh settles; showing the login form
+  // during it would flash for anyone already signed in.
   if (status === 'unknown') return <Splash />
-  if (!token) return <AuthScreen />
+  if (!isAuthenticated) return <AuthScreen />
 
   return (
     <Router>

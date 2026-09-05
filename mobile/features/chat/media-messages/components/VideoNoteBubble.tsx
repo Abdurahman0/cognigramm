@@ -3,6 +3,7 @@ import { ResizeMode, Video, type AVPlaybackStatus } from "expo-av";
 import { useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { useMediaUri } from "@/hooks/useMediaUri";
 import type { ChatMessage } from "@/types";
 
 interface VideoNoteBubbleProps {
@@ -30,7 +31,8 @@ export function VideoNoteBubble({
   accentColor
 }: VideoNoteBubbleProps): JSX.Element {
   const metadata = (message.attachment?.metadataJson ?? {}) as Record<string, unknown>;
-  const attachmentUrl = message.attachment?.publicUrl ?? message.attachment?.uri ?? null;
+  const { uri: leasedUrl, retry: retryAttachment } = useMediaUri(message.attachment);
+  const attachmentUrl = leasedUrl ?? null;
   const posterUrl = typeof metadata.thumbnail_url === "string" ? metadata.thumbnail_url : undefined;
   const metadataDuration = isFiniteNumber(metadata.duration_ms) ? metadata.duration_ms : 0;
   const videoRef = useRef<Video | null>(null);
@@ -103,6 +105,8 @@ export function VideoNoteBubble({
           shouldPlay={false}
           isLooping={false}
           onPlaybackStatusUpdate={onPlaybackStatusUpdate}
+          // A signed URL that expired while the chat was open reports here.
+          onError={retryAttachment}
           posterSource={posterUrl ? { uri: posterUrl } : undefined}
           usePoster={Boolean(posterUrl)}
         />

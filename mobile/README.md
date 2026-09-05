@@ -20,11 +20,48 @@ domain, `wss://messanger.cognilabs.org/ws/chat?token=<jwt>`. These are the defau
 `services/api/config.ts`; `EXPO_PUBLIC_API_BASE_URL` / `EXPO_PUBLIC_WS_BASE_URL` override
 them. No localhost anywhere in the client.
 
-The REST surface in `services/api/index.ts` covers all 27 paths the backend publishes,
-including pin/unpin, the pinned list, message search, delivery receipts, per-conversation
-typing, `PATCH /users/me/status` and `/health`. Attachments go to `/files/upload-local` as
-multipart with the field named `file` — `/files/presign` answers 503 in this deployment,
-which is expected.
+The REST surface in `services/api/index.ts` covers every path the backend publishes,
+including sessions, the change feed, pin/unpin, the pinned list, message search, delivery
+receipts, per-conversation typing, `PATCH /users/me/status` and `/health`. Attachments go
+to `/files/upload` as multipart with the field named `file`.
+
+### Sessions and tokens
+
+An access token lives 15 minutes; a rotating refresh token extends a device session for up
+to 180 days. `services/api/session.ts` owns that lifecycle, and three rules from the
+backend contract shape it:
+
+- **One refresh at a time.** Two concurrent refreshes are read by the server as token
+  reuse and revoke the whole session — verified against production.
+- **A refresh token is single-use.** It is never retried, not even after a lost response,
+  and the rotated replacement is stored before the new access token is released.
+- **Only a definitive 401 signs the user out.** Network errors, 429 and 5xx leave the
+  session intact; a 403 is an origin misconfiguration, not a reason to loop.
+
+Startup order is refresh → `/users/me` → open socket, driven from `app/_layout.tsx`. The
+refresh token lives in the Keychain / Keystore through `expo-secure-store`, never in
+AsyncStorage; the access token is never persisted at all. Settings lists the account's
+signed-in devices and can revoke one or all of them, and a socket closed with code `4001`
+means this device was revoked — the app returns to sign-in instead of reconnecting.
+
+On web the cookie flow is used only when the page is same-site with the API, because a
+host-only cookie is not sent from any other origin; a cross-origin web build authenticates
+as a device instead, so its session still survives a reload.
+
+### Files
+
+Uploads return `bucket` + `object_key` plus a signed URL that expires in about 15 minutes.
+That URL is a lease, never an identity: `services/api/mediaUrls.ts` caches it and re-signs
+through `GET /files/access` when a player reports failure, which is what an image or voice
+message does after a chat has been open a while. A URL that still works is deliberately
+never swapped, because replacing the source restarts playback.
+
+### Recovery
+
+Redis can drop an event while the socket is down. `GET /conversations/{id}/changes?after_id=`
+replays creates, edits, deletes and pin changes since a stored cursor, and
+`recoverConversationChanges` in the chat store applies each entry as an upsert — on open,
+and for every conversation after a reconnect.
 
 **CORS gates the browser build.** The backend keeps an origin allowlist:
 `https://messanger.cognilabs.org` is accepted, anything else gets `400 Disallowed CORS

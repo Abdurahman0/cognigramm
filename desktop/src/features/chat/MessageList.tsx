@@ -26,6 +26,7 @@ interface MessageListProps {
   isLoadingMore: boolean
   onLoadOlder: () => void
   onEdit: (message: Message) => void
+  onForward: (message: Message) => void
 }
 
 export function MessageList({
@@ -37,6 +38,7 @@ export function MessageList({
   isLoadingMore,
   onLoadOlder,
   onEdit,
+  onForward,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -172,6 +174,7 @@ export function MessageList({
                     })
                   }
                   onEdit={onEdit}
+                  onForward={onForward}
                   onDelete={(target) => deleteMessage(target.id)}
                   onTogglePin={(target) => togglePin(target.id, target.isPinned)}
                   onJumpTo={jumpTo}

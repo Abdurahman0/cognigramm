@@ -1,4 +1,6 @@
 import { apiRequest } from "@/services/api/httpClient";
+import { CLIENT_TYPE } from "@/services/api/session";
+import { describeDevice } from "@/services/deviceName";
 import type {
   ApiCallsHistoryResponse,
   ApiCallSession,
@@ -39,6 +41,49 @@ interface RegisterPayload {
 interface LoginPayload {
   identifier: string;
   password: string;
+  /** Shown in the account's device list, so a row can be recognised there. */
+  device_name?: string;
+  client_type?: "mobile" | "web";
+}
+
+/** One row of `GET /auth/sessions`: a device that can refresh into this account. */
+export interface ApiDeviceSession {
+  id: string;
+  device_name: string;
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string;
+  is_current: boolean;
+}
+
+/** `GET /files/access` — a fresh signed GET URL for a stored object. */
+export interface ApiFileAccess {
+  url: string;
+  expires_in: number;
+}
+
+export type ApiChangeEvent =
+  | "message_created"
+  | "message_edited"
+  | "message_deleted"
+  | "message_pinned"
+  | "message_unpinned";
+
+/**
+ * One entry of the per-conversation change feed. `message` is the message's
+ * *current* state, not a snapshot of when the change happened, so entries
+ * apply as upserts and their order does not matter.
+ */
+export interface ApiChangeItem {
+  cursor: number;
+  event: ApiChangeEvent;
+  message: ApiMessage;
+}
+
+export interface ApiChangesPage {
+  items: ApiChangeItem[];
+  next_cursor: number;
+  has_more: boolean;
 }
 
 interface CreateConversationPayload {
@@ -59,14 +104,32 @@ export const authApi = {
   register(payload: RegisterPayload): Promise<ApiUser> {
     return apiRequest<ApiUser>("/auth/register", {
       method: "POST",
-      body: payload
+      body: payload,
+      anonymous: true
     });
   },
   login(payload: LoginPayload): Promise<ApiTokenResponse> {
     return apiRequest<ApiTokenResponse>("/auth/login", {
       method: "POST",
-      body: payload
+      body: { client_type: CLIENT_TYPE, device_name: describeDevice(), ...payload },
+      anonymous: true
     });
+  },
+  /** Device sessions for this account, newest activity first. */
+  sessions(): Promise<ApiDeviceSession[]> {
+    return apiRequest<ApiDeviceSession[]>("/auth/sessions");
+  },
+  revokeSession(sessionId: string): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>(`/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE"
+    });
+  },
+  /** Ends this device's session; any open socket closes with code 4001. */
+  logout(): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>("/auth/logout", { method: "POST" });
+  },
+  logoutAll(): Promise<{ status: string }> {
+    return apiRequest<{ status: string }>("/auth/logout-all", { method: "POST" });
   }
 };
 
@@ -147,6 +210,16 @@ export const conversationsApi = {
       method: "DELETE",
       token
     });
+  },
+  /**
+   * Everything that happened to this conversation's messages after `afterId`.
+   * This is the recovery path for events missed while the socket was down.
+   */
+  changes(token: string, conversationId: number, afterId = 0, limit = 100): Promise<ApiChangesPage> {
+    return apiRequest<ApiChangesPage>(`/conversations/${conversationId}/changes`, {
+      token,
+      query: { after_id: afterId, limit }
+    });
   }
 };
 
@@ -215,11 +288,22 @@ export const messagesApi = {
       body: payload
     });
   },
+  /**
+   * Multipart upload to S3 through the backend. The response's `public_url` is
+   * a signed URL that expires in about 15 minutes — persist `bucket` and
+   * `object_key`, and re-sign through `filesApi.access` when it runs out.
+   */
   uploadLocalAttachment(token: string, formData: FormData): Promise<ApiLocalUploadResponse> {
-    return apiRequest<ApiLocalUploadResponse>("/files/upload-local", {
+    return apiRequest<ApiLocalUploadResponse>("/files/upload", {
       method: "POST",
       token,
       body: formData
+    });
+  },
+  /** A fresh signed GET URL for an object whose previous one expired. */
+  fileAccess(objectKey: string): Promise<ApiFileAccess> {
+    return apiRequest<ApiFileAccess>("/files/access", {
+      query: { object_key: objectKey }
     });
   }
 };

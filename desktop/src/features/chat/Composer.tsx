@@ -1,9 +1,12 @@
-import { Paperclip, SendHorizontal, X } from 'lucide-react'
+import { Mic, Paperclip, SendHorizontal, Trash2, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import { Button, Spinner, Textarea, Tooltip } from '@/components/ui'
-import { useEditMessage, useSendAttachment, useSendMessage } from '@/hooks/use-messages'
+import { Button, Spinner, Textarea, Tooltip, toast } from '@/components/ui'
+import { MIN_DURATION_MS, useVoiceRecorder } from '@/features/chat/use-voice-recorder'
+import { useEditMessage, useSendFile, useSendMessage } from '@/hooks/use-messages'
 import { useTypingSignal } from '@/hooks/use-typing'
+import { formatDuration } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { useChatStore } from '@/stores/chat'
 import type { Message } from '@/types'
 
@@ -17,27 +20,42 @@ interface ComposerProps {
   onCancelEdit: () => void
 }
 
+/** The live meter drawn while recording, newest sample on the right. */
+function LevelMeter({ levels }: { levels: number[] }) {
+  return (
+    <div className="flex h-6 flex-1 items-center gap-[2px] overflow-hidden">
+      {levels.map((level, index) => (
+        <span
+          key={index}
+          className="bg-destructive w-[3px] shrink-0 rounded-full"
+          style={{ height: `${Math.max(10, Math.min(100, level * 160))}%` }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function Composer({ conversationId, editing, onCancelEdit }: ComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const draft = useChatStore((state) => state.draftByConversation[conversationId] ?? '')
   const setDraft = useChatStore((state) => state.setDraft)
   const replyTo = useChatStore((state) => state.replyTo)
   const setReplyTo = useChatStore((state) => state.setReplyTo)
 
-  const [value, setValue] = useState(draft)
+  const [value, setValue] = useState('')
   const sendMessage = useSendMessage(conversationId)
-  const sendAttachment = useSendAttachment(conversationId)
+  const sendFile = useSendFile(conversationId)
   const editMessage = useEditMessage()
   const { keystroke, stop } = useTypingSignal(conversationId)
+  const recorder = useVoiceRecorder()
 
   // Switching conversations swaps in that chat's draft.
   useEffect(() => {
     setValue(useChatStore.getState().draftByConversation[conversationId] ?? '')
   }, [conversationId])
 
-  // Entering edit mode loads the existing text and focuses the caret at its end.
+  // Entering edit mode loads the existing text and puts the caret at its end.
   useEffect(() => {
     if (!editing) return
     setValue(editing.body)
@@ -56,6 +74,10 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
     element.style.height = 'auto'
     element.style.height = `${Math.min(element.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`
   }, [value])
+
+  useEffect(() => {
+    if (recorder.error) toast.error('Cannot record', recorder.error)
+  }, [recorder.error])
 
   const activeReply = replyTo?.conversationId === conversationId ? replyTo : null
 
@@ -88,8 +110,68 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
     const file = Array.from(event.clipboardData.files)[0]
     if (!file) return
     event.preventDefault()
-    sendAttachment.mutate(file)
+    sendFile.mutate({ file })
   }
+
+  const finishRecording = async () => {
+    const recording = await recorder.finish()
+    if (!recording) {
+      toast.info('Too short', 'Hold the recording for at least a second.')
+      return
+    }
+    sendFile.mutate({
+      file: recording.file,
+      kind: 'voice',
+      // The server stores bytes and derives nothing, so the shape of the
+      // waveform and its length have to travel with the message.
+      metadata: {
+        duration_ms: recording.durationMs,
+        waveform: recording.waveform,
+        codec: recording.mimeType,
+      },
+    })
+  }
+
+  if (recorder.isRecording || recorder.state === 'processing') {
+    const tooShort = recorder.durationMs < MIN_DURATION_MS
+    return (
+      <div className="shrink-0 px-3 pb-3">
+        <div className="glass-floating flex items-center gap-3 rounded-2xl p-2.5">
+          <span className="bg-destructive size-2.5 shrink-0 animate-pulse rounded-full" />
+          <span className="shrink-0 text-[13px] font-medium tabular-nums">
+            {formatDuration(recorder.durationMs)}
+          </span>
+          <LevelMeter levels={recorder.levels} />
+          <Tooltip content="Discard">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Discard recording"
+              onClick={recorder.cancel}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Send voice message">
+            <Button
+              size="icon"
+              aria-label="Send voice message"
+              disabled={tooShort || recorder.state === 'processing'}
+              onClick={() => void finishRecording()}
+            >
+              {recorder.state === 'processing' ? (
+                <Spinner />
+              ) : (
+                <SendHorizontal className="size-4" />
+              )}
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
+    )
+  }
+
+  const hasText = value.trim().length > 0
 
   return (
     <div className="shrink-0 px-3 pb-3">
@@ -128,10 +210,10 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
             size="icon"
             variant="ghost"
             aria-label="Attach file"
-            disabled={sendAttachment.isPending}
+            disabled={sendFile.isPending}
             onClick={() => fileInputRef.current?.click()}
           >
-            {sendAttachment.isPending ? <Spinner /> : <Paperclip className="size-4" />}
+            {sendFile.isPending ? <Spinner /> : <Paperclip className="size-4" />}
           </Button>
         </Tooltip>
         <input
@@ -140,7 +222,7 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
           hidden
           onChange={(event) => {
             const file = event.target.files?.[0]
-            if (file) sendAttachment.mutate(file)
+            if (file) sendFile.mutate({ file })
             event.target.value = ''
           }}
         />
@@ -166,16 +248,32 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
           aria-label="Message"
         />
 
-        <Tooltip content={editing ? 'Save (Enter)' : 'Send (Enter)'}>
-          <Button
-            size="icon"
-            aria-label={editing ? 'Save message' : 'Send message'}
-            disabled={!value.trim()}
-            onClick={submit}
-          >
-            <SendHorizontal className="size-4" />
-          </Button>
-        </Tooltip>
+        {/* The send button turns into a microphone when there is nothing to
+            send, which is where a messenger user expects to find it. */}
+        {hasText || editing ? (
+          <Tooltip content={editing ? 'Save (Enter)' : 'Send (Enter)'}>
+            <Button
+              size="icon"
+              aria-label={editing ? 'Save message' : 'Send message'}
+              onClick={submit}
+            >
+              <SendHorizontal className="size-4" />
+            </Button>
+          </Tooltip>
+        ) : (
+          <Tooltip content="Record voice message">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Record voice message"
+              disabled={recorder.state === 'requesting'}
+              onClick={() => void recorder.start()}
+              className={cn(recorder.state === 'requesting' && 'opacity-60')}
+            >
+              {recorder.state === 'requesting' ? <Spinner /> : <Mic className="size-4" />}
+            </Button>
+          </Tooltip>
+        )}
       </div>
     </div>
   )

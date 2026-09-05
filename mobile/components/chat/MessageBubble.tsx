@@ -16,6 +16,7 @@ import {
 import { VideoNoteBubble } from "@/features/chat/media-messages/components/VideoNoteBubble";
 import { VoiceMessageBubble } from "@/features/chat/media-messages/components/VoiceMessageBubble";
 import { useAppTheme } from "@/hooks/useAppTheme";
+import { useMediaUri } from "@/hooks/useMediaUri";
 import type { ChatMessage } from "@/types";
 import { formatMessageDate } from "@/utils/date";
 
@@ -29,6 +30,7 @@ interface MessageBubbleProps {
   onOpenActions?: (event: GestureResponderEvent) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onForward?: () => void;
   onDismissActions?: () => void;
   showActionsTooltip?: boolean;
   canEdit?: boolean;
@@ -168,6 +170,7 @@ export function MessageBubble({
   onOpenActions,
   onEdit,
   onDelete,
+  onForward,
   onDismissActions,
   showActionsTooltip = false,
   canEdit = false,
@@ -186,7 +189,9 @@ export function MessageBubble({
     : theme.colors.messageOther;
   const textColor = isMine ? theme.colors.onAccent : theme.colors.textPrimary;
   const metaColor = isMine ? "rgba(255, 255, 255, 0.78)" : theme.colors.textMuted;
-  const attachmentUrl = message.attachment?.publicUrl ?? null;
+  // Signed S3 URLs expire in about 15 minutes, so the URL is leased rather
+  // than read straight off the message and re-signed when a load fails.
+  const { uri: attachmentUrl, retry: retryAttachment } = useMediaUri(message.attachment);
   const mimeType = (message.attachment?.mimeType ?? "").toLowerCase();
   const isImageAttachment = mimeType.startsWith("image/") || message.type === "image";
   const callSummary = message.type === "system" ? getCallSummaryPresentation(message.body) : null;
@@ -244,57 +249,9 @@ export function MessageBubble({
             isMine && !isVideoNote ? theme.elevation.soft : null
           ]}
         >
-          {senderLabel || showWebActionsButton ? (
+          {senderLabel ? (
             <View style={styles.topRow}>
-              {senderLabel ? (
-                <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderLabel}</Text>
-              ) : (
-                <View />
-              )}
-              {showWebActionsButton ? (
-                <Pressable
-                  onPress={onOpenActions}
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.actionsButton, pressed && styles.actionsButtonPressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open message actions"
-                >
-                  <Feather name="more-horizontal" size={14} color={metaColor} />
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-          {showWebActionsButton && showActionsTooltip && (canEdit || canDelete) ? (
-            <View
-              {...(Platform.OS === "web" ? { dataSet: { glass: "strong" } } : null)}
-              style={[
-                styles.tooltip,
-                { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glassStrong },
-                theme.elevation.panel
-              ]}
-            >
-              {canEdit ? (
-                <Pressable
-                  onPress={onEdit}
-                  style={({ pressed }) => [
-                    styles.tooltipAction,
-                    pressed && { backgroundColor: theme.colors.glassHover }
-                  ]}
-                >
-                  <Text style={[styles.tooltipActionText, { color: theme.colors.textPrimary }]}>Edit</Text>
-                </Pressable>
-              ) : null}
-              {canDelete ? (
-                <Pressable
-                  onPress={onDelete}
-                  style={({ pressed }) => [
-                    styles.tooltipAction,
-                    pressed && { backgroundColor: theme.colors.danger + "12" }
-                  ]}
-                >
-                  <Text style={[styles.tooltipActionText, { color: theme.colors.danger }]}>Delete</Text>
-                </Pressable>
-              ) : null}
+              <Text style={[styles.sender, { color: theme.colors.textMuted }]}>{senderLabel}</Text>
             </View>
           ) : null}
           {message.isDeleted ? (
@@ -367,7 +324,12 @@ export function MessageBubble({
           ) : isImageAttachment ? (
             attachmentUrl ? (
               <Pressable onPress={openImagePreview} style={styles.imageWrap}>
-                <Image source={{ uri: attachmentUrl }} style={styles.imagePreview} resizeMode="cover" />
+                <Image
+                  source={{ uri: attachmentUrl }}
+                  style={styles.imagePreview}
+                  resizeMode="cover"
+                  onError={retryAttachment}
+                />
               </Pressable>
             ) : (
               <View style={styles.voiceRow}>
@@ -426,6 +388,73 @@ export function MessageBubble({
             ) : null}
           </View>
         </Pressable>
+
+        {/* Sibling of the bubble, not a child: React Native Web hands a press to
+            the outermost Pressable, so an actions button nested inside the
+            bubble receives no press at all. */}
+        {showWebActionsButton ? (
+          <View style={styles.actionsAnchor} pointerEvents="box-none">
+            <Pressable
+              onPress={onOpenActions}
+              hitSlop={8}
+              onHoverIn={() => setHovered(true)}
+              onHoverOut={() => setHovered(false)}
+              style={({ pressed }) => [styles.actionsButton, pressed && styles.actionsButtonPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Open message actions"
+            >
+              <Feather name="more-horizontal" size={14} color={metaColor} />
+            </Pressable>
+
+            {showActionsTooltip && (canEdit || canDelete || onForward) ? (
+              <View
+                {...(Platform.OS === "web" ? { dataSet: { glass: "strong" } } : null)}
+                style={[
+                  styles.tooltip,
+                  // Opens inward from whichever edge the bubble sits against, so
+                  // it never hangs off the side of the window.
+                  isMine ? { right: 0 } : { left: 0 },
+                  { borderColor: theme.colors.glassBorder, backgroundColor: theme.colors.glassStrong },
+                  theme.elevation.panel
+                ]}
+              >
+                {onForward ? (
+                  <Pressable
+                    onPress={onForward}
+                    style={({ pressed }) => [
+                      styles.tooltipAction,
+                      pressed && { backgroundColor: theme.colors.glassHover }
+                    ]}
+                  >
+                    <Text style={[styles.tooltipActionText, { color: theme.colors.textPrimary }]}>Forward</Text>
+                  </Pressable>
+                ) : null}
+                {canEdit ? (
+                  <Pressable
+                    onPress={onEdit}
+                    style={({ pressed }) => [
+                      styles.tooltipAction,
+                      pressed && { backgroundColor: theme.colors.glassHover }
+                    ]}
+                  >
+                    <Text style={[styles.tooltipActionText, { color: theme.colors.textPrimary }]}>Edit</Text>
+                  </Pressable>
+                ) : null}
+                {canDelete ? (
+                  <Pressable
+                    onPress={onDelete}
+                    style={({ pressed }) => [
+                      styles.tooltipAction,
+                      pressed && { backgroundColor: theme.colors.danger + "12" }
+                    ]}
+                  >
+                    <Text style={[styles.tooltipActionText, { color: theme.colors.danger }]}>Delete</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
       </Animated.View>
 
       <Modal
@@ -437,7 +466,12 @@ export function MessageBubble({
         <Pressable style={styles.previewOverlay} onPress={() => setImagePreviewVisible(false)}>
           <View style={styles.previewContent}>
             {attachmentUrl ? (
-              <Image source={{ uri: attachmentUrl }} style={styles.previewImage} resizeMode="contain" />
+              <Image
+                source={{ uri: attachmentUrl }}
+                style={styles.previewImage}
+                resizeMode="contain"
+                onError={retryAttachment}
+              />
             ) : null}
             <Pressable style={styles.previewCloseButton} onPress={() => setImagePreviewVisible(false)}>
               <Feather name="x" size={18} color="#FFFFFF" />
@@ -484,6 +518,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     width: "100%"
   },
+  actionsAnchor: {
+    justifyContent: "flex-start",
+    paddingLeft: 4,
+    paddingTop: 2
+  },
   actionsButton: {
     alignItems: "center",
     borderRadius: 999,
@@ -498,11 +537,10 @@ const styles = StyleSheet.create({
   tooltip: {
     borderRadius: 10,
     borderWidth: 1,
-    minWidth: 110,
+    minWidth: 120,
     overflow: "hidden",
     position: "absolute",
-    right: 4,
-    top: 34,
+    top: 26,
     zIndex: 50
   },
   tooltipAction: {

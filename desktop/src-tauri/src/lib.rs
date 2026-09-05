@@ -1,3 +1,5 @@
+mod secrets;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -56,6 +58,12 @@ pub fn run() {
     }
 
     builder
+        .invoke_handler(tauri::generate_handler![
+            secrets::secret_set,
+            secrets::secret_get,
+            secrets::secret_delete,
+            secrets::device_name
+        ])
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())

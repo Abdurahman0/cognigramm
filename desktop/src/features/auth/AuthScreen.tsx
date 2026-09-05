@@ -1,14 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { Eye, EyeOff, LogIn, UserPlus } from 'lucide-react'
+import { Eye, EyeOff, LogIn, ShieldAlert, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { toUser } from '@/api/adapters'
 import { authApi, usersApi } from '@/api/endpoints'
-import { setAuthToken } from '@/api/client'
+import { adoptTokens, clearSession } from '@/api/session'
 import type { ApiError } from '@/api/client'
+import { describeDevice } from '@/lib/secure-store'
 import {
   Button,
   Input,
@@ -73,6 +74,7 @@ function PasswordField({
 
 export function AuthScreen() {
   const signIn = useAuthStore((state) => state.signIn)
+  const endedReason = useAuthStore((state) => state.endedReason)
   const [tab, setTab] = useState<'login' | 'register'>('login')
 
   const loginForm = useForm<LoginValues>({
@@ -87,19 +89,27 @@ export function AuthScreen() {
 
   const login = useMutation({
     mutationFn: async (values: LoginValues) => {
-      const { access_token } = await authApi.login(values)
-      // The token has to be live before /users/me is called, and the store is
-      // only updated once the profile confirms it.
-      setAuthToken(access_token)
+      const tokens = await authApi.login({
+        ...values,
+        // Named so the row is recognisable in the account's device list.
+        device_name: await describeDevice(),
+      })
+      // The access token has to be live before /users/me is called; the store
+      // is only updated once the profile confirms the session works.
+      await adoptTokens(tokens)
       const profile = await usersApi.me()
-      return { token: access_token, user: toUser(profile) }
+      return { tokens, user: toUser(profile) }
     },
-    onSuccess: ({ token, user }) => signIn(token, user),
+    onSuccess: ({ tokens, user }) => void signIn(tokens, user),
     onError: (error: ApiError) => {
-      setAuthToken(null)
+      void clearSession()
       toast.error(
         'Sign-in failed',
-        error.status === 401 ? 'Wrong username or password.' : error.message,
+        error.status === 401
+          ? 'Wrong username or password.'
+          : error.status === 403
+            ? 'This app origin is not allowed by the server.'
+            : error.message,
       )
     },
   })
@@ -107,20 +117,21 @@ export function AuthScreen() {
   const register = useMutation({
     mutationFn: async (values: RegisterValues) => {
       await authApi.register(values)
-      const { access_token } = await authApi.login({
+      const tokens = await authApi.login({
         identifier: values.username,
         password: values.password,
+        device_name: await describeDevice(),
       })
-      setAuthToken(access_token)
+      await adoptTokens(tokens)
       const profile = await usersApi.me()
-      return { token: access_token, user: toUser(profile) }
+      return { tokens, user: toUser(profile) }
     },
-    onSuccess: ({ token, user }) => {
+    onSuccess: ({ tokens, user }) => {
       toast.success('Account created', `Welcome, ${user.fullName}.`)
-      signIn(token, user)
+      void signIn(tokens, user)
     },
     onError: (error: ApiError) => {
-      setAuthToken(null)
+      void clearSession()
       toast.error('Registration failed', error.message)
     },
   })
@@ -134,6 +145,13 @@ export function AuthScreen() {
             {tab === 'login' ? 'Sign in to continue' : 'Create your workspace account'}
           </p>
         </div>
+
+        {endedReason ? (
+          <div className="bg-warning/12 text-warning mb-4 flex items-start gap-2 rounded-xl p-2.5 text-[13px]">
+            <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+            <span>{endedReason}</span>
+          </div>
+        ) : null}
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as 'login' | 'register')}>
           <TabsList className="mb-5 w-full">

@@ -4,27 +4,28 @@ import { useEffect } from 'react'
 import { toUser } from '@/api/adapters'
 import { usersApi } from '@/api/endpoints'
 import { queryKeys } from '@/api/query-keys'
+import { ApiError } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 
 /**
- * Confirms a restored token still works and refreshes the profile.
+ * Keeps the signed-in profile current.
  *
- * A persisted token is only a guess: it may have expired while the app was
- * closed. The 401 handler in the API client turns a rejection here into a
- * sign-out, which is what routes the window back to the login screen.
+ * Session restoration itself happens in `useAuthStore.bootstrap`, which
+ * refreshes the token before anything else runs; this query only re-reads the
+ * profile afterwards, so a name or avatar changed on another device shows up.
  */
 export function useSession() {
-  const token = useAuthStore((state) => state.token)
+  const isAuthenticated = useAuthStore((state) => state.status === 'authenticated')
   const setUser = useAuthStore((state) => state.setUser)
 
   const query = useQuery({
     queryKey: queryKeys.me,
     queryFn: () => usersApi.me(),
-    enabled: Boolean(token),
+    enabled: isAuthenticated,
     staleTime: 5 * 60_000,
+    // A 4xx here is answered by the auth layer, not by trying again.
     retry: (failureCount, error) =>
-      // Retrying a 401 would only repeat the sign-out.
-      failureCount < 2 && !(error as { status?: number }).status?.toString().startsWith('4'),
+      failureCount < 2 && !(error instanceof ApiError && error.status >= 400 && error.status < 500),
   })
 
   useEffect(() => {

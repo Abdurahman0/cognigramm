@@ -50,6 +50,7 @@ import { useAppTheme } from '@/hooks/useAppTheme'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { ApiRequestError } from '@/services/api/httpClient'
 import { useCallsStore } from '@/store/callsStore'
+import { ForwardSheet } from '@/features/chat/ForwardSheet'
 import { useChatStore } from '@/store/chatStore'
 import type { CallType, ChatMessage, ChatSummary } from '@/types'
 import { formatRelative } from '@/utils/date'
@@ -136,6 +137,7 @@ export function ConversationPanel({
 	const ignoreNextScrollEventRef = useRef(false)
 	const composerTranslateY = useRef(new Animated.Value(0)).current
 	const [selectedMessageId, setSelectedMessageId] = useState<string>('')
+	const [forwardingMessage, setForwardingMessage] = useState<ChatMessage | null>(null)
 	const [composerBottomInset, setComposerBottomInset] = useState(insets.bottom)
 	const [composerHeight, setComposerHeight] = useState(72)
 	const [headerHeight, setHeaderHeight] = useState(72)
@@ -244,6 +246,7 @@ export function ConversationPanel({
 		markConversationRead,
 		sendTypingEvent,
 		loadOlderMessages,
+		forwardMessage,
 	} = useChatStore(
 		useShallow(state => ({
 			chats: state.chats,
@@ -256,6 +259,7 @@ export function ConversationPanel({
 			markConversationRead: state.markConversationRead,
 			sendTypingEvent: state.sendTypingEvent,
 			loadOlderMessages: state.loadOlderMessages,
+			forwardMessage: state.forwardMessage,
 		})),
 	)
 
@@ -792,8 +796,13 @@ export function ConversationPanel({
 
 	const runMessageAction = (
 		message: ChatMessage,
-		action: 'edit' | 'delete',
+		action: 'edit' | 'delete' | 'forward',
 	) => {
+		if (action === 'forward') {
+			setForwardingMessage(message)
+			setSelectedMessageId('')
+			return
+		}
 		if (action === 'edit') {
 			if (!canEditMessage(message)) {
 				toast.info(
@@ -837,6 +846,9 @@ export function ConversationPanel({
 		const editAllowed = canEditMessage(message)
 		const deleteAllowed = canDeleteMessage(message)
 
+		options.push('Forward')
+		handlers.push(() => runMessageAction(message, 'forward'))
+
 		if (editAllowed) {
 			options.push('Edit')
 			handlers.push(() => runMessageAction(message, 'edit'))
@@ -874,6 +886,12 @@ export function ConversationPanel({
 				return {
 					text: option,
 					onPress: () => runMessageAction(message, 'edit'),
+				}
+			}
+			if (option === 'Forward') {
+				return {
+					text: option,
+					onPress: () => runMessageAction(message, 'forward'),
 				}
 			}
 			return { text: option, style: 'cancel' as const }
@@ -1308,13 +1326,11 @@ export function ConversationPanel({
 								isMine={item.senderId === currentUser.id}
 								showSender={showSender}
 								onLongPress={
-									Platform.OS === 'web' || !canDeleteMessage(item)
-										? undefined
-										: () => openMessageActions(item)
+									Platform.OS === 'web' ? undefined : () => openMessageActions(item)
 								}
-								onOpenActions={
-									canDeleteMessage(item) ? () => openMessageActions(item) : undefined
-								}
+								// Every message can at least be forwarded, so the menu is
+								// no longer gated on being able to delete this one.
+								onOpenActions={() => openMessageActions(item)}
 								showActionsTooltip={
 									Platform.OS === 'web' && selectedMessageId === item.id
 								}
@@ -1322,15 +1338,18 @@ export function ConversationPanel({
 								canDelete={canDeleteMessage(item)}
 								onEdit={() => runMessageAction(item, 'edit')}
 								onDelete={() => runMessageAction(item, 'delete')}
+								onForward={() => runMessageAction(item, 'forward')}
 								onDismissActions={closeMessageActions}
 							/>
 						</View>
 					)
 				}}
 				onContentSizeChange={() => {
-					if (selectedMessageId) {
-						setSelectedMessageId('')
-					}
+					// The open action menu is deliberately left alone here. React
+					// Native Web reports a content-size change on every list render,
+					// so clearing the selection at this point closed the menu in the
+					// same frame the button opened it — which made Edit, Delete and
+					// Forward unreachable on the web build. Scrolling still closes it.
 					if (isNearBottomRef.current) {
 						scrollToBottom(false, true)
 					}
@@ -1565,6 +1584,24 @@ export function ConversationPanel({
 					<TypingIndicator label={typingLabel} />
 				</Animated.View>
 			) : null}
+			<ForwardSheet
+				message={forwardingMessage}
+				chats={chats}
+				sourceChatId={chatId}
+				onCancel={() => setForwardingMessage(null)}
+				onSelect={targetChatId => {
+					if (!forwardingMessage) {
+						return
+					}
+					forwardMessage(forwardingMessage, targetChatId)
+					const destination = chats.find(item => item.id === targetChatId)
+					toast.success(
+						'Forwarded',
+						destination ? `Sent to ${destination.title}` : undefined,
+					)
+					setForwardingMessage(null)
+				}}
+			/>
 		</KeyboardAvoidingView>
 	)
 }

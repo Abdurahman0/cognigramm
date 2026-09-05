@@ -19,6 +19,48 @@ export type ApiCallState =
 export interface ApiTokenResponse {
   access_token: string
   token_type: string
+  /** Present for `client_type: "mobile"`; the web flow returns null and a cookie. */
+  refresh_token: string | null
+  /** Access-token lifetime in seconds; 900 at the time of writing. */
+  expires_in: number
+  /** The device session this token belongs to — not the presence session id. */
+  session_id: string | null
+}
+
+/** One row of `GET /auth/sessions`: a device that can refresh into this account. */
+export interface ApiDeviceSession {
+  id: string
+  device_name: string
+  created_at: string
+  last_used_at: string | null
+  expires_at: string
+  is_current: boolean
+}
+
+/** `GET /files/access` — a fresh signed GET URL for a stored object. */
+export interface ApiFileAccess {
+  url: string
+  expires_in: number
+}
+
+export type ApiChangeEvent =
+  'message_created' | 'message_edited' | 'message_deleted' | 'message_pinned' | 'message_unpinned'
+
+/**
+ * One entry of the per-conversation change feed. `message` is the message's
+ * *current* state, not a snapshot of the moment the change happened, so
+ * entries apply as upserts and order does not matter.
+ */
+export interface ApiChangeItem {
+  cursor: number
+  event: ApiChangeEvent
+  message: ApiMessage
+}
+
+export interface ApiChangesPage {
+  items: ApiChangeItem[]
+  next_cursor: number
+  has_more: boolean
 }
 
 export interface ApiUser {

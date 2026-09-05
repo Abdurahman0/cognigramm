@@ -5,12 +5,15 @@ import { useParams } from 'react-router-dom'
 import { ChatHeader } from '@/features/chat/ChatHeader'
 import { Composer } from '@/features/chat/Composer'
 import { ConversationDetails } from '@/features/chat/ConversationDetails'
+import { ForwardDialog } from '@/features/chat/ForwardDialog'
 import { MessageList } from '@/features/chat/MessageList'
 import { PinnedBar } from '@/features/chat/PinnedBar'
 import { SearchPanel } from '@/features/chat/SearchPanel'
+import { recoverConversation } from '@/api/change-feed'
 import { useConversation } from '@/hooks/use-conversations'
 import { useLoadOlderMessages, useMessages } from '@/hooks/use-messages'
 import { useDirectory } from '@/hooks/use-users'
+import { useQueryClient } from '@tanstack/react-query'
 import { realtime } from '@/realtime/socket'
 import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
@@ -35,6 +38,7 @@ export function ChatScreen() {
   const params = useParams<{ conversationId?: string }>()
   const conversationId = params.conversationId ? Number(params.conversationId) : null
 
+  const queryClient = useQueryClient()
   const conversation = useConversation(conversationId)
   const { byId } = useDirectory()
   const { data: messages, isPending } = useMessages(conversationId)
@@ -46,6 +50,7 @@ export function ChatScreen() {
 
   const [searchOpen, setSearchOpen] = useState(false)
   const [editing, setEditing] = useState<Message | null>(null)
+  const [forwarding, setForwarding] = useState<Message | null>(null)
 
   // Opening a chat joins its room, tells the server it is on screen, and
   // clears the badge. Closing it clears the active conversation so presence
@@ -62,10 +67,14 @@ export function ChatScreen() {
     realtime.joinConversation(conversationId)
     realtime.setActiveConversation(conversationId)
 
+    // Replay anything that changed while this conversation was closed — an
+    // edit, a delete, a pin — which the socket only delivers to open rooms.
+    void recoverConversation(queryClient, conversationId)
+
     return () => {
       realtime.setActiveConversation(null)
     }
-  }, [conversationId, setActiveConversation, clearUnread])
+  }, [conversationId, setActiveConversation, clearUnread, queryClient])
 
   // Switching chats must not carry an unfinished edit across.
   useEffect(() => {
@@ -103,6 +112,7 @@ export function ChatScreen() {
           isLoadingMore={isLoadingMore}
           onLoadOlder={loadOlder}
           onEdit={setEditing}
+          onForward={setForwarding}
         />
 
         <Composer
@@ -113,6 +123,7 @@ export function ChatScreen() {
       </div>
 
       {detailsOpen ? <ConversationDetails conversation={conversation} usersById={byId} /> : null}
+      <ForwardDialog message={forwarding} onClose={() => setForwarding(null)} />
     </div>
   )
 }

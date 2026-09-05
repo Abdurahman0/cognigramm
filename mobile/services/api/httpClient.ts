@@ -1,10 +1,19 @@
 import { API_BASE_URL, USE_MOCK_API } from "@/services/api/config";
 import { handleMockRequest, MockNotFoundError } from "@/services/api/mockBackend";
+import { ensureAccessToken, getAccessToken, refreshAfterUnauthorized } from "@/services/api/session";
 import { notifyUnauthorized } from "@/services/api/unauthorizedHandler";
 
 interface ApiRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+  /**
+   * Advisory only. Access tokens expire every 15 minutes, so a token captured
+   * by a caller is often already stale; the live one from the session module
+   * wins, and this is the fallback for the few calls made before a session
+   * exists.
+   */
   token?: string;
+  /** Skips the Authorization header entirely (login, register, refresh). */
+  anonymous?: boolean;
   query?: Record<string, string | number | boolean | null | undefined>;
   headers?: Record<string, string>;
   body?: unknown;
@@ -53,6 +62,12 @@ const extractErrorMessage = (status: number, payload: unknown): string => {
         return firstMessage;
       }
     }
+  }
+  if (status === 413) {
+    return "That file is too large (100 MB maximum)";
+  }
+  if (status === 502) {
+    return "Storage provider is unavailable, try again";
   }
   return `Request failed with status ${status}`;
 };
@@ -111,27 +126,48 @@ export async function apiRequest<TResponse>(path: string, options: ApiRequestOpt
   const query = buildQueryString(options.query);
   const url = `${API_BASE_URL}${path.startsWith("/") ? path : `/${path}`}${query}`;
 
-  const headers: Record<string, string> = {
-    ...options.headers
-  };
-
-  if (options.token) {
-    headers.Authorization = `Bearer ${options.token}`;
-  }
-
   const isFormData = isFormDataBody(options.body);
   const hasJsonBody = options.body !== undefined && options.body !== null && !isFormData;
 
-  if (hasJsonBody && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
+  const send = async (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = {
+      ...options.headers
+    };
 
-  const response = await fetch(url, {
-    method: options.method ?? "GET",
-    headers,
-    body: hasJsonBody ? JSON.stringify(options.body) : isFormData ? (options.body as FormData) : undefined,
-    signal: options.signal
-  });
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Multipart must not carry an explicit Content-Type: only the client can
+    // generate the boundary that goes with the body it is about to write.
+    if (hasJsonBody && !headers["Content-Type"]) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    return fetch(url, {
+      method: options.method ?? "GET",
+      headers,
+      body: hasJsonBody ? JSON.stringify(options.body) : isFormData ? (options.body as FormData) : undefined,
+      signal: options.signal,
+      credentials: "include"
+    });
+  };
+
+  // A 15-minute access token expires often enough that refreshing up front is
+  // the common path rather than the exception.
+  const liveToken = options.anonymous ? null : (await ensureAccessToken()) ?? options.token ?? null;
+  let response = await send(liveToken);
+
+  // One retry, and only one: the refresh above already covered the predictable
+  // case, so a 401 here means the token died mid-flight or was revoked.
+  if (response.status === 401 && !options.anonymous) {
+    const renewed = await refreshAfterUnauthorized();
+    if (renewed) {
+      response = await send(renewed);
+    } else if (getAccessToken()) {
+      response = await send(getAccessToken());
+    }
+  }
 
   const payload = await parseResponsePayload(response);
 

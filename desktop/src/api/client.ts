@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@/lib/config'
-import { isDesktopRuntime } from '@/lib/tauri'
+import { getTransport } from '@/api/transport'
+import { ensureAccessToken, getAccessToken, refreshAfterUnauthorized } from '@/api/session'
 
 export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
@@ -24,54 +25,15 @@ export class ApiError extends Error {
     this.detail = detail
   }
 
-  /** A 401 means the token is gone or expired; anything else is worth retrying. */
-  get isAuthFailure(): boolean {
-    return this.status === 401
+  /** Status 0 is this client's marker for "the request never reached anyone". */
+  get isOffline(): boolean {
+    return this.status === 0
   }
-}
 
-// ---------------------------------------------------------------------------
-// Auth token
-//
-// Held in a module local rather than passed to every call: the store owns it,
-// pushes it here on login/restore, and clears it on logout. That keeps the
-// query layer free of token plumbing and gives the socket one place to read.
-// ---------------------------------------------------------------------------
-let authToken: string | null = null
-let onUnauthorized: (() => void) | null = null
-
-export const setAuthToken = (token: string | null): void => {
-  authToken = token
-}
-
-export const getAuthToken = (): string | null => authToken
-
-export const setUnauthorizedHandler = (handler: (() => void) | null): void => {
-  onUnauthorized = handler
-}
-
-// ---------------------------------------------------------------------------
-// Transport
-//
-// A Tauri webview's origin is `tauri://localhost`, which the backend's CORS
-// allowlist does not (and should not) contain. The HTTP plugin issues the
-// request from Rust instead, where CORS does not apply — so the desktop build
-// never depends on the server allowlisting a client origin. In a plain browser
-// (vite dev, `pnpm build` preview) this falls back to window.fetch.
-// ---------------------------------------------------------------------------
-type FetchFn = typeof globalThis.fetch
-
-let transportPromise: Promise<FetchFn> | null = null
-
-const resolveTransport = async (): Promise<FetchFn> => {
-  if (!isDesktopRuntime) return globalThis.fetch.bind(globalThis)
-  const plugin = await import('@tauri-apps/plugin-http')
-  return plugin.fetch as unknown as FetchFn
-}
-
-const getTransport = (): Promise<FetchFn> => {
-  transportPromise ??= resolveTransport()
-  return transportPromise
+  /** Worth retrying: the request itself was fine, the server or link was not. */
+  get isTransient(): boolean {
+    return this.status === 0 || this.status === 429 || this.status >= 500
+  }
 }
 
 const buildQueryString = (query: RequestOptions['query']): string => {
@@ -109,6 +71,8 @@ const extractMessage = (status: number, payload: unknown): string => {
     }
   }
   if (status === 0) return 'Network unreachable'
+  if (status === 413) return 'That file is too large (100 MB maximum)'
+  if (status === 502) return 'Storage provider is unavailable, try again'
   return `Request failed (${status})`
 }
 
@@ -122,21 +86,17 @@ export async function apiRequest<TResponse>(
   const fetchImpl = await getTransport()
   const url = `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}${buildQueryString(options.query)}`
 
-  const headers: Record<string, string> = { Accept: 'application/json', ...options.headers }
-
-  if (!options.anonymous && authToken) {
-    headers.Authorization = `Bearer ${authToken}`
-  }
-
   const formBody = isFormData(options.body)
   const jsonBody = options.body !== undefined && options.body !== null && !formBody
-  if (jsonBody && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json'
-  }
 
-  let response: Response
-  try {
-    response = await fetchImpl(url, {
+  const send = async (token: string | null): Promise<Response> => {
+    const headers: Record<string, string> = { Accept: 'application/json', ...options.headers }
+    if (token) headers.Authorization = `Bearer ${token}`
+    // Multipart must not carry an explicit Content-Type: only the client can
+    // generate the boundary that goes with the body it is about to write.
+    if (jsonBody && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
+
+    return fetchImpl(url, {
       method: options.method ?? 'GET',
       headers,
       body: jsonBody
@@ -145,16 +105,43 @@ export async function apiRequest<TResponse>(
           ? (options.body as FormData)
           : undefined,
       signal: options.signal,
+      credentials: 'include',
     })
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error
-    throw new ApiError(error instanceof Error ? error.message : 'Network request failed', 0, error)
+  }
+
+  const attempt = async (token: string | null): Promise<Response> => {
+    try {
+      return await send(token)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Network request failed',
+        0,
+        error,
+      )
+    }
+  }
+
+  // A 15-minute access token expires often enough that refreshing up front is
+  // the common path, not the exception.
+  const token = options.anonymous ? null : await ensureAccessToken()
+  let response = await attempt(token)
+
+  // One retry, and only one: the refresh above already handled the predictable
+  // case, so a 401 here means the token died mid-flight or was revoked.
+  if (response.status === 401 && !options.anonymous) {
+    const renewed = await refreshAfterUnauthorized()
+    if (renewed) {
+      response = await attempt(renewed)
+    } else if (getAccessToken()) {
+      // Refresh failed transiently and the old token is still all we have.
+      response = await attempt(getAccessToken())
+    }
   }
 
   const payload = await parsePayload(response)
 
   if (!response.ok) {
-    if (response.status === 401) onUnauthorized?.()
     throw new ApiError(extractMessage(response.status, payload), response.status, payload)
   }
 

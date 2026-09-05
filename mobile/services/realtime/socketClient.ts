@@ -1,4 +1,5 @@
 import { USE_MOCK_API, WS_BASE_URL } from "@/services/api/config";
+import { ensureAccessToken, notifySessionLost } from "@/services/api/session";
 import type { ApiSocketEnvelope } from "@/services/api";
 
 export type SocketStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
@@ -35,6 +36,9 @@ interface ConnectOptions {
 
 const RECONNECT_DELAYS_MS = [500, 1_000, 2_000, 4_000, 8_000, 12_000];
 
+/** Close code the server uses when the device session is revoked or expired. */
+const CLOSE_SESSION_REVOKED = 4001;
+
 class RealtimeSocketClient {
   private socket: WebSocket | null = null;
   private token: string | null = null;
@@ -58,7 +62,7 @@ class RealtimeSocketClient {
     this.onStatusChange = options.onStatusChange;
     this.getActiveConversationId = options.getActiveConversationId;
     this.manuallyClosed = false;
-    this.openSocket();
+    void this.openSocket();
   }
 
   disconnect(): void {
@@ -86,7 +90,7 @@ class RealtimeSocketClient {
     this.queue.push(encoded);
   }
 
-  private openSocket(): void {
+  private async openSocket(): Promise<void> {
     if (!this.token) {
       return;
     }
@@ -101,8 +105,14 @@ class RealtimeSocketClient {
       return;
     }
 
+    // The URL carries an access token, and those expire every 15 minutes. An
+    // established socket survives expiry; a new one opened with a stale token
+    // is rejected, so the current token is fetched at connect time.
+    const liveToken = (await ensureAccessToken()) ?? this.token;
+    this.token = liveToken;
+
     const base = WS_BASE_URL.replace(/\/+$/, "");
-    let url = `${base}/ws/chat?token=${encodeURIComponent(this.token)}`;
+    let url = `${base}/ws/chat?token=${encodeURIComponent(liveToken)}`;
     if (this.sessionId) {
       url += `&session_id=${encodeURIComponent(this.sessionId)}`;
     }
@@ -131,9 +141,19 @@ class RealtimeSocketClient {
       }
     };
 
-    this.socket.onclose = () => {
+    this.socket.onclose = (event: { code?: number; reason?: string }) => {
       this.clearPing();
       this.socket = null;
+
+      if (event?.code === CLOSE_SESSION_REVOKED) {
+        // Signed out on this device, or the session expired. Reconnecting
+        // would fail forever; the app has to go back to the sign-in screen.
+        this.manuallyClosed = true;
+        this.setStatus("disconnected");
+        notifySessionLost(event.reason || "Signed out on this device");
+        return;
+      }
+
       if (this.manuallyClosed) {
         this.setStatus("disconnected");
         return;
@@ -161,14 +181,17 @@ class RealtimeSocketClient {
 
   private scheduleReconnect(): void {
     this.clearReconnectTimer();
-    const delay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+    const base = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)] ?? 12_000;
+    // Full jitter: without it every client dropped by the same server blip
+    // comes back in the same millisecond.
+    const delay = base / 2 + Math.random() * (base / 2);
     this.reconnectAttempt += 1;
     this.setStatus("reconnecting");
     this.reconnectTimer = setTimeout(() => {
       if (this.manuallyClosed) {
         return;
       }
-      this.openSocket();
+      void this.openSocket();
     }, delay);
   }
 

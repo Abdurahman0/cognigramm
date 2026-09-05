@@ -25,6 +25,9 @@ export default function LoginScreen(): JSX.Element {
   const toast = useAppToast();
   const login = useAuthStore((state) => state.login);
   const status = useAuthStore((state) => state.status);
+  // Set when a session ended on its own — an expired refresh token, or this
+  // device revoked from somewhere else — so the screen can say why.
+  const endedReason = useAuthStore((state) => state.endedReason);
 
   const {
     control,
@@ -80,6 +83,14 @@ export default function LoginScreen(): JSX.Element {
             Access your internal messaging workspace.
           </AppText>
 
+          {endedReason ? (
+            <View style={[styles.notice, { backgroundColor: theme.colors.dangerMuted }]}>
+              <AppText variant="footnote" tone="secondary">
+                {endedReason}
+              </AppText>
+            </View>
+          ) : null}
+
           <View style={styles.form}>
             <Controller
               control={control}
@@ -131,6 +142,11 @@ export default function LoginScreen(): JSX.Element {
 }
 
 const styles = StyleSheet.create({
+  notice: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
   root: {
     backgroundColor: "transparent",
     flex: 1

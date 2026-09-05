@@ -1,5 +1,8 @@
 import { apiRequest } from '@/api/client'
 import type {
+  ApiChangesPage,
+  ApiDeviceSession,
+  ApiFileAccess,
   ApiCallSession,
   ApiCallsHistoryResponse,
   ApiConversation,
@@ -36,10 +39,21 @@ export interface ProfilePatch {
 }
 
 export const authApi = {
-  login(payload: { identifier: string; password: string }) {
+  /**
+   * `client_type: 'mobile'` is deliberate for a desktop app: it returns the
+   * refresh token in the body, which this client can store itself. The 'web'
+   * flow puts it in a host-only cookie, which only helps a browser served from
+   * an allowlisted origin — a Tauri webview is neither.
+   */
+  login(payload: {
+    identifier: string
+    password: string
+    device_name: string
+    client_type?: 'mobile' | 'web'
+  }) {
     return apiRequest<ApiTokenResponse>('/auth/login', {
       method: 'POST',
-      body: payload,
+      body: { client_type: 'mobile', ...payload },
       anonymous: true,
     })
   },
@@ -49,6 +63,22 @@ export const authApi = {
       body: payload,
       anonymous: true,
     })
+  },
+  /** Device sessions, newest activity first. */
+  sessions() {
+    return apiRequest<ApiDeviceSession[]>('/auth/sessions')
+  },
+  revokeSession(sessionId: string) {
+    return apiRequest<{ status: string }>(`/auth/sessions/${encodeURIComponent(sessionId)}`, {
+      method: 'DELETE',
+    })
+  },
+  /** Ends this device's session; open sockets close with code 4001. */
+  logout() {
+    return apiRequest<{ status: string }>('/auth/logout', { method: 'POST' })
+  },
+  logoutAll() {
+    return apiRequest<{ status: string }>('/auth/logout-all', { method: 'POST' })
   },
 }
 
@@ -98,6 +128,15 @@ export const conversationsApi = {
       method: 'DELETE',
     })
   },
+  /**
+   * Everything that happened to this conversation's messages after `afterId`.
+   * This is the recovery path for events missed while the socket was down.
+   */
+  changes(conversationId: number, afterId = 0, limit = 100) {
+    return apiRequest<ApiChangesPage>(`/conversations/${conversationId}/changes`, {
+      query: { after_id: afterId, limit },
+    })
+  },
 }
 
 export const messagesApi = {
@@ -139,19 +178,27 @@ export const messagesApi = {
   },
 }
 
+/** 1 byte to 100 MiB, enforced by the server; checked here to fail fast. */
+export const MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
 export const filesApi = {
-  /** Multipart upload that returns an attachment ready to attach to a message. */
-  uploadLocal(file: File, onProgress?: (fraction: number) => void) {
+  /**
+   * Multipart upload to S3 through the backend. Returns the stable identity of
+   * the object (`bucket` + `object_key`) plus a signed URL that expires in
+   * about 15 minutes — persist the former, never the latter.
+   */
+  upload(file: File, signal?: AbortSignal) {
     const form = new FormData()
     form.append('file', file)
-    onProgress?.(0)
-    return apiRequest<ApiLocalUploadResponse>('/files/upload-local', {
+    return apiRequest<ApiLocalUploadResponse>('/files/upload', {
       method: 'POST',
       body: form,
-    }).then((result) => {
-      onProgress?.(1)
-      return result
+      signal,
     })
+  },
+  /** A fresh signed GET URL for an object whose previous one expired. */
+  access(objectKey: string) {
+    return apiRequest<ApiFileAccess>('/files/access', { query: { object_key: objectKey } })
   },
   presign(payload: ApiPresignedUploadRequest) {
     return apiRequest<ApiPresignedUploadResponse>('/files/presign', {
