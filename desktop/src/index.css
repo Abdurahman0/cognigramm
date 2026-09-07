@@ -66,8 +66,12 @@
 
   --bubble-mine: #007aff;
   --bubble-mine-foreground: #ffffff;
-  --bubble-other: rgba(255, 255, 255, 0.62);
+  --bubble-other: rgba(255, 255, 255, 0.78);
   --bubble-other-foreground: #000000;
+  --bubble-other-rim: rgba(78, 66, 54, 0.1);
+
+  /* The transcript reads as a page laid on the wallpaper, not as a hole in it. */
+  --transcript: rgba(255, 255, 255, 0.26);
 }
 
 .dark {
@@ -118,8 +122,11 @@
 
   --bubble-mine: #0a84ff;
   --bubble-mine-foreground: #ffffff;
-  --bubble-other: rgba(154, 148, 140, 0.28);
+  --bubble-other: rgba(58, 55, 51, 0.92);
   --bubble-other-foreground: #ffffff;
+  --bubble-other-rim: rgba(255, 255, 255, 0.06);
+
+  --transcript: rgba(0, 0, 0, 0.22);
 }
 
 @theme inline {
@@ -157,6 +164,16 @@
   --color-bubble-mine-foreground: var(--bubble-mine-foreground);
   --color-bubble-other: var(--bubble-other);
   --color-bubble-other-foreground: var(--bubble-other-foreground);
+  --color-bubble-other-rim: var(--bubble-other-rim);
+  --color-transcript: var(--transcript);
+
+  /*
+   * Message bubbles get their own radius rather than borrowing the sheet's.
+   * At 26px a two-line message is most of the way to a pill, which reads as a
+   * toy; 14px keeps the corner soft and the shape a rectangle.
+   */
+  --radius-bubble: 14px;
+  --radius-bubble-tail: 5px;
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -289,15 +306,11 @@
     box-shadow: inset 0 0 0 0.5px var(--selection-rim);
   }
 
-  .drag-region {
-    -webkit-app-region: drag;
-    app-region: drag;
-  }
-
-  .no-drag {
-    -webkit-app-region: no-drag;
-    app-region: no-drag;
-  }
+  /*
+   * Window dragging is not done in CSS. `-webkit-app-region` is a Chromium
+   * extension that Tauri does not read and WKWebView does not implement;
+   * the title bar carries `data-tauri-drag-region` instead.
+   */
 }
 
 @media (prefers-reduced-motion: reduce) {

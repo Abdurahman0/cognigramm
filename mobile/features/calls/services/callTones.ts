@@ -1,3 +1,4 @@
+import { playCallSound, stopCallSound } from "@/features/calls/services/callSounds";
 /**
  * The sounds a call makes.
  *
@@ -151,12 +152,16 @@ class WebCallTones implements CallTones {
     };
   }
 
+  // The ringing sounds are audio files rather than synthesised patterns, so a
+  // call sounds the same here as it does on a phone.
   ringback(): void {
-    this.loop(RINGBACK);
+    this.stop();
+    void playCallSound("outgoing");
   }
 
   ringtone(): void {
-    this.loop(RINGTONE);
+    this.stop();
+    void playCallSound("incoming");
   }
 
   connected(): void {
@@ -177,6 +182,7 @@ class WebCallTones implements CallTones {
   }
 
   stop(): void {
+    void stopCallSound();
     this.teardown?.();
     this.teardown = null;
     this.active = null;

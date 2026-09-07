@@ -13,6 +13,7 @@ import type { DeliveryState } from '@/types'
 import { toast } from '@/components/ui/toast'
 import { initCallEngine } from '@/features/calls/call-engine'
 import { isWindowFocused, notify } from '@/lib/notify'
+import { playMessageTone } from '@/lib/sound'
 import { realtime } from '@/realtime/socket'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
@@ -101,7 +102,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
       if (!isMine && !isOpen) chat().bumpUnread(message.conversationId)
 
+      // Announce an arrival the reader is not already looking at: a system
+      // notification plus a short tone. Both are skipped for the open, focused
+      // conversation, where the message appearing is announcement enough.
       if (options.announce && !isMine && (!isOpen || !isWindowFocused())) {
+        playMessageTone()
         void notify({
           title: message.senderName ?? 'New message',
           body: message.body || `Sent ${message.kind.replace('_', ' ')}`,

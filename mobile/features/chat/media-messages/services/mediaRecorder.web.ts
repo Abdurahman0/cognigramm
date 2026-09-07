@@ -63,6 +63,19 @@ const startDrawLoop = (): void => {
     const height = source.videoHeight;
     if (width > 0 && height > 0) {
       const side = Math.min(width, height);
+
+      // The front camera records what the viewfinder shows: mirrored. The
+      // viewfinder has to be mirrored — people frame themselves in it as if it
+      // were a mirror — so a recording that is not leaves the sender watching a
+      // flipped version of the take they just composed. The rear camera is
+      // filming the world and is left alone.
+      const selfie = facingMode === "user";
+      if (selfie) {
+        context.save();
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
+      }
+
       context.drawImage(
         source,
         (width - side) / 2,
@@ -74,6 +87,10 @@ const startDrawLoop = (): void => {
         canvas.width,
         canvas.height
       );
+
+      if (selfie) {
+        context.restore();
+      }
     }
     drawHandle = requestAnimationFrame(draw);
   };

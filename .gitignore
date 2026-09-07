@@ -6,6 +6,7 @@ venv/
 .pytest_cache/
 
 # Node / Next.js
+.pnpm-store/
 frontend/node_modules/
 frontend/.next/
 frontend/tsconfig.tsbuildinfo

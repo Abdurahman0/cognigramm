@@ -119,7 +119,7 @@ export function MessageList({
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex min-h-0 flex-1 flex-col justify-end overflow-y-auto"
+        className="bg-transcript flex min-h-0 flex-1 flex-col justify-end overflow-y-auto"
       >
         {/* A readable column: bubbles pinned to the far edges of a wide
             window make a two-person conversation hard to follow. */}
@@ -152,7 +152,7 @@ export function MessageList({
               <div key={message.clientMessageId || message.id}>
                 {showDivider ? (
                   <div className="my-3 flex justify-center">
-                    <span className="text-muted-foreground rounded-full bg-black/15 px-2.5 py-0.5 text-[11px] font-medium">
+                    <span className="glass-floating text-muted-foreground rounded-full px-2.5 py-0.5 text-[11px] font-medium">
                       {formatDayDivider(message.createdAt)}
                     </span>
                   </div>

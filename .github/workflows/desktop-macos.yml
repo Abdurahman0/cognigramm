@@ -1,0 +1,109 @@
+# Builds the macOS desktop client.
+#
+# This is a GitHub Actions workflow rather than a local script because a macOS
+# bundle cannot be produced anywhere but on macOS: `codesign`, `hdiutil` and
+# the macOS SDK ship only with Xcode, and Apple's licence ties them to Apple
+# hardware. The Linux and Windows artifacts are built locally; this one is not.
+#
+# Run it from the Actions tab ("Run workflow"), or push a tag like
+# `desktop-v0.1.0`. It produces one universal .dmg that runs on both Apple
+# Silicon and Intel Macs.
+name: desktop-macos
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'desktop-v*'
+
+jobs:
+  build:
+    # An Apple Silicon runner. It can cross-compile the Intel half, so a
+    # single job yields the universal binary.
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm format:check
+          pnpm test
+
+      # `--bundles app` only. The .dmg is assembled below, after the app has
+      # been signed: a disk image built before signing would carry an
+      # unsigned app, and macOS on Apple Silicon refuses to launch one.
+      - name: Build
+        run: pnpm exec tauri build --target universal-apple-darwin --bundles app
+
+      # Ad-hoc signature (`-`), not a Developer ID one. `lipo` strips the
+      # per-slice signatures the linker applied, and an arm64 binary with no
+      # signature at all is killed by the kernel on launch. This is also what
+      # lets macOS remember the camera and microphone grants between runs.
+      - name: Sign (ad-hoc)
+        run: |
+          set -euo pipefail
+          APP=$(find src-tauri/target/universal-apple-darwin/release/bundle/macos \
+                  -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          codesign --force --deep --sign - "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          DMG="qora-qarga_${VERSION}_macos_universal.dmg"
+
+          rm -rf dmg-staging && mkdir dmg-staging
+          cp -R "$APP_PATH" dmg-staging/
+          ln -s /Applications dmg-staging/Applications
+
+          hdiutil create -volname "Qora Qarga" -srcfolder dmg-staging \
+            -ov -format UDZO "$DMG"
+
+          # A zip as well: it survives being passed around chat clients that
+          # mangle disk images, and needs no mounting to run.
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" \
+            "qora-qarga_${VERSION}_macos_universal.app.zip"
+
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+          lipo -archs "$APP_PATH/Contents/MacOS/"* || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qora-qarga-macos-universal
+          path: |
+            desktop/qora-qarga_*_macos_universal.dmg
+            desktop/qora-qarga_*_macos_universal.app.zip
+          if-no-files-found: error
+          retention-days: 30

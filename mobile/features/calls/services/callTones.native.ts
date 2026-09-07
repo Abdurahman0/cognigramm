@@ -1,3 +1,4 @@
+import { playCallSound, stopCallSound } from "@/features/calls/services/callSounds";
 import type { CallTones } from "@/features/calls/services/callTones";
 
 /**
@@ -40,30 +41,36 @@ class NativeCallTones implements CallTones {
   private ringingBack = false;
 
   ringback(): void {
-    if (!this.manager || this.ringingBack) {
+    if (this.ringingBack) {
       return;
     }
     this.stop();
     this.ringingBack = true;
+    // The session still starts through the manager so audio routing is set up
+    // for the call itself; the ringback the caller hears is our own file, so
+    // the sound matches the desktop and web clients.
     try {
-      this.manager.start({ media: "audio", ringback: "_DEFAULT_" });
+      this.manager?.start({ media: "audio" });
     } catch {
-      this.ringingBack = false;
+      // Routing is a nicety; the tone below is the part people notice.
     }
+    void playCallSound("outgoing");
   }
 
   ringtone(): void {
-    if (!this.manager || this.ringing) {
+    if (this.ringing) {
       return;
     }
     this.stop();
     this.ringing = true;
     try {
-      // -1 vibrates on the platform's own ringer pattern rather than a made-up one.
-      this.manager.startRingtone("_DEFAULT_", -1, "playback", 30);
+      // -1 vibrates on the platform's own ringer pattern; the audible part is
+      // our own ringtone rather than the system one.
+      this.manager?.startRingtone("", -1, "playback", 30);
     } catch {
-      this.ringing = false;
+      // Vibration is optional.
     }
+    void playCallSound("incoming");
   }
 
   connected(): void {
@@ -91,15 +98,16 @@ class NativeCallTones implements CallTones {
   }
 
   stop(): void {
-    if (!this.manager) {
-      return;
-    }
+    // Our own sound first: it plays whether or not the native manager linked,
+    // so an early return here would leave a ringtone running forever.
+    void stopCallSound();
+
     try {
       if (this.ringing) {
-        this.manager.stopRingtone();
+        this.manager?.stopRingtone();
       }
       if (this.ringingBack) {
-        this.manager.stopRingback();
+        this.manager?.stopRingback();
       }
     } catch {
       // nothing playing

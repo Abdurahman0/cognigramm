@@ -212,17 +212,87 @@ So build where your users are, or older:
 | Ubuntu 24.04 (glibc 2.39) | Ubuntu 24.04+ only |
 | Kali / Arch / rolling (glibc 2.4x) | that machine, and little else |
 
-### The easy path: GitHub Actions
+### macOS
 
-`.github/workflows/desktop.yml` already builds on `ubuntu-22.04`, macOS and
-Windows. Push a tag, or run it from the Actions tab:
+macOS is the one platform that cannot be built from here at all. `codesign`,
+`hdiutil` and the macOS SDK ship only with Xcode, and Apple's licence ties them
+to Apple hardware — there is no equivalent of `cargo-xwin` for it. Two ways
+round that:
+
+**On a Mac**, one command:
 
 ```bash
-git tag v0.1.0 && git push origin v0.1.0
+bash desktop/scripts-build-macos.sh
 ```
 
-Each run uploads `.deb`, `.rpm`, `.AppImage`, `.dmg`, `.exe` and `.msi` as
-artifacts. Hand people the file for their platform.
+**Without a Mac**, `.github/workflows/desktop-macos.yml` runs the same steps on
+a GitHub-hosted Apple Silicon runner. Trigger it from the Actions tab
+(*desktop-macos → Run workflow*) or by pushing a tag:
+
+```bash
+git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
+```
+
+Either way the output is one **universal** `.dmg` — a single file holding both
+the Apple Silicon and the Intel build — plus a `.zip` of the bare `.app`.
+
+Two things are done by hand rather than by the bundler, and both matter:
+
+- The app is **ad-hoc signed** (`codesign --sign -`) after `lipo` merges the two
+  architectures, because merging discards the per-slice signatures the linker
+  applied, and macOS on Apple Silicon kills an unsigned binary at launch. It is
+  also what makes the camera and microphone grants stick between runs.
+- The `.dmg` is assembled *after* signing, so it cannot capture an unsigned app.
+
+`src-tauri/Info.plist` carries `NSCameraUsageDescription`,
+`NSMicrophoneUsageDescription` and `NSLocalNetworkUsageDescription`. Without
+them macOS does not deny capture — it terminates the process the moment
+`getUserMedia` runs, with no prompt and nothing in the UI to explain it.
+
+There is no Apple Developer ID, so the build is not notarised. On first launch
+Gatekeeper refuses it; the recipient opens it once with **right-click → Open**,
+or clears the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Qora Qarg'a.app"
+```
+
+Calls need **macOS 12 or newer**: WKWebView's media-capture delegate does not
+exist below that, so `getUserMedia` has nothing to answer it. The app installs
+and chats fine on older systems.
+
+### The other platforms in CI
+
+Only the macOS workflow exists, because Linux and Windows are built locally
+(below). Adding jobs for them is a matter of copying the macOS one onto
+`ubuntu-22.04` and `windows-latest` runners — the value of doing so is the
+Ubuntu glibc floor and the NSIS installer, both of which are awkward here.
+
+### Windows
+
+A Windows binary can be cross-compiled from Linux, and an installer mostly
+cannot. The difference is worth knowing before you spend an evening on it:
+
+```bash
+rustup target add x86_64-pc-windows-msvc
+cargo install --locked cargo-xwin          # downloads the MSVC libraries (~2 GB, once)
+sudo apt install clang lld llvm            # `ring` needs clang-cl to build its C code
+pnpm tauri build --runner cargo-xwin --target x86_64-pc-windows-msvc --bundles nsis
+```
+
+The `.exe` itself builds and links fine — it lands in
+`src-tauri/target/x86_64-pc-windows-msvc/release/qora-qarga-desktop.exe`, about
+6 MB, and is a self-contained portable app. The NSIS *installer* step is what
+fails: Tauri's installer script needs the plugin set that ships with the
+official Windows NSIS, and a distribution's `makensis` rejects it with a macro
+arity error. Use CI for the installer, or hand people the portable `.exe`.
+
+On the receiving machine the app needs the **WebView2 runtime**: preinstalled on
+Windows 11 and on most Windows 10 installs, and a free download from Microsoft
+otherwise. The installer built in CI bundles a bootstrapper that handles this;
+the portable `.exe` does not. Neither is code-signed, so SmartScreen shows a
+"Windows protected your PC" warning on first run — *More info → Run anyway*, or
+buy a signing certificate.
 
 ### Building for Ubuntu without CI
 

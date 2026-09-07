@@ -1,4 +1,7 @@
 import { toast } from '@/components/ui/toast'
+import { notify } from '@/lib/notify'
+import { focusWindow } from '@/lib/window'
+import { playCallTone, stopCallTone } from '@/features/calls/call-tones'
 import { CallPeer, requestUserMedia } from '@/features/calls/webrtc'
 import { realtime } from '@/realtime/socket'
 import { useCallStore } from '@/stores/calls'
@@ -18,7 +21,6 @@ let currentUserId = -1
 let peer: CallPeer | null = null
 let localStream: MediaStream | null = null
 let remoteStream: MediaStream | null = null
-let ringtone: (() => void) | null = null
 const streamListeners = new Set<StreamListener>()
 
 const emitStreams = (): void => {
@@ -40,43 +42,8 @@ const newCallId = (): string =>
 const peerIdOf = (call: ApiCallSession): number | null =>
   call.participants.find((participant) => participant.user_id !== currentUserId)?.user_id ?? null
 
-/**
- * A synthesised ring, so no audio asset has to ship. Two alternating tones at
- * a low gain — enough to notice, not enough to startle.
- */
-const startRingtone = (): (() => void) => {
-  try {
-    const context = new AudioContext()
-    const gain = context.createGain()
-    gain.gain.value = 0.05
-    gain.connect(context.destination)
-
-    let stopped = false
-    const beep = () => {
-      if (stopped) return
-      const oscillator = context.createOscillator()
-      oscillator.type = 'sine'
-      oscillator.frequency.value = 440
-      oscillator.connect(gain)
-      oscillator.start()
-      oscillator.stop(context.currentTime + 0.35)
-    }
-    beep()
-    const timer = setInterval(beep, 1_800)
-
-    return () => {
-      stopped = true
-      clearInterval(timer)
-      void context.close()
-    }
-  } catch {
-    return () => undefined
-  }
-}
-
 const stopRingtone = (): void => {
-  ringtone?.()
-  ringtone = null
+  stopCallTone()
 }
 
 const teardown = (): void => {
@@ -139,7 +106,7 @@ export const callEngine = {
       return
     }
 
-    ringtone = startRingtone()
+    playCallTone('outgoing')
     realtime.send('call_invite', {
       conversation_id: conversationId,
       call_type: callType,
@@ -220,7 +187,14 @@ export function initCallEngine(userId: number): () => void {
         peerId: from_user_id,
         callType: call.call_type,
       })
-      ringtone = startRingtone()
+      playCallTone('incoming')
+
+      // A ringing call behind other windows, or in the tray, is a missed call.
+      void focusWindow()
+      void notify({
+        title: 'Incoming call',
+        body: `${call.call_type === 'video' ? 'Video' : 'Audio'} call`,
+      })
     }),
   )
 

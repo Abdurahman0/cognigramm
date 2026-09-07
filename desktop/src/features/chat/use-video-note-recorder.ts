@@ -3,12 +3,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /**
  * Round video message recording.
  *
- * The circle is presentation, not encoding: the backend stores whatever bytes
- * it is given and explicitly does not crop, so the camera stream is recorded
- * as it comes and the round shape is a CSS mask on both the viewfinder and the
- * bubble. That avoids a per-frame canvas draw loop for a result nobody can
- * tell apart.
+ * Frames go through a canvas before they reach the recorder, for two reasons.
+ * It crops the camera's rectangle to the square the round bubble actually
+ * shows, so nothing is encoded that will never be seen. And it mirrors the
+ * front camera, because the viewfinder is mirrored — people frame themselves
+ * in it as if it were a mirror — and a recording that is not leaves the sender
+ * watching a flipped version of the take they just composed. The mobile client
+ * does the same, so one person's video notes look alike wherever they came
+ * from.
  */
+
+/** What the round bubble shows; anything larger is encoded and then cropped away. */
+const CAPTURE_SIZE = 480
+
+/** Smooth enough for a talking head, cheap enough to encode on a laptop. */
+const CAPTURE_FPS = 30
 
 /** Anything shorter is a misfire, not a message. */
 export const MIN_VIDEO_MS = 800
@@ -49,6 +58,9 @@ export function useVideoNoteRecorder() {
 
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const canvasStreamRef = useRef<MediaStream | null>(null)
+  const sourceRef = useRef<HTMLVideoElement | null>(null)
+  const frameRef = useRef<number | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const startedAtRef = useRef(0)
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -57,8 +69,16 @@ export function useVideoNoteRecorder() {
   const teardown = useCallback(() => {
     if (tickRef.current) clearInterval(tickRef.current)
     tickRef.current = null
+    if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    frameRef.current = null
+    canvasStreamRef.current?.getTracks().forEach((track) => track.stop())
+    canvasStreamRef.current = null
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
+    if (sourceRef.current) {
+      sourceRef.current.srcObject = null
+      sourceRef.current = null
+    }
     recorderRef.current = null
     setStream(null)
   }, [])
@@ -96,8 +116,86 @@ export function useVideoNoteRecorder() {
     cancelledRef.current = false
     setDurationMs(0)
 
+    // The camera feeds a hidden video element, which feeds the canvas the
+    // recorder actually reads. Every part of that is optional: WebKitGTK ships
+    // `captureStream` and `MediaRecorder` support that varies by build, and a
+    // recorder that cannot start is worse than one that cannot mirror. So the
+    // whole pipeline is attempted, and the raw camera stream is the fallback.
+    const source = document.createElement('video')
+    source.srcObject = media
+    source.muted = true
+    source.playsInline = true
+    // Bounded: a detached video element that never resolves `play()` would
+    // otherwise leave the button stuck on its loading state.
+    await Promise.race([
+      source.play().catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, 1_500)),
+    ])
+    sourceRef.current = source
+
+    const canvas = document.createElement('canvas')
+    canvas.width = CAPTURE_SIZE
+    canvas.height = CAPTURE_SIZE
+    const context = canvas.getContext('2d')
+
+    const drawFrame = () => {
+      const width = source.videoWidth
+      const height = source.videoHeight
+      if (context && width > 0 && height > 0) {
+        const side = Math.min(width, height)
+        context.save()
+        // Mirrored, to match the viewfinder the take was composed in.
+        context.translate(CAPTURE_SIZE, 0)
+        context.scale(-1, 1)
+        context.drawImage(
+          source,
+          (width - side) / 2,
+          (height - side) / 2,
+          side,
+          side,
+          0,
+          0,
+          CAPTURE_SIZE,
+          CAPTURE_SIZE,
+        )
+        context.restore()
+      }
+      frameRef.current = requestAnimationFrame(drawFrame)
+    }
+    frameRef.current = requestAnimationFrame(drawFrame)
+
+    let recordedStream: MediaStream = media
+    try {
+      if (typeof canvas.captureStream === 'function') {
+        const captured = canvas.captureStream(CAPTURE_FPS)
+        for (const track of media.getAudioTracks()) captured.addTrack(track)
+        canvasStreamRef.current = captured
+        recordedStream = captured
+      }
+    } catch {
+      recordedStream = media
+    }
+
     const mimeType = pickMimeType()
-    const recorder = new MediaRecorder(media, mimeType ? { mimeType } : undefined)
+    let recorder: MediaRecorder
+    try {
+      recorder = new MediaRecorder(recordedStream, mimeType ? { mimeType } : undefined)
+    } catch {
+      // The canvas stream was refused; the camera's own stream is always
+      // recordable, it just cannot be mirrored or cropped.
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+      frameRef.current = null
+      canvasStreamRef.current?.getTracks().forEach((track) => track.stop())
+      canvasStreamRef.current = null
+      try {
+        recorder = new MediaRecorder(media, mimeType ? { mimeType } : undefined)
+      } catch {
+        teardown()
+        setState('idle')
+        setError('Recording is not supported here')
+        return false
+      }
+    }
     recorderRef.current = recorder
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data)
@@ -116,7 +214,7 @@ export function useVideoNoteRecorder() {
 
     setState('recording')
     return true
-  }, [state])
+  }, [state, teardown])
 
   const finish = useCallback(async (): Promise<VideoNoteRecording | null> => {
     const recorder = recorderRef.current
@@ -124,14 +222,33 @@ export function useVideoNoteRecorder() {
 
     setState('processing')
     const durationAtStop = Date.now() - startedAtRef.current
-    const track = streamRef.current?.getVideoTracks()[0]
-    const settings = track?.getSettings()
+    // The stored frame is the square the canvas produced, not the camera's.
 
+    // `onstop` not arriving would leave the composer stuck on "processing"
+    // with no way out, so the wait is bounded and whatever chunks arrived are
+    // used. Asking for the final chunk first means that fallback still has the
+    // whole take in it.
     const blob = await new Promise<Blob>((resolve) => {
-      recorder.onstop = () => {
+      const settle = () => {
         resolve(new Blob(chunksRef.current, { type: recorder.mimeType || 'video/webm' }))
       }
-      recorder.stop()
+      const timer = setTimeout(settle, 4_000)
+      recorder.onstop = () => {
+        clearTimeout(timer)
+        settle()
+      }
+      try {
+        if (recorder.state === 'inactive') {
+          clearTimeout(timer)
+          settle()
+          return
+        }
+        recorder.requestData()
+        recorder.stop()
+      } catch {
+        clearTimeout(timer)
+        settle()
+      }
     })
 
     teardown()
@@ -148,8 +265,8 @@ export function useVideoNoteRecorder() {
     return {
       file,
       durationMs: durationAtStop,
-      width: settings?.width ?? 640,
-      height: settings?.height ?? 640,
+      width: CAPTURE_SIZE,
+      height: CAPTURE_SIZE,
       mimeType: file.type,
     }
   }, [state, teardown])

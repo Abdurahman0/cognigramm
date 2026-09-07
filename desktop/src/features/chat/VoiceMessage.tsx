@@ -36,7 +36,7 @@ export function VoiceMessage({ attachment, mine }: { attachment: Attachment; min
   const [elapsedMs, setElapsedMs] = useState(0)
 
   const waveform = readWaveform(attachment.metadata)
-  const totalMs = readDuration(attachment.metadata)
+  const [totalMs, setTotalMs] = useState(() => readDuration(attachment.metadata))
   const progress = totalMs > 0 ? Math.min(1, elapsedMs / totalMs) : 0
 
   useEffect(() => {
@@ -47,11 +47,36 @@ export function VoiceMessage({ attachment, mine }: { attachment: Attachment; min
       setIsPlaying(false)
       setElapsedMs(0)
     }
+
+    // The sender's metadata is the fast path, but a message from a client that
+    // sends none would otherwise sit at 0:00 with a waveform that never fills.
+    // A recorded WebM also reports `Infinity` until it has been seeked to the
+    // end, which is what forcing the position past it resolves.
+    const resolveDuration = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        setTotalMs((current) => current || audio.duration * 1000)
+        return
+      }
+      const onSeeked = () => {
+        if (Number.isFinite(audio.duration) && audio.duration > 0) {
+          setTotalMs((current) => current || audio.duration * 1000)
+        }
+        audio.currentTime = 0
+        audio.removeEventListener('seeked', onSeeked)
+      }
+      audio.addEventListener('seeked', onSeeked)
+      audio.currentTime = 1e101
+    }
+
     audio.addEventListener('timeupdate', onTime)
     audio.addEventListener('ended', onEnd)
+    audio.addEventListener('loadedmetadata', resolveDuration)
+    if (audio.readyState >= 1) resolveDuration()
+
     return () => {
       audio.removeEventListener('timeupdate', onTime)
       audio.removeEventListener('ended', onEnd)
+      audio.removeEventListener('loadedmetadata', resolveDuration)
     }
   }, [url])
 

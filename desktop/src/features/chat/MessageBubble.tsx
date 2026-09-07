@@ -63,6 +63,11 @@ function MessageBubbleBase({
   }
 
   const isVideoNote = message.kind === 'video_note' && message.attachments.length > 0
+  const hasText = !message.isDeleted && Boolean(message.body)
+
+  // Enough room for "23:59" plus a tick, and a little more when the message
+  // also carries a pin or an "edited" mark.
+  const metaWidth = (isMine ? 46 : 34) + (message.isPinned ? 12 : 0) + (message.editedAt ? 34 : 0)
 
   const mediaOnly =
     message.attachments.length > 0 &&
@@ -101,17 +106,22 @@ function MessageBubbleBase({
 
       <div
         className={cn(
-          'relative max-w-[min(68ch,72%)] rounded-2xl text-[14px] leading-snug',
+          // A readable line is about fifty characters; past that the eye has to
+          // hunt for the start of the next one.
+          'rounded-bubble relative max-w-[min(52ch,68%)] text-[14px] leading-relaxed',
           // A picture with no caption fills its bubble; a wide blue frame
           // around a photo reads as a mistake rather than a design.
-          mediaOnly ? 'p-1' : 'px-3 py-2',
+          mediaOnly ? 'p-1' : 'px-3 py-1.5',
           isMine
             ? 'bg-bubble-mine text-bubble-mine-foreground'
-            : 'bg-bubble-other text-bubble-other-foreground',
+            : 'bg-bubble-other text-bubble-other-foreground shadow-[inset_0_0_0_0.5px_var(--bubble-other-rim)]',
           // Last, so it wins: a round note is its own shape, and a bubble
           // behind it shows as four corners poking out from under the circle.
           isVideoNote && 'bg-transparent p-0',
-          isGroupStart && (isMine ? 'rounded-tr-md' : 'rounded-tl-md'),
+          // The first message of a run points at its author; the rest align
+          // under it, which is what makes a run read as one turn.
+          isGroupStart &&
+            (isMine ? 'rounded-tr-[--radius-bubble-tail]' : 'rounded-tl-[--radius-bubble-tail]'),
           message.delivery === 'failed' && 'ring-destructive ring-1',
           message.pending && 'opacity-80',
         )}
@@ -176,19 +186,27 @@ function MessageBubbleBase({
         ) : message.body ? (
           <p data-selectable className="break-words whitespace-pre-wrap">
             {message.body}
+            {/* Holds a gap at the end of the last line for the clock to sit in.
+                Without it the time takes a line of its own, and a one-word
+                message ends up as tall as a paragraph. */}
+            <span aria-hidden className="inline-block" style={{ width: metaWidth }} />
           </p>
         ) : null}
 
         <div
           className={cn(
-            'flex items-center justify-end gap-1 text-[10px]',
+            'flex items-center justify-end gap-1 text-[10px] leading-none',
+            hasText && 'absolute right-2.5 bottom-1.5',
             // Over an image the timestamp needs its own backing to stay legible.
             mediaOnly
               ? 'absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 text-white'
-              : 'mt-0.5',
+              : '',
             // A video note has no coloured bubble behind it, so the white
             // meta text of an outgoing message would vanish on a light theme.
-            !mediaOnly && (isMine && !isVideoNote ? 'text-white/70' : 'text-muted-foreground'),
+            !mediaOnly && (isMine && !isVideoNote ? 'text-white/75' : 'text-muted-foreground'),
+            // Only the row form needs the gap above; the floating one sits in
+            // the space the text already reserved.
+            !mediaOnly && !hasText && 'mt-0.5',
           )}
         >
           {message.isPinned ? <Pin className="size-3" aria-label="Pinned" /> : null}

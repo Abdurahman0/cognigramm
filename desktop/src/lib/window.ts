@@ -32,3 +32,16 @@ export const closeWindow = (): Promise<unknown> => withWindow((win) => win.hide(
 
 export const isMaximized = async (): Promise<boolean> =>
   (await withWindow((win) => win.isMaximized())) ?? false
+
+/**
+ * Brings the window to the front from wherever it is — minimised, behind
+ * another app, or hidden in the tray. An incoming call that rings behind three
+ * other windows is a missed call.
+ */
+export const focusWindow = async (): Promise<void> => {
+  await withWindow(async (win) => {
+    await win.show()
+    await win.unminimize()
+    await win.setFocus()
+  })
+}

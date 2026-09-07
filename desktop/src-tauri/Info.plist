@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into the generated bundle Info.plist by tauri-bundler.
+
+  macOS refuses camera and microphone access to any app whose Info.plist does
+  not say why it wants them: the process is terminated the moment
+  `getUserMedia` runs, with no prompt and nothing in the UI. These three keys
+  are what turn that into an ordinary permission dialog.
+
+  The local-network key is for calls: WebRTC gathers host candidates on the
+  LAN, which macOS 15 treats as local network access and gates the same way.
+-->
+<plist version="1.0">
+<dict>
+  <key>NSCameraUsageDescription</key>
+  <string>Qora Qarg'a uses the camera for video calls and video messages.</string>
+
+  <key>NSMicrophoneUsageDescription</key>
+  <string>Qora Qarg'a uses the microphone for calls and voice messages.</string>
+
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Qora Qarg'a connects calls directly over the local network when both people are on it.</string>
+</dict>
+</plist>

@@ -27,7 +27,7 @@ function ConnectionPill() {
         : 'bg-destructive'
 
   return (
-    <div className="no-drag bg-input flex items-center gap-1.5 rounded-full px-2.5 py-1">
+    <div className="bg-input flex items-center gap-1.5 rounded-full px-2.5 py-1">
       <span className={cn('size-1.5 rounded-full', tone)} />
       <span className="text-muted-foreground text-[11px] font-medium">
         {STATUS_LABEL[status] ?? status}
@@ -54,7 +54,7 @@ function WindowButton({
         onClick={onClick}
         aria-label={label}
         className={cn(
-          'no-drag text-muted-foreground flex size-7 items-center justify-center rounded-md transition-colors',
+          'text-muted-foreground flex size-7 items-center justify-center rounded-md transition-colors',
           danger
             ? 'hover:bg-destructive hover:text-white'
             : 'hover:bg-accent hover:text-foreground',
@@ -81,6 +81,13 @@ interface TitleBarProps {
  * makes a frameless window still feel like a native one. It is rendered on
  * every screen including sign-in: without it a frameless window has nothing
  * to drag and no way to close.
+ *
+ * The drag itself comes from `data-tauri-drag-region`, not from CSS.
+ * `-webkit-app-region` is an Electron/Chromium property that Tauri does not
+ * read on any platform and that WKWebView does not implement at all, so on
+ * macOS a frameless window styled that way cannot be moved. `deep` opts the
+ * whole subtree in; Tauri excludes buttons and other clickable elements by
+ * itself, so the controls keep working.
  */
 export function TitleBar({ showStatus = true }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false)
@@ -91,7 +98,10 @@ export function TitleBar({ showStatus = true }: TitleBarProps) {
   }, [])
 
   return (
-    <header className="drag-region flex h-11 shrink-0 items-center justify-between gap-3 px-3">
+    <header
+      data-tauri-drag-region="deep"
+      className="flex h-11 shrink-0 items-center justify-between gap-3 px-3"
+    >
       <div className="flex items-center gap-2.5">
         <span className="bg-primary/15 grid size-6 place-items-center rounded-md text-[13px]">
           🐦‍⬛
