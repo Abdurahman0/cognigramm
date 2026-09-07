@@ -1,6 +1,7 @@
 import { Navigate, Route, HashRouter as Router, Routes } from 'react-router-dom'
 
 import { AppShell } from '@/components/layout/AppShell'
+import { TitleBar } from '@/components/layout/TitleBar'
 import { Spinner } from '@/components/ui'
 import { AuthScreen } from '@/features/auth/AuthScreen'
 import { CallsPage } from '@/features/calls/CallsPage'
@@ -14,9 +15,25 @@ import { useOnlinePresence } from '@/hooks/use-users'
 import { useAuthStore } from '@/stores/auth'
 import { useEffect } from 'react'
 
+/**
+ * Chrome for the screens that live outside the app shell.
+ *
+ * The window is frameless, so every screen has to carry its own title bar —
+ * on the sign-in screen there is otherwise no drag region and no close button,
+ * and the window cannot be moved or dismissed at all.
+ */
+function WindowFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="app-wallpaper flex h-full flex-col overflow-hidden">
+      <TitleBar showStatus={false} />
+      <div className="min-h-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
 function Splash() {
   return (
-    <div className="app-wallpaper grid h-full place-items-center">
+    <div className="grid h-full place-items-center">
       <Spinner className="text-muted-foreground size-6" />
     </div>
   )
@@ -40,8 +57,18 @@ export function App() {
 
   // `unknown` lasts until that first refresh settles; showing the login form
   // during it would flash for anyone already signed in.
-  if (status === 'unknown') return <Splash />
-  if (!isAuthenticated) return <AuthScreen />
+  if (status === 'unknown')
+    return (
+      <WindowFrame>
+        <Splash />
+      </WindowFrame>
+    )
+  if (!isAuthenticated)
+    return (
+      <WindowFrame>
+        <AuthScreen />
+      </WindowFrame>
+    )
 
   return (
     <Router>

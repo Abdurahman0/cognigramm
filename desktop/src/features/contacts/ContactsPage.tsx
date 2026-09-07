@@ -1,6 +1,5 @@
 import { MessageSquare, Phone, Search, Video } from 'lucide-react'
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 
 import {
   Avatar,
@@ -11,12 +10,12 @@ import {
   Skeleton,
   Tooltip,
   initialsOf,
-  toast,
 } from '@/components/ui'
 import { callEngine } from '@/features/calls/call-engine'
+import { ProfileDialogHost } from '@/features/contacts/ProfileDialogHost'
 import { PresenceDot } from '@/features/conversations/PresenceDot'
-import { useConversations, useCreateConversation } from '@/hooks/use-conversations'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
+import { useOpenDirectChat } from '@/hooks/use-open-direct-chat'
 import { useUserSearch } from '@/hooks/use-users'
 import { formatLastSeen } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth'
@@ -25,35 +24,19 @@ import type { User } from '@/types'
 
 /** The directory. Every row can start a chat or place a call directly. */
 export function ContactsPage() {
-  const navigate = useNavigate()
   const [term, setTerm] = useState('')
+  const [profile, setProfile] = useState<User | null>(null)
   const debounced = useDebouncedValue(term, 250)
   const { users, isPending } = useUserSearch(debounced)
-  const { conversations } = useConversations()
-  const create = useCreateConversation()
   const currentUserId = useAuthStore((state) => state.user?.id ?? -1)
   const onlineIds = useChatStore((state) => state.onlineUserIds)
+  const openDirectChat = useOpenDirectChat()
 
-  /** Reuses the existing direct chat when there is one. */
-  const openChat = (user: User, then?: (conversationId: number, peerId: number) => void) => {
-    const existing = conversations.find((row) => row.kind === 'direct' && row.peerId === user.id)
-    if (existing) {
-      if (then) then(existing.id, user.id)
-      else void navigate(`/chats/${existing.id}`)
-      return
-    }
-
-    create.mutate(
-      { type: 'direct', participant_ids: [user.id] },
-      {
-        onSuccess: (conversation) => {
-          if (then) then(conversation.id, user.id)
-          else void navigate(`/chats/${conversation.id}`)
-        },
-        onError: (error: Error) => toast.error('Could not open chat', error.message),
-      },
+  const call = (user: User, callType: 'audio' | 'video') =>
+    openDirectChat(
+      user.id,
+      (conversationId) => void callEngine.start(conversationId, user.id, callType),
     )
-  }
 
   const visible = users.filter((user) => user.id !== currentUserId)
 
@@ -90,22 +73,34 @@ export function ContactsPage() {
                   key={user.id}
                   className="raised-card flex items-center gap-3 rounded-xl px-3 py-2.5"
                 >
-                  <div className="relative">
-                    <Avatar className="size-10">
-                      {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
-                      <AvatarFallback>{initialsOf(user.fullName)}</AvatarFallback>
-                    </Avatar>
-                    <PresenceDot userId={user.id} />
-                  </div>
+                  {/* The card itself opens the person's profile; the buttons
+                      on the right stay shortcuts for the two things people do
+                      most often. */}
+                  <button
+                    type="button"
+                    onClick={() => setProfile(user)}
+                    aria-label={`Open profile of ${user.fullName}`}
+                    className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  >
+                    <span className="relative">
+                      <Avatar className="size-10">
+                        {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
+                        <AvatarFallback>{initialsOf(user.fullName)}</AvatarFallback>
+                      </Avatar>
+                      <PresenceDot userId={user.id} />
+                    </span>
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[14px] font-medium">{user.fullName}</p>
-                    <p className="text-muted-foreground truncate text-[12px]">
-                      {onlineIds.includes(user.id)
-                        ? 'online'
-                        : user.title || formatLastSeen(user.lastSeenAt)}
-                    </p>
-                  </div>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] font-medium">
+                        {user.fullName}
+                      </span>
+                      <span className="text-muted-foreground block truncate text-[12px]">
+                        {onlineIds.includes(user.id)
+                          ? 'online'
+                          : user.title || formatLastSeen(user.lastSeenAt)}
+                      </span>
+                    </span>
+                  </button>
 
                   <div className="flex items-center gap-0.5">
                     <Tooltip content="Message">
@@ -113,7 +108,7 @@ export function ContactsPage() {
                         size="icon-sm"
                         variant="ghost"
                         aria-label={`Message ${user.fullName}`}
-                        onClick={() => openChat(user)}
+                        onClick={() => openDirectChat(user.id)}
                       >
                         <MessageSquare className="size-4" />
                       </Button>
@@ -123,13 +118,7 @@ export function ContactsPage() {
                         size="icon-sm"
                         variant="ghost"
                         aria-label={`Call ${user.fullName}`}
-                        onClick={() =>
-                          openChat(
-                            user,
-                            (conversationId, peerId) =>
-                              void callEngine.start(conversationId, peerId, 'audio'),
-                          )
-                        }
+                        onClick={() => call(user, 'audio')}
                       >
                         <Phone className="size-4" />
                       </Button>
@@ -139,13 +128,7 @@ export function ContactsPage() {
                         size="icon-sm"
                         variant="ghost"
                         aria-label={`Video call ${user.fullName}`}
-                        onClick={() =>
-                          openChat(
-                            user,
-                            (conversationId, peerId) =>
-                              void callEngine.start(conversationId, peerId, 'video'),
-                          )
-                        }
+                        onClick={() => call(user, 'video')}
                       >
                         <Video className="size-4" />
                       </Button>
@@ -157,6 +140,8 @@ export function ContactsPage() {
           )}
         </div>
       </div>
+
+      <ProfileDialogHost user={profile} onClose={() => setProfile(null)} />
     </div>
   )
 }

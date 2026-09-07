@@ -31,9 +31,11 @@ React + TypeScript  ──►  Tauri 2 (Rust)  ──►  .exe / .msi · .app / 
 ## What it does
 
 Chats with history, search, replies, edits, deletes, pins and **forwarding**;
-image and file attachments; **voice messages** with a recorded waveform;
-typing indicators, presence and read receipts; audio and video calls; the
-account's **signed-in devices**, with per-device revocation.
+image and file attachments; **voice messages** with a recorded waveform and
+**round video messages**; a **shared-files view** grouped by kind; **profile
+cards** showing who someone is and what time it is where they are; typing
+indicators, presence and read receipts; audio and video calls; the account's
+**signed-in devices**, with per-device revocation.
 
 ## Getting started
 
@@ -195,10 +197,71 @@ anyway, so the extra radius buys frame time and nothing else.
 - Notifications go through the OS notification centre, and only fire when the
   message is not already visible on screen.
 
+## Distributing to other people
+
+A Linux binary runs on the glibc it was built against **or newer, never older**.
+This matters more than anything else here: a bundle built on a rolling distro
+(Kali, Arch, Fedora Rawhide) will refuse to start on Ubuntu LTS with a
+`GLIBC_2.xx not found` error, even though the package installs cleanly.
+
+So build where your users are, or older:
+
+| Built on | Runs on |
+| --- | --- |
+| Ubuntu 22.04 (glibc 2.35) | Ubuntu 22.04+, Debian 12+ — the safe default |
+| Ubuntu 24.04 (glibc 2.39) | Ubuntu 24.04+ only |
+| Kali / Arch / rolling (glibc 2.4x) | that machine, and little else |
+
+### The easy path: GitHub Actions
+
+`.github/workflows/desktop.yml` already builds on `ubuntu-22.04`, macOS and
+Windows. Push a tag, or run it from the Actions tab:
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+Each run uploads `.deb`, `.rpm`, `.AppImage`, `.dmg`, `.exe` and `.msi` as
+artifacts. Hand people the file for their platform.
+
+### Building for Ubuntu without CI
+
+Any Ubuntu 22.04 machine, VM or container works. With Docker:
+
+```bash
+docker run --rm -v "$PWD/..:/src" -w /src/desktop ubuntu:22.04 bash -c '
+  apt-get update && apt-get install -y curl build-essential libwebkit2gtk-4.1-dev \
+    libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev libgtk-3-dev &&
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs &&
+  npm i -g pnpm@11 &&
+  curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal &&
+  . "$HOME/.cargo/env" && pnpm install --frozen-lockfile && pnpm desktop:build'
+```
+
+The bundles land in `src-tauri/target/release/bundle/`.
+
+### What the recipient does
+
+```bash
+sudo apt install ./Qora\ Qarg\'a_0.1.0_amd64.deb   # apt pulls the dependencies; dpkg -i does not
+```
+
+Or the AppImage, which needs no install — but on Ubuntu 22.04+ it needs FUSE 2,
+which is no longer preinstalled:
+
+```bash
+sudo apt install libfuse2          # libfuse2t64 on Ubuntu 24.04+
+chmod +x Qora*.AppImage && ./Qora*.AppImage
+```
+
+The package declares `libwebkit2gtk-4.1-0`, `libgtk-3-0` and
+`libayatana-appindicator3-1`; every Ubuntu from 22.04 has all three. There is no
+code signing on Linux, so nothing else is required — and nothing warns the user
+either, which is the usual trade.
+
 ## Known limits
 
 - Group calls show as one-to-one: the engine holds a single peer connection.
 - No TURN server, as above.
-- Video notes (round video) are a mobile feature and are rendered, not recorded.
 - `POST /files/presign` (direct-to-S3 upload) is wired in `filesApi` but unused;
   the backend upload needs no bucket CORS and is the recommended path.

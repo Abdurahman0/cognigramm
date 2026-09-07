@@ -15,6 +15,7 @@ import {
 } from '@/components/ui'
 import { AttachmentView } from '@/features/chat/AttachmentView'
 import { DeliveryTicks } from '@/features/chat/DeliveryTicks'
+import { VideoNoteBubble } from '@/features/chat/VideoNoteBubble'
 import { VoiceMessage } from '@/features/chat/VoiceMessage'
 import { formatTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -61,11 +62,14 @@ function MessageBubbleBase({
     )
   }
 
+  const isVideoNote = message.kind === 'video_note' && message.attachments.length > 0
+
   const mediaOnly =
     message.attachments.length > 0 &&
     !message.body &&
     !message.forwardedFromMessageId &&
     message.kind !== 'voice' &&
+    !isVideoNote &&
     !(showAuthor && !isMine && isGroupStart)
 
   const copy = () => {
@@ -104,6 +108,9 @@ function MessageBubbleBase({
           isMine
             ? 'bg-bubble-mine text-bubble-mine-foreground'
             : 'bg-bubble-other text-bubble-other-foreground',
+          // Last, so it wins: a round note is its own shape, and a bubble
+          // behind it shows as four corners poking out from under the circle.
+          isVideoNote && 'bg-transparent p-0',
           isGroupStart && (isMine ? 'rounded-tr-md' : 'rounded-tl-md'),
           message.delivery === 'failed' && 'ring-destructive ring-1',
           message.pending && 'opacity-80',
@@ -150,7 +157,11 @@ function MessageBubbleBase({
               // message, and a changing key would remount the player and stop
               // a voice message mid-playback.
               const key = attachment.objectKey || `${attachment.id}-${attachment.name}`
-              // A voice message is a player, not a file row.
+              // A voice message is a player and a video note is a circle;
+              // neither belongs in the generic attachment row.
+              if (message.kind === 'video_note') {
+                return <VideoNoteBubble key={key} attachment={attachment} />
+              }
               return message.kind === 'voice' || attachment.mimeType.startsWith('audio/') ? (
                 <VoiceMessage key={key} attachment={attachment} mine={isMine} />
               ) : (
@@ -175,7 +186,9 @@ function MessageBubbleBase({
             mediaOnly
               ? 'absolute right-2 bottom-2 rounded-full bg-black/45 px-1.5 py-0.5 text-white'
               : 'mt-0.5',
-            !mediaOnly && (isMine ? 'text-white/70' : 'text-muted-foreground'),
+            // A video note has no coloured bubble behind it, so the white
+            // meta text of an outgoing message would vanish on a light theme.
+            !mediaOnly && (isMine && !isVideoNote ? 'text-white/70' : 'text-muted-foreground'),
           )}
         >
           {message.isPinned ? <Pin className="size-3" aria-label="Pinned" /> : null}

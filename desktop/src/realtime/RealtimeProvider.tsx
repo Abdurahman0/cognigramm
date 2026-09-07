@@ -7,7 +7,7 @@ import { rememberAttachmentUrls } from '@/api/media-urls'
 import { applyDeliveryById, patchMessage, upsertMessage } from '@/api/message-cache'
 import { queryKeys } from '@/api/query-keys'
 import { ensureAccessToken, scheduleProactiveRefresh } from '@/api/session'
-import type { ApiConversation } from '@/api/types'
+import type { ApiConversation, ApiUser } from '@/api/types'
 import type { DeliveryStatePayload } from '@/realtime/events'
 import type { DeliveryState } from '@/types'
 import { toast } from '@/components/ui/toast'
@@ -282,6 +282,22 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     )
     unsubscribers.push(
       realtime.on('user_offline', (payload) => chat().setUserOnline(payload.user_id, false)),
+    )
+
+    // "last seen 5 minutes ago" in the chat header comes from the directory
+    // cache, which is otherwise only refreshed every few minutes. Patching it
+    // here keeps the line honest without another request.
+    unsubscribers.push(
+      realtime.on('last_seen_update', (payload) => {
+        if (!payload?.last_seen) return
+        queryClient.setQueryData<ApiUser[]>(queryKeys.users(''), (previous) =>
+          previous?.map((user) =>
+            user.id === payload.user_id
+              ? { ...user, last_seen_at: payload.last_seen ?? null }
+              : user,
+          ),
+        )
+      }),
     )
 
     // ---- errors ------------------------------------------------------------

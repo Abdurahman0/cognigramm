@@ -14,7 +14,8 @@ import {
   toast,
 } from '@/components/ui'
 import { queryKeys } from '@/api/query-keys'
-import { AttachmentView } from '@/features/chat/AttachmentView'
+import { SharedFilesDialog, SharedMediaThumb } from '@/features/chat/SharedFilesDialog'
+import { ProfileDialogHost } from '@/features/contacts/ProfileDialogHost'
 import { PresenceDot } from '@/features/conversations/PresenceDot'
 import { useAddMembers, useRemoveMember } from '@/hooks/use-conversations'
 import { useMessages } from '@/hooks/use-messages'
@@ -36,17 +37,26 @@ export function ConversationDetails({
   const currentUserId = useAuthStore((state) => state.user?.id ?? -1)
   const { data: messages } = useMessages(conversation.id)
   const [adding, setAdding] = useState(false)
+  const [profile, setProfile] = useState<User | null>(null)
+  const [filesOpen, setFilesOpen] = useState(false)
 
   const addMembers = useAddMembers(conversation.id)
   const removeMember = useRemoveMember(conversation.id)
   const { users: candidates } = useUserSearch('', adding)
 
+  // Photos and video only: a thumbnail grid cannot show a voice message or a
+  // PDF, and rendering one as an image just produces a broken-image tile.
+  // Everything else is in the "See all" view, grouped by kind.
   const sharedMedia = useMemo(
     () =>
       (messages ?? [])
-        .filter((message) => !message.isDeleted && message.attachments.length > 0)
+        .filter((message) => !message.isDeleted)
         .flatMap((message) => message.attachments)
-        .slice(-12)
+        .filter(
+          (attachment) =>
+            attachment.mimeType.startsWith('image/') || attachment.mimeType.startsWith('video/'),
+        )
+        .slice(-6)
         .reverse(),
     [messages],
   )
@@ -93,9 +103,12 @@ export function ConversationDetails({
             {conversation.members.map((member) => {
               const user = usersById.get(member.userId)
               return (
-                <div
+                <button
                   key={member.userId}
-                  className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5"
+                  type="button"
+                  disabled={!user}
+                  onClick={() => user && setProfile(user)}
+                  className="hover:bg-accent/60 flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors disabled:hover:bg-transparent"
                 >
                   <div className="relative">
                     <Avatar className="size-8">
@@ -114,7 +127,7 @@ export function ConversationDetails({
                     <p className="text-muted-foreground truncate text-[11px]">@{member.username}</p>
                   </div>
                   {member.role === 'admin' ? <Badge variant="muted">admin</Badge> : null}
-                </div>
+                </button>
               )
             })}
           </div>
@@ -157,14 +170,24 @@ export function ConversationDetails({
 
         {sharedMedia.length > 0 ? (
           <section>
-            <h3 className="text-faint-foreground mb-2 text-[11px] font-semibold tracking-wide uppercase">
-              Shared files
-            </h3>
-            <div className="space-y-1.5">
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="text-faint-foreground text-[11px] font-semibold tracking-wide uppercase">
+                Shared files
+              </h3>
+              {/* The panel shows the most recent handful; everything else,
+                  grouped by kind, is one click away. */}
+              <Button size="sm" variant="ghost" onClick={() => setFilesOpen(true)}>
+                See all
+              </Button>
+            </div>
+            {/* Thumbnails, not players: a panel this narrow cannot show a
+                video control bar without looking broken. */}
+            <div className="grid grid-cols-3 gap-1.5">
               {sharedMedia.map((attachment) => (
-                <AttachmentView
-                  key={`${attachment.id}-${attachment.name}`}
+                <SharedMediaThumb
+                  key={attachment.objectKey || `${attachment.id}-${attachment.name}`}
                   attachment={attachment}
+                  onOpen={() => setFilesOpen(true)}
                 />
               ))}
             </div>
@@ -189,6 +212,13 @@ export function ConversationDetails({
           </Button>
         ) : null}
       </div>
+
+      <ProfileDialogHost user={profile} onClose={() => setProfile(null)} />
+      <SharedFilesDialog
+        conversationId={conversation.id}
+        open={filesOpen}
+        onClose={() => setFilesOpen(false)}
+      />
     </aside>
   )
 }

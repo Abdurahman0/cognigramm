@@ -136,8 +136,10 @@ export function AuthScreen() {
     },
   })
 
+  // The wallpaper comes from the window frame, so the gradient runs unbroken
+  // behind the title bar instead of restarting below it.
   return (
-    <div className="app-wallpaper flex h-full items-center justify-center p-8">
+    <div className="flex h-full items-center justify-center p-8">
       <div className="glass-panel w-full max-w-sm rounded-2xl p-6">
         <div className="mb-6 space-y-1 text-center">
           <h1 className="text-xl font-semibold tracking-tight">{APP_NAME}</h1>

@@ -2,10 +2,12 @@ import { Info, Phone, Search, Video } from 'lucide-react'
 
 import { Avatar, AvatarFallback, AvatarImage, Button, Tooltip, initialsOf } from '@/components/ui'
 import { callEngine } from '@/features/calls/call-engine'
+import { ProfileDialogHost } from '@/features/contacts/ProfileDialogHost'
 import { PresenceDot } from '@/features/conversations/PresenceDot'
 import { formatLastSeen } from '@/lib/format'
 import { useChatStore } from '@/stores/chat'
 import { useUiStore } from '@/stores/ui'
+import { useState } from 'react'
 import type { Conversation, User } from '@/types'
 
 interface ChatHeaderProps {
@@ -22,6 +24,7 @@ export function ChatHeader({ conversation, peer, onToggleSearch, searchOpen }: C
   const typingIds = useChatStore((state) => state.typingByConversation[conversation.id])
   const detailsOpen = useUiStore((state) => state.detailsOpen)
   const setDetailsOpen = useUiStore((state) => state.setDetailsOpen)
+  const [profileOpen, setProfileOpen] = useState(false)
 
   const title =
     conversation.kind === 'direct' ? (peer?.fullName ?? conversation.title) : conversation.title
@@ -41,18 +44,28 @@ export function ChatHeader({ conversation, peer, onToggleSearch, searchOpen }: C
 
   return (
     <header className="border-border/60 flex h-14 shrink-0 items-center gap-3 border-b px-3">
-      <div className="relative">
-        <Avatar className="size-9">
-          {peer?.avatarUrl ? <AvatarImage src={peer.avatarUrl} alt="" /> : null}
-          <AvatarFallback>{initialsOf(title)}</AvatarFallback>
-        </Avatar>
-        <PresenceDot userId={conversation.peerId} className="size-2.5" />
-      </div>
+      {/* In a direct chat the header is the fastest route to the other
+          person's card; a group has no single profile to open. */}
+      <button
+        type="button"
+        disabled={!peer}
+        onClick={() => peer && setProfileOpen(true)}
+        className="enabled:hover:bg-accent/50 flex min-w-0 flex-1 items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors"
+        aria-label={peer ? `Open profile of ${peer.fullName}` : title}
+      >
+        <span className="relative">
+          <Avatar className="size-9">
+            {peer?.avatarUrl ? <AvatarImage src={peer.avatarUrl} alt="" /> : null}
+            <AvatarFallback>{initialsOf(title)}</AvatarFallback>
+          </Avatar>
+          <PresenceDot userId={conversation.peerId} className="size-2.5" />
+        </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px] font-semibold">{title}</p>
-        <p className="text-muted-foreground truncate text-[12px]">{subtitle}</p>
-      </div>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold">{title}</span>
+          <span className="text-muted-foreground block truncate text-[12px]">{subtitle}</span>
+        </span>
+      </button>
 
       <Tooltip content="Audio call">
         <Button
@@ -96,6 +109,11 @@ export function ChatHeader({ conversation, peer, onToggleSearch, searchOpen }: C
           <Info className="size-4" />
         </Button>
       </Tooltip>
+
+      <ProfileDialogHost
+        user={profileOpen ? (peer ?? null) : null}
+        onClose={() => setProfileOpen(false)}
+      />
     </header>
   )
 }

@@ -66,13 +66,23 @@ function WindowButton({
   )
 }
 
+interface TitleBarProps {
+  /**
+   * The socket status pill. Hidden before sign-in, where there is no socket
+   * and the pill would only ever say "Offline".
+   */
+  showStatus?: boolean
+}
+
 /**
  * The window's own title bar.
  *
  * The whole strip is a drag region except for the controls, which is what
- * makes a frameless window still feel like a native one.
+ * makes a frameless window still feel like a native one. It is rendered on
+ * every screen including sign-in: without it a frameless window has nothing
+ * to drag and no way to close.
  */
-export function TitleBar() {
+export function TitleBar({ showStatus = true }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
@@ -90,7 +100,7 @@ export function TitleBar() {
       </div>
 
       <div className="flex items-center gap-2">
-        <ConnectionPill />
+        {showStatus ? <ConnectionPill /> : null}
         {isDesktopRuntime ? (
           <div className="flex items-center gap-0.5">
             <WindowButton onClick={() => void minimizeWindow()} label="Minimize">

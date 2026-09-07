@@ -1,8 +1,10 @@
-import { Mic, Paperclip, SendHorizontal, Trash2, X } from 'lucide-react'
+import { Mic, Paperclip, SendHorizontal, Trash2, Video, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { Button, Spinner, Textarea, Tooltip, toast } from '@/components/ui'
 import { MIN_DURATION_MS, useVoiceRecorder } from '@/features/chat/use-voice-recorder'
+import { VideoNoteViewfinder } from '@/features/chat/VideoNoteViewfinder'
+import { MIN_VIDEO_MS, useVideoNoteRecorder } from '@/features/chat/use-video-note-recorder'
 import { useEditMessage, useSendFile, useSendMessage } from '@/hooks/use-messages'
 import { useTypingSignal } from '@/hooks/use-typing'
 import { formatDuration } from '@/lib/format'
@@ -49,6 +51,7 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
   const editMessage = useEditMessage()
   const { keystroke, stop } = useTypingSignal(conversationId)
   const recorder = useVoiceRecorder()
+  const videoRecorder = useVideoNoteRecorder()
 
   // Switching conversations swaps in that chat's draft.
   useEffect(() => {
@@ -78,6 +81,10 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
   useEffect(() => {
     if (recorder.error) toast.error('Cannot record', recorder.error)
   }, [recorder.error])
+
+  useEffect(() => {
+    if (videoRecorder.error) toast.error('Cannot record video', videoRecorder.error)
+  }, [videoRecorder.error])
 
   const activeReply = replyTo?.conversationId === conversationId ? replyTo : null
 
@@ -130,6 +137,66 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
         codec: recording.mimeType,
       },
     })
+  }
+
+  const finishVideoNote = async () => {
+    const recording = await videoRecorder.finish()
+    if (!recording) {
+      toast.info('Too short', 'Hold the recording for at least a second.')
+      return
+    }
+    sendFile.mutate({
+      file: recording.file,
+      kind: 'video_note',
+      metadata: {
+        duration_ms: recording.durationMs,
+        width: recording.width,
+        height: recording.height,
+        codec: recording.mimeType,
+      },
+    })
+  }
+
+  if (videoRecorder.isRecording || videoRecorder.state === 'processing') {
+    const tooShort = videoRecorder.durationMs < MIN_VIDEO_MS
+    return (
+      <div className="relative shrink-0 px-3 pb-3">
+        <VideoNoteViewfinder stream={videoRecorder.stream} />
+        <div className="glass-floating flex items-center gap-3 rounded-2xl p-2.5">
+          <span className="bg-destructive size-2.5 shrink-0 animate-pulse rounded-full" />
+          <span className="shrink-0 text-[13px] font-medium tabular-nums">
+            {formatDuration(videoRecorder.durationMs)}
+          </span>
+          <span className="text-muted-foreground flex-1 truncate text-[13px]">
+            Recording a video message…
+          </span>
+          <Tooltip content="Discard">
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label="Discard video message"
+              onClick={videoRecorder.cancel}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Send video message">
+            <Button
+              size="icon"
+              aria-label="Send video message"
+              disabled={tooShort || videoRecorder.state === 'processing'}
+              onClick={() => void finishVideoNote()}
+            >
+              {videoRecorder.state === 'processing' ? (
+                <Spinner />
+              ) : (
+                <SendHorizontal className="size-4" />
+              )}
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
+    )
   }
 
   if (recorder.isRecording || recorder.state === 'processing') {
@@ -261,18 +328,32 @@ export function Composer({ conversationId, editing, onCancelEdit }: ComposerProp
             </Button>
           </Tooltip>
         ) : (
-          <Tooltip content="Record voice message">
-            <Button
-              size="icon"
-              variant="ghost"
-              aria-label="Record voice message"
-              disabled={recorder.state === 'requesting'}
-              onClick={() => void recorder.start()}
-              className={cn(recorder.state === 'requesting' && 'opacity-60')}
-            >
-              {recorder.state === 'requesting' ? <Spinner /> : <Mic className="size-4" />}
-            </Button>
-          </Tooltip>
+          <>
+            <Tooltip content="Record video message">
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Record video message"
+                disabled={videoRecorder.state === 'requesting'}
+                onClick={() => void videoRecorder.start()}
+                className={cn(videoRecorder.state === 'requesting' && 'opacity-60')}
+              >
+                {videoRecorder.state === 'requesting' ? <Spinner /> : <Video className="size-4" />}
+              </Button>
+            </Tooltip>
+            <Tooltip content="Record voice message">
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Record voice message"
+                disabled={recorder.state === 'requesting'}
+                onClick={() => void recorder.start()}
+                className={cn(recorder.state === 'requesting' && 'opacity-60')}
+              >
+                {recorder.state === 'requesting' ? <Spinner /> : <Mic className="size-4" />}
+              </Button>
+            </Tooltip>
+          </>
         )}
       </div>
     </div>
